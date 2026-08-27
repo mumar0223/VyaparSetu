@@ -52,9 +52,10 @@ export function FloatingInput({
   return (
     <div
       className={cn(
-        "w-full transition-all duration-300 ease-out z-20 max-w-3xl mx-auto px-4 md:px-6"
+        "w-full transition-all duration-300 ease-out z-20"
       )}
     >
+
 
       {/* Elevated Pill Container */}
       <div className="relative rounded-2xl md:rounded-3xl border border-zinc-800 bg-[#1e1e1e]/90 p-2 shadow-2xl backdrop-blur-xl transition-all focus-within:border-zinc-700 focus-within:ring-1 focus-within:ring-zinc-700/50">

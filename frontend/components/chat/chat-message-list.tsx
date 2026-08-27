@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, Check, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThinkingAccordion } from "./thinking-accordion";
@@ -16,14 +16,7 @@ export function ChatMessageList({
   messages,
   isLoading = false,
 }: ChatMessageListProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
-
-  // Auto-scroll to bottom on new message / streaming update
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
 
   // Clean up speech synthesis when unmounting
   useEffect(() => {
@@ -61,59 +54,55 @@ export function ChatMessageList({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full overflow-y-auto"
-    >
-      <div className="max-w-3xl w-full mx-auto px-4 md:px-6 py-6 space-y-6 pb-44">
-        {messages.map((msg, index) => {
-          const isUser = msg.role === "user";
-          return (
-            <div
-              key={msg.id || index}
-              className={cn(
-                "flex flex-col w-full animate-in fade-in-50 duration-200",
-                isUser ? "items-end" : "items-start"
-              )}
-            >
-              {isUser ? (
-                /* User Message Bubble */
-                <div className="max-w-[85%] md:max-w-xl rounded-3xl bg-[#2b2b2b] px-4 py-3 text-[15px] leading-relaxed text-zinc-100 shadow-xs">
-                  <MarkdownMessage content={msg.content} variant="user" />
-                </div>
-              ) : (
-                /* Assistant Message */
-                <div className="w-full text-zinc-200 text-[15px] leading-relaxed">
-                  {/* Thinking Loader / Dynamic Tool Accordion */}
-                  <ThinkingAccordion
-                    isStreaming={msg.isStreaming && !msg.content}
-                    toolCalls={msg.toolCalls}
-                    completedDurationSeconds={msg.thoughtDurationSeconds || 2}
+    <div className="flex flex-col space-y-6 w-full">
+      {messages.map((msg, index) => {
+        const isUser = msg.role === "user";
+        return (
+          <div
+            key={msg.id || index}
+            className={cn(
+              "flex flex-col w-full animate-in fade-in-50 duration-200",
+              isUser ? "items-end" : "items-start"
+            )}
+          >
+            {isUser ? (
+              /* User Message Bubble */
+              <div className="max-w-[85%] md:max-w-xl rounded-3xl bg-[#2b2b2b] px-4 py-3 text-[15px] leading-relaxed text-zinc-100 shadow-xs">
+                <MarkdownMessage content={msg.content} variant="user" />
+              </div>
+            ) : (
+              /* Assistant Message */
+              <div className="w-full text-zinc-200 text-[15px] leading-relaxed">
+                {/* Thinking Loader / Dynamic Tool Accordion */}
+                <ThinkingAccordion
+                  isStreaming={msg.isStreaming && !msg.content}
+                  toolCalls={msg.toolCalls}
+                  completedDurationSeconds={msg.thoughtDurationSeconds || 2}
+                />
+
+                {/* Rich Markdown Message Content (LaTeX, GFM Tables, Code) */}
+                {msg.content && (
+                  <MarkdownMessage
+                    content={msg.content}
+                    variant="assistant"
                   />
+                )}
 
-                  {/* Rich Markdown Message Content (LaTeX, GFM Tables, Code) */}
-                  {msg.content && (
-                    <MarkdownMessage content={msg.content} variant="assistant" />
-                  )}
-
-                  {/* Assistant Action Bar: Copy & Speak Aloud only */}
-                  {!msg.isStreaming && msg.content && (
-                    <div className="mt-3 flex items-center gap-1.5 text-zinc-400 select-none">
-                      <CopyButton text={msg.content} />
-                      <SpeakButton
-                        isSpeaking={speakingMessageId === msg.id}
-                        onToggle={() => handleToggleSpeak(msg.id, msg.content)}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        <div ref={bottomRef} className="h-4" />
-      </div>
+                {/* Assistant Action Bar: Copy & Speak Aloud only */}
+                {!msg.isStreaming && msg.content && (
+                  <div className="mt-3 flex items-center gap-1.5 text-zinc-400 select-none">
+                    <CopyButton text={msg.content} />
+                    <SpeakButton
+                      isSpeaking={speakingMessageId === msg.id}
+                      onToggle={() => handleToggleSpeak(msg.id, msg.content)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

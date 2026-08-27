@@ -11,6 +11,7 @@ import {
   Landmark,
   FileSpreadsheet,
   Coins,
+  ArrowDown,
 } from "lucide-react";
 import { FloatingInput } from "./floating-input";
 import { HistorySidebar } from "./history-sidebar";
@@ -40,8 +41,30 @@ export function ChatWorkspace({
   const [isInitialLoading, setIsInitialLoading] = useState(
     Boolean(initialChatId),
   );
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const chatCache = useRef<Map<string, ChatMessage[]>>(new Map());
+
+  // Auto-scroll to bottom on message update / stream if user hasn't scrolled up
+  useEffect(() => {
+    if (!showScrollBottom) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isLoading, showScrollBottom]);
+
+  const handleScroll = () => {
+    if (!scrollViewportRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollViewportRef.current;
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 100);
+  };
+
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollBottom(false);
+  };
+
 
   // 1. Fetch Conversations History
   const fetchConversations = useCallback(async () => {
@@ -426,7 +449,7 @@ export function ChatWorkspace({
     }
   };
 
-  const hasMessages = messages.length > 0;
+  const isNewChatView = !activeChatId && messages.length === 0;
   const activeConversation = conversations.find((c) => c.id === activeChatId);
 
   return (
@@ -454,9 +477,9 @@ export function ChatWorkspace({
 
       {/* ── Main Chat Area (Edge-to-Edge Full Width) ── */}
       <div className="relative flex flex-1 flex-col h-full overflow-hidden min-w-0">
-        {/* ── View State: Empty / New Chat (Centered) vs Active Chat ── */}
-        {!hasMessages ? (
-          /* NEW CHAT (Centered Hero View) */
+        {/* ── View State: New Chat View vs Active Chat Thread View ── */}
+        {isNewChatView ? (
+          /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
           <div className="w-full h-full overflow-y-auto flex flex-col justify-center items-center px-4 py-8 -mt-6">
             <div className="w-full max-w-3xl text-center mb-8 animate-in fade-in-50 duration-300">
               <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-zinc-100 mb-2">
@@ -469,7 +492,7 @@ export function ChatWorkspace({
             </div>
 
             {/* Vertically Centered Input Bar */}
-            <div className="w-full max-w-3xl">
+            <div className="w-full max-w-3xl px-4 md:px-6">
               <FloatingInput
                 onSend={handleSendMessage}
                 isLoading={isLoading}
@@ -530,14 +553,33 @@ export function ChatWorkspace({
             </div>
           </div>
         ) : (
-          /* ACTIVE CHAT THREAD (Full Width Viewport, Edge-to-Edge Scrollbar, Centered Content) */
-          <div className="relative flex-1 flex flex-col h-full overflow-hidden w-full">
-            {/* Scrollable Message List (Full width scrollbar with pb-44 bottom padding) */}
-            <ChatMessageList messages={messages} isLoading={isLoading} />
+          /* ACTIVE CHAT THREAD (Single Unified Scroll Viewport with Sticky Bottom Input) */
+          <div
+            ref={scrollViewportRef}
+            onScroll={handleScroll}
+            className="relative flex-1 flex flex-col h-full overflow-y-auto w-full"
+          >
+            {/* Scrollable Message List */}
+            <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-6 py-6">
+              <ChatMessageList messages={messages} isLoading={isLoading} />
+              <div ref={bottomRef} className="h-6" />
+            </div>
 
-            {/* Floating Sticky Input Bar at Bottom with Frosted Gradient Backdrop */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#131314] via-[#131314]/90 to-transparent pointer-events-none z-20">
-              <div className="pointer-events-auto">
+            {/* Sticky Bottom Input Bar (Sticks to bottom of scroll viewport with frosted backdrop) */}
+            <div className="sticky bottom-0 w-full max-w-3xl mx-auto px-4 md:px-6 pb-4 pt-2 bg-gradient-to-t from-[#131314] via-[#131314]/95 to-transparent pointer-events-none z-20">
+              <div className="relative pointer-events-auto">
+                {/* Dynamic Scroll to Bottom Button anchored directly above the input */}
+                {showScrollBottom && (
+                  <button
+                    type="button"
+                    onClick={scrollToBottom}
+                    title="Scroll to bottom"
+                    className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 size-8 rounded-full bg-[#212121]/95 hover:bg-[#2e2e2e] border border-zinc-700/60 shadow-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer backdrop-blur animate-in fade-in-0 zoom-in-90 duration-150 group"
+                  >
+                    <ArrowDown className="size-4 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-y-0.5 duration-150" />
+                  </button>
+                )}
+
                 <FloatingInput
                   onSend={handleSendMessage}
                   isLoading={isLoading}
@@ -547,6 +589,7 @@ export function ChatWorkspace({
             </div>
           </div>
         )}
+
       </div>
 
       {/* ── Right-Side History Sidebar (Width = 240px / w-60) ── */}
