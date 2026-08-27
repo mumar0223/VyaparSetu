@@ -31,13 +31,15 @@ export function ChatWorkspace({
   const router = useRouter();
 
   const [activeChatId, setActiveChatId] = useState<string | null>(
-    initialChatId || null
+    initialChatId || null,
   );
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isInitialLoading, setIsInitialLoading] = useState(Boolean(initialChatId));
+  const [isInitialLoading, setIsInitialLoading] = useState(
+    Boolean(initialChatId),
+  );
 
   const chatCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
@@ -171,7 +173,6 @@ export function ChatWorkspace({
     }
   };
 
-
   // 6. Rename Chat
   const handleRenameChat = async (id: string, newTitle: string) => {
     try {
@@ -182,7 +183,7 @@ export function ChatWorkspace({
       });
       if (res.ok) {
         setConversations((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
+          prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c)),
         );
       }
     } catch (err) {
@@ -200,7 +201,7 @@ export function ChatWorkspace({
       });
       if (res.ok) {
         setConversations((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, pinned } : c))
+          prev.map((c) => (c.id === id ? { ...c, pinned } : c)),
         );
       }
     } catch (err) {
@@ -285,7 +286,11 @@ export function ChatWorkspace({
             if (isNew || !activeChatId) {
               setActiveChatId(conversationId);
               // Silent URL change without page reload/loading flash!
-              window.history.replaceState(null, "", `/dashboard/c/${conversationId}`);
+              window.history.replaceState(
+                null,
+                "",
+                `/dashboard/c/${conversationId}`,
+              );
               // Add to conversations history list
               setConversations((prev) => [
                 {
@@ -304,29 +309,27 @@ export function ChatWorkspace({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: text }),
               })
-
                 .then((res) => res.json())
                 .then((titleData) => {
                   if (titleData?.title) {
                     setConversations((prev) =>
                       prev.map((c) =>
-                        c.id === conversationId ? { ...c, title: titleData.title } : c
-                      )
+                        c.id === conversationId
+                          ? { ...c, title: titleData.title }
+                          : c,
+                      ),
                     );
                   }
                 })
                 .catch((err) =>
-                  console.warn("Background title generation error:", err)
+                  console.warn("Background title generation error:", err),
                 );
             }
           } else if (eventType === "thinking") {
-
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantMessageId
-                  ? { ...m, thinking: data.step }
-                  : m
-              )
+                m.id === assistantMessageId ? { ...m, thinking: data.step } : m,
+              ),
             );
           } else if (eventType === "tool_call") {
             setMessages((prev) =>
@@ -346,7 +349,7 @@ export function ChatWorkspace({
                     },
                   ],
                 };
-              })
+              }),
             );
           } else if (eventType === "tool_result") {
             setMessages((prev) =>
@@ -361,24 +364,26 @@ export function ChatWorkspace({
                         summary: data.summary || t.summary,
                         status: data.status || "completed",
                       }
-                    : t
+                    : t,
                 );
                 return { ...m, toolCalls: tools };
-              })
+              }),
             );
-
           } else if (eventType === "chunk") {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantMessageId
                   ? { ...m, content: m.content + data.text }
-                  : m
-              )
+                  : m,
+              ),
             );
           } else if (eventType === "done") {
             const elapsed = Math.max(
               1,
-              Math.round((Date.now() - (newUserMessage.createdAt as any).getTime()) / 1000)
+              Math.round(
+                (Date.now() - (newUserMessage.createdAt as any).getTime()) /
+                  1000,
+              ),
             );
             setMessages((prev) =>
               prev.map((m) =>
@@ -388,11 +393,10 @@ export function ChatWorkspace({
                       isStreaming: false,
                       thoughtDurationSeconds: elapsed,
                     }
-                  : m
-              )
+                  : m,
+              ),
             );
           }
-
         }
       }
     } catch (err) {
@@ -407,8 +411,8 @@ export function ChatWorkspace({
                   "I encountered a temporary connection issue. Please try again.",
                 isStreaming: false,
               }
-            : m
-        )
+            : m,
+        ),
       );
     } finally {
       setIsLoading(false);
@@ -422,36 +426,31 @@ export function ChatWorkspace({
     }
   };
 
-
   const hasMessages = messages.length > 0;
   const activeConversation = conversations.find((c) => c.id === activeChatId);
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-[#131314] text-foreground">
-      {/* ── Floating Controls (Top Right Corner - No Topbar) ── */}
-      <div className="absolute top-3.5 right-4 z-30 flex items-center gap-2 pointer-events-auto">
-        {!isSidebarOpen && (
+      {/* ── Floating Controls (Visible ONLY when Sidebar is Closed) ── */}
+      {!isSidebarOpen && (
+        <div className="absolute top-3.5 right-8 z-30 flex items-center gap-2 pointer-events-auto">
           <button
             onClick={handleNewChat}
             title="New chat"
-            className="size-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/60 backdrop-blur border border-zinc-800"
+            className="size-9 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/80 backdrop-blur border border-zinc-800"
           >
             <Plus className="size-4" />
           </button>
-        )}
 
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          title={isSidebarOpen ? "Hide chat history" : "Show chat history"}
-          className="size-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/60 backdrop-blur border border-zinc-800"
-        >
-          {isSidebarOpen ? (
-            <PanelRightClose className="size-4" />
-          ) : (
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            title="Show chat history"
+            className="size-9 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/80 backdrop-blur border border-zinc-800"
+          >
             <PanelRightOpen className="size-4" />
-          )}
-        </button>
-      </div>
+          </button>
+        </div>
+      )}
 
       {/* ── Main Chat Area (Edge-to-Edge Full Width) ── */}
       <div className="relative flex flex-1 flex-col h-full overflow-hidden min-w-0">
@@ -464,7 +463,8 @@ export function ChatWorkspace({
                 What&apos;s on the agenda today?
               </h1>
               <p className="text-sm text-zinc-400">
-                Hyper-local mandi intelligence, financial structuring, and government credit scheme advisor
+                Hyper-local mandi intelligence, financial structuring, and
+                government credit scheme advisor
               </p>
             </div>
 
@@ -484,25 +484,29 @@ export function ChatWorkspace({
                   label: "Live APMC Mandi Rates",
                   desc: "Current onion, wheat & commodity price arrivals",
                   icon: TrendingUp,
-                  prompt: "Show me the latest regional mandi rates and APMC trends for Onion and Wheat.",
+                  prompt:
+                    "Show me the latest regional mandi rates and APMC trends for Onion and Wheat.",
                 },
                 {
                   label: "PM Mudra & SVANidhi Loan",
                   desc: "Check zero-collateral credit eligibility",
                   icon: Landmark,
-                  prompt: "Evaluate my eligibility for PM Mudra Kishore and PM SVANidhi loans.",
+                  prompt:
+                    "Evaluate my eligibility for PM Mudra Kishore and PM SVANidhi loans.",
                 },
                 {
                   label: "Working Capital Optimization",
                   desc: "Analyze 14-day cash flow & stock buffer",
                   icon: Coins,
-                  prompt: "Give me advice on optimizing my micro-enterprise working capital and inventory buffer.",
+                  prompt:
+                    "Give me advice on optimizing my micro-enterprise working capital and inventory buffer.",
                 },
                 {
                   label: "GST & Trade Compliance",
                   desc: "Udyam Aadhar & balance sheet checklist",
                   icon: FileSpreadsheet,
-                  prompt: "What is the compliance checklist for Udyam Aadhar and micro-enterprise ledger audit?",
+                  prompt:
+                    "What is the compliance checklist for Udyam Aadhar and micro-enterprise ledger audit?",
                 },
               ].map((chip, i) => (
                 <button
@@ -544,7 +548,6 @@ export function ChatWorkspace({
           </div>
         )}
       </div>
-
 
       {/* ── Right-Side History Sidebar (Width = 240px / w-60) ── */}
       <HistorySidebar
