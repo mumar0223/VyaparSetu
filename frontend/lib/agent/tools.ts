@@ -2,6 +2,17 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { ToolContext } from "./types";
 
+const MandiRatesSchema = z.object({
+  commodity: z.string().describe("Name of commodity e.g. Onion, Wheat, Cotton, Mustard, Tomato"),
+  state: z.string().optional().describe("State or district e.g. Maharashtra, Madhya Pradesh, Gujarat"),
+});
+
+const SchemeEligibilitySchema = z.object({
+  schemeName: z.enum(["PM_MUDRA", "PM_SVANIDHI", "STAND_UP_INDIA"]).describe("Government scheme to evaluate"),
+  annualTurnover: z.number().describe("Annual turnover / sales in INR"),
+  yearsOperating: z.number().optional().default(2).describe("Years in business operation"),
+});
+
 /**
  * Agent Tools Registry
  * Defines domain tools for VyaparSetu's autonomous business advisor.
@@ -10,11 +21,8 @@ export function getAgentTools(ctx?: ToolContext) {
   return {
     getMandiRates: tool({
       description: "Fetches real-time mandi prices, APMC market arrivals, and price trends for agricultural and trade commodities.",
-      parameters: z.object({
-        commodity: z.string().describe("Name of commodity e.g. Onion, Wheat, Cotton, Mustard, Tomato"),
-        state: z.string().optional().describe("State or district e.g. Maharashtra, Madhya Pradesh, Gujarat"),
-      }),
-      execute: async ({ commodity, state }) => {
+      inputSchema: MandiRatesSchema,
+      execute: async ({ commodity, state }: { commodity: string; state?: string }) => {
         console.log(`[TOOL:getMandiRates] Fetching rates for "${commodity}" in ${state || "all regions"}...`);
         
         // Mock dynamic realistic data
@@ -46,13 +54,21 @@ export function getAgentTools(ctx?: ToolContext) {
 
     evaluateSchemeEligibility: tool({
       description: "Evaluates micro-enterprise eligibility for Indian government credit and subsidy schemes (PM Mudra, PM SVANidhi, Stand-Up India).",
-      parameters: z.object({
-        schemeName: z.enum(["PM_MUDRA", "PM_SVANIDHI", "STAND_UP_INDIA"]).describe("Government scheme to evaluate"),
-        annualTurnover: z.number().describe("Annual turnover / sales in INR"),
-        yearsOperating: z.number().optional().default(2).describe("Years in business operation"),
-      }),
-      execute: async ({ schemeName, annualTurnover, yearsOperating = 2 }) => {
+      inputSchema: SchemeEligibilitySchema,
+      execute: async ({
+        schemeName,
+        annualTurnover,
+        yearsOperating = 2,
+      }: {
+        schemeName: "PM_MUDRA" | "PM_SVANIDHI" | "STAND_UP_INDIA";
+        annualTurnover: number;
+        yearsOperating?: number;
+      }) => {
+
+
         console.log(`[TOOL:evaluateSchemeEligibility] Evaluating ${schemeName} for turnover ₹${annualTurnover}...`);
+
+
 
         if (schemeName === "PM_MUDRA") {
           const category = annualTurnover < 500000 ? "Shishu (up to ₹50,000)" : annualTurnover < 2500000 ? "Kishore (₹50k - ₹5 Lakhs)" : "Tarun (₹5 Lakhs - ₹10 Lakhs)";
@@ -95,5 +111,43 @@ export function getAgentTools(ctx?: ToolContext) {
   };
 }
 
+export interface ToolMeta {
+  name: string;
+  icon: "sprout" | "landmark" | "globe" | "terminal" | "github" | "search";
+  formatSummary: (args: any, result?: any) => string;
+}
+
+export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
+  getMandiRates: {
+    name: "getMandiRates",
+    icon: "sprout",
+    formatSummary: (args) =>
+      `Queried live APMC mandi rates for ${args?.commodity || "commodities"}`,
+  },
+  evaluateSchemeEligibility: {
+    name: "evaluateSchemeEligibility",
+    icon: "landmark",
+    formatSummary: (args) =>
+      `Evaluated ${(args?.schemeName || "Credit Scheme").replace(/_/g, " ")} qualification rules`,
+  },
+  webSearch: {
+    name: "webSearch",
+    icon: "globe",
+    formatSummary: (args) => `Searched ${args?.count || 7} websites`,
+  },
+  cloneRepo: {
+    name: "cloneRepo",
+    icon: "terminal",
+    formatSummary: (args) =>
+      `Cloned ${args?.repo || "SIH 2026 problem statements repository"}`,
+  },
+  githubSearch: {
+    name: "githubSearch",
+    icon: "github",
+    formatSummary: (args) => `Searching ${args?.count || 3} websites`,
+  },
+};
+
 export type AgentTools = ReturnType<typeof getAgentTools>;
 export const agentTools = getAgentTools();
+

@@ -16,7 +16,8 @@ export default async function ProfilePage() {
     .toUpperCase();
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+    <div className="h-full overflow-y-auto p-4 md:p-6 lg:p-8">
+      <div className="flex flex-col gap-6 max-w-4xl mx-auto">
       <div className="p-6 rounded-2xl border border-border bg-card">
         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <User className="size-6 text-primary" /> Enterprise & Entrepreneur Profile
@@ -70,6 +71,8 @@ export default async function ProfilePage() {
           </div>
         </div>
       </div>
+      </div>
     </div>
   );
 }
+

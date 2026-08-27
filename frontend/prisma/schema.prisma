@@ -17,10 +17,11 @@ model User {
   isActive           Boolean    @default(true)
   lastLoginAt        DateTime?
   avatar             String?
-  auditLogs          AuditLog[] @relation("UserAuditLogs")
-  sessions           Session[]  @relation("UserSessions")
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  auditLogs          AuditLog[]     @relation("UserAuditLogs")
+  sessions           Session[]      @relation("UserSessions")
+  conversations      Conversation[] @relation("UserConversations")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@index([email])
   @@index([role])
@@ -55,3 +56,32 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
 }
+
+model Conversation {
+  id        String                @id @default(cuid())
+  title     String                @default("New Conversation")
+  pinned    Boolean               @default(false)
+  userId    String
+  user      User                  @relation("UserConversations", fields: [userId], references: [id], onDelete: Cascade)
+  messages  ConversationMessage[]
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([pinned])
+  @@index([updatedAt])
+}
+
+model ConversationMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // "user" | "assistant" | "system"
+  content        String       @db.Text
+  thinking       String?      @db.Text
+  toolCalls      Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+

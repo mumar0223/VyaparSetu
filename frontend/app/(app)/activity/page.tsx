@@ -2,7 +2,8 @@ import { Activity } from "lucide-react";
 
 export default function ActivityPage() {
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+    <div className="h-full overflow-y-auto p-4 md:p-6 lg:p-8">
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto">
       <div className="p-6 rounded-2xl border border-border bg-card">
         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <Activity className="size-6 text-primary" /> Advisory & Transaction Log
@@ -21,6 +22,8 @@ export default function ActivityPage() {
           WhatsApp voice queries, daily sales ledger updates, and scheme qualification results will be recorded here in real-time.
         </p>
       </div>
+      </div>
     </div>
   );
 }
+
