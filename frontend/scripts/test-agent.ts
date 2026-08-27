@@ -18,8 +18,8 @@ Can you check what is today's mandi price for Onion, and evaluate which PM Mudra
 
   const result = await executeAgent({
     sessionId: "test-session-001",
-    provider: "openai",
-    model: process.env.OPENAI_MODEL || "moonshotai.kimi-k2.5",
+    provider: "vertex",
+    model: process.env.GOOGLE_VERTEX_MODEL || "gemini-3.7-flash",
     messages: [
       {
         role: "user",

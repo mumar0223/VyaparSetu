@@ -1,5 +1,6 @@
 import { generateText, streamText, LanguageModel } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createVertex } from "@ai-sdk/google-vertex";
 
 // Dynamic language model instantiation using Vercel AI SDK
 export function getLanguageModel(
@@ -7,6 +8,38 @@ export function getLanguageModel(
   model?: string,
 ): LanguageModel {
   switch (provider.toLowerCase()) {
+    case "vertex":
+    case "google-vertex":
+    case "gemini-vertex": {
+      const project = process.env.GOOGLE_VERTEX_PROJECT;
+      const location = process.env.GOOGLE_VERTEX_LOCATION || "us-central1";
+      const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+      let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+
+      if (privateKey) {
+        privateKey = privateKey.replace(/\\n/g, "\n");
+      }
+
+      const selectedModel =
+        model || process.env.GOOGLE_VERTEX_MODEL || "gemini-2.5-flash";
+      console.log(
+        `[AI-PROVIDER] Instantiating Vertex AI Gemini model: ${selectedModel} (Project: ${project}, Location: ${location})`,
+      );
+
+      const vertexClient = createVertex({
+        project,
+        location,
+        googleAuthOptions: {
+          credentials: {
+            client_email: clientEmail,
+            private_key: privateKey,
+          },
+        },
+      });
+
+      return vertexClient(selectedModel);
+    }
+
     case "gemini":
     case "google": {
       const apiKey = process.env.GEMINI_API_KEY || "";
@@ -86,9 +119,11 @@ export async function runAIModel(
 ): Promise<string> {
   const selectedModel =
     model ||
-    (provider === "openai"
-      ? process.env.OPENAI_MODEL || "gpt-4o-mini"
-      : process.env.GEMINI_MODEL || "gemini-2.0-flash");
+    (provider === "vertex" || provider === "google-vertex"
+      ? process.env.GOOGLE_VERTEX_MODEL || "gemini-2.5-flash"
+      : provider === "gemini" || provider === "google"
+        ? process.env.GEMINI_MODEL || "gemini-2.5-flash"
+        : process.env.OPENAI_MODEL || "gpt-4o-mini");
   console.log(
     `[AI-PROVIDER] Vercel AI SDK Dispatching to: ${provider} (model: ${selectedModel})`,
   );
