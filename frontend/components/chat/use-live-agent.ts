@@ -41,11 +41,13 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const recognitionRef = useRef<any>(null);
+  const isConnectedRef = useRef(false);
 
   const isSpeakingRef = useRef(false);
   const isMutedRef = useRef(false);
   const isPersistingTurnRef = useRef(false);
 
+  const committedUserFinalTextRef = useRef("");
   const accumulatedUserTextRef = useRef("");
   const accumulatedAssistantTextRef = useRef("");
   const currentTurnToolCallsRef = useRef<ToolCallItem[]>([]);
@@ -59,12 +61,13 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     if (isPersistingTurnRef.current) return;
     isPersistingTurnRef.current = true;
 
-    const userText = accumulatedUserTextRef.current.trim() || "Voice Query";
+    const userText = accumulatedUserTextRef.current.trim() || committedUserFinalTextRef.current.trim() || "Voice Query";
     const asstText = accumulatedAssistantTextRef.current.trim();
     const toolCalls = [...currentTurnToolCallsRef.current];
     const chatId = activeChatIdRef.current;
 
-    // Reset turn buffers
+    // Reset turn buffers for next turn
+    committedUserFinalTextRef.current = "";
     accumulatedUserTextRef.current = "";
     accumulatedAssistantTextRef.current = "";
     currentTurnToolCallsRef.current = [];
@@ -77,7 +80,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
         toolCalls,
       });
 
-      // Save to Database
+      // Save to PostgreSQL Database
       if (chatId) {
         try {
           await fetch(`/api/chats/${chatId}/messages`, {
@@ -90,17 +93,20 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             }),
           });
         } catch (err) {
-          console.error("Failed to save voice messages to database:", err);
+          console.error("[LiveAgent] Failed to save voice messages to database:", err);
         }
       }
     }
 
+    // 3 Second debounce window for natural pause & speech completion
     setTimeout(() => {
       isPersistingTurnRef.current = false;
-    }, 1000);
+    }, 3000);
   }, []);
 
   const disconnect = useCallback(() => {
+    isConnectedRef.current = false;
+
     if (wsRef.current) {
       try {
         wsRef.current.onopen = null;
@@ -142,7 +148,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
         recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch (e) {}
       recognitionRef.current = null;
     }
@@ -154,6 +160,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     setLiveUserTranscript("");
     setLiveAssistantTranscript("");
     setActiveToolName(null);
+    committedUserFinalTextRef.current = "";
     accumulatedUserTextRef.current = "";
     accumulatedAssistantTextRef.current = "";
     currentTurnToolCallsRef.current = [];
@@ -173,6 +180,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     disconnect();
     setStatus("listening");
     setErrorMessage(null);
+    isConnectedRef.current = true;
 
     try {
       // 1. Fetch Session Config & WSS URL
@@ -201,8 +209,17 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
           isSpeakingRef.current = isPlaying;
           if (isPlaying) {
             setStatus("speaking");
+            setMicVolume(0);
+            // Strict Half-Duplex: Pause native recognition while AI is speaking
+            if (recognitionRef.current) {
+              try { recognitionRef.current.abort(); } catch (e) {}
+            }
           } else {
             setStatus("listening");
+            // Resume native speech recognition when AI finishes
+            if (recognitionRef.current && !isMutedRef.current && isConnectedRef.current) {
+              try { recognitionRef.current.start(); } catch (e) {}
+            }
           }
         },
       });
@@ -223,7 +240,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       inputContextRef.current = new AudioCtx();
 
-      // 4. Start Speech Recognition for User Subtitles
+      // 4. Start Continuous Native Speech Recognition for Live User Captions
       const SpeechRecognition =
         typeof window !== "undefined"
           ? (window as any).SpeechRecognition ||
@@ -238,22 +255,30 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
           recognition.lang = "hi-IN";
 
           recognition.onresult = (event: any) => {
+            // Drop input if muted or if AI is currently speaking
             if (isMutedRef.current || isSpeakingRef.current) return;
 
             let interim = "";
-            let final = "";
+            let newFinal = "";
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-              const transcript = event.results[i][0].transcript;
+              const transcript = event.results[i][0]?.transcript || "";
               if (event.results[i].isFinal) {
-                final += transcript;
+                newFinal += transcript + " ";
               } else {
                 interim += transcript;
               }
             }
 
-            const currentText = (final || interim).trim();
+            if (newFinal) {
+              committedUserFinalTextRef.current += newFinal;
+            }
+
+            const currentText = (committedUserFinalTextRef.current + interim).trim();
             if (currentText) {
+              // As soon as user speaks:
+              // 1. Clear assistant transcript to give immediate visual feedback
+              setLiveAssistantTranscript("");
               accumulatedUserTextRef.current = currentText;
               setLiveUserTranscript(currentText);
             }
@@ -264,21 +289,31 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             if (event.error === "language-not-supported" || event.error === "network") {
               try {
                 recognition.lang = "en-IN";
-                recognition.start();
+                if (!isSpeakingRef.current && isConnectedRef.current) {
+                  recognition.start();
+                }
               } catch (e) {}
             }
           };
 
           recognition.onend = () => {
-            if (recognitionRef.current && !isMutedRef.current && !isSpeakingRef.current) {
-              try { recognition.start(); } catch (e) {}
+            // Auto-restart continuous recognition when idle & connected
+            if (
+              recognitionRef.current &&
+              !isMutedRef.current &&
+              !isSpeakingRef.current &&
+              isConnectedRef.current
+            ) {
+              try {
+                recognition.start();
+              } catch (e) {}
             }
           };
 
           recognition.start();
           recognitionRef.current = recognition;
         } catch (e) {
-          console.warn("SpeechRecognition init error:", e);
+          console.warn("[LiveAgent] SpeechRecognition init warning:", e);
         }
       }
 
@@ -307,7 +342,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             systemInstruction: {
               parts: [
                 {
-                  text: `${sessionData.systemInstruction}\nSpeak naturally and concisely in Hindi/Hinglish. Provide real-time text parts accompanying all speech for live captions.`,
+                  text: `${sessionData.systemInstruction}\nSpeak naturally and concisely in conversational Hindi/Hinglish. Output synchronous text parts with all spoken audio for live captions.`,
                 },
               ],
             },
@@ -336,21 +371,20 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
               return;
             }
 
-            const inputData = e.inputBuffer.getChannelData(0);
-
-            // Compute RMS Volume Level
-            let sum = 0;
-            for (let i = 0; i < inputData.length; i++) {
-              sum += inputData[i] * inputData[i];
-            }
-            const rms = Math.sqrt(sum / inputData.length);
-
-            // Half-Duplex Gate: Hold mic audio while model is speaking to prevent self-interruption
+            // Strict Half-Duplex Gate: Completely discard mic audio while model is speaking to prevent self-interruption & glitching
             if (isSpeakingRef.current) {
               setMicVolume(0);
               return;
             }
 
+            const inputData = e.inputBuffer.getChannelData(0);
+
+            // Compute RMS Volume Level for visual feedback
+            let sum = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              sum += inputData[i] * inputData[i];
+            }
+            const rms = Math.sqrt(sum / inputData.length);
             setMicVolume(Math.min(1, rms * 8));
 
             // Downsample cleanly to 16kHz PCM
@@ -395,12 +429,15 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
           for (const part of parts) {
             if (part.thought || part.thoughtContent) continue;
 
+            // When AI begins emitting tokens, transition captions to AI output
             if (part.text) {
+              setLiveUserTranscript("");
               accumulatedAssistantTextRef.current += part.text;
               setLiveAssistantTranscript(accumulatedAssistantTextRef.current);
             }
 
             if (part.inlineData?.data && playerRef.current) {
+              setLiveUserTranscript("");
               playerRef.current.playChunk(part.inlineData.data);
             }
           }
@@ -445,7 +482,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
                   id: call.id,
                 });
               } catch (e) {
-                console.error("Tool execution failed:", e);
+                console.error("[LiveAgent] Tool execution failed:", e);
                 functionResponses.push({
                   response: { output: { error: "Execution failed" } },
                   id: call.id,
@@ -472,12 +509,12 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             persistCompletedTurn();
           }
         } catch (err) {
-          console.error("Error processing WebSocket message:", err);
+          console.error("[LiveAgent] Error processing WebSocket message:", err);
         }
       };
 
       ws.onerror = (err) => {
-        console.error("WebSocket error:", err);
+        console.error("[LiveAgent] WebSocket error:", err);
         setStatus("error");
         setErrorMessage("Connection error with Live Voice OS.");
       };
@@ -486,7 +523,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
         console.log("[LiveAgent] WebSocket closed");
       };
     } catch (err: any) {
-      console.error("Voice connection error:", err);
+      console.error("[LiveAgent] Voice connection error:", err);
       setStatus("error");
       setErrorMessage(
         err?.name === "NotAllowedError"
@@ -508,8 +545,8 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     }
 
     if (nextMuted && recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (e) {}
-    } else if (!nextMuted && recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch (e) {}
+    } else if (!nextMuted && recognitionRef.current && !isSpeakingRef.current) {
       try { recognitionRef.current.start(); } catch (e) {}
     }
   }, [isMuted]);

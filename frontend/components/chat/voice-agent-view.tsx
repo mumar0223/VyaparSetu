@@ -248,11 +248,11 @@ export function VoiceAgentView({
           </div>
         )}
 
-        {/* Real-time Mic Activity Level Indicator */}
+        {/* Real-time Mic Activity Level / Half-Duplex Indicator */}
         {status === "listening" && !isMuted && (
-          <div className="mt-4 flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/80 border border-zinc-800 shadow-xs animate-in fade-in-50">
+          <div className="mt-4 flex items-center gap-2 px-3.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 shadow-sm animate-in fade-in-50">
             <div className="size-2 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-[11px] font-medium text-zinc-400">Mic Input:</span>
+            <span className="text-[11px] font-medium text-zinc-300">Mic Active</span>
             <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-emerald-400 transition-all duration-75 rounded-full"
@@ -262,12 +262,38 @@ export function VoiceAgentView({
           </div>
         )}
 
+        {status === "speaking" && (
+          <div className="mt-4 flex items-center gap-2 px-3.5 py-1 rounded-full bg-sky-950/60 border border-sky-800/40 shadow-sm animate-in fade-in-50">
+            <div className="size-2 rounded-full bg-sky-400 animate-pulse" />
+            <span className="text-[11.5px] font-medium text-sky-300">AI Speaking &bull; Mic Paused</span>
+          </div>
+        )}
 
         {/* ── Live Captions / Subtitle Area ── */}
         {showLiveCaptions && (
-          <div className="mt-8 w-full min-h-[70px] flex flex-col items-center justify-center text-center px-4">
-            {assistantTranscript ? (
-              <div className="text-[15px] md:text-base font-normal text-zinc-100 leading-relaxed max-w-lg transition-all animate-in fade-in-50 prose prose-invert prose-p:my-0">
+          <div className="mt-8 w-full min-h-[80px] flex flex-col items-center justify-center text-center px-4">
+            {status === "listening" && liveTranscript ? (
+              <div className="flex flex-col items-center gap-1.5 transition-all animate-in fade-in-50 max-w-lg">
+                <span className="text-[10.5px] font-semibold tracking-wider uppercase text-emerald-400/90 bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-800/40">
+                  Listening to you
+                </span>
+                <p className="text-[15px] md:text-base font-medium text-emerald-300 leading-relaxed">
+                  &ldquo;{liveTranscript}&rdquo;
+                </p>
+              </div>
+            ) : status === "speaking" && assistantTranscript ? (
+              <div className="flex flex-col items-center gap-1.5 transition-all animate-in fade-in-50 max-w-lg">
+                <span className="text-[10.5px] font-semibold tracking-wider uppercase text-sky-400/90 bg-sky-950/40 px-2 py-0.5 rounded-md border border-sky-800/40">
+                  VyaparSetu Speaking
+                </span>
+                <div className="text-[15px] md:text-base font-normal text-zinc-100 leading-relaxed prose prose-invert prose-p:my-0">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {assistantTranscript}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            ) : assistantTranscript ? (
+              <div className="text-[15px] md:text-base font-normal text-zinc-200 leading-relaxed max-w-lg transition-all animate-in fade-in-50 prose prose-invert prose-p:my-0">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {assistantTranscript}
                 </ReactMarkdown>
@@ -277,15 +303,16 @@ export function VoiceAgentView({
                 You: &ldquo;{liveTranscript}&rdquo;
               </p>
             ) : (
-              <p className="text-xs md:text-[13px] text-zinc-500 tracking-wide font-normal">
+              <p className="text-xs md:text-[13px] text-zinc-400 tracking-wide font-normal">
                 {isInitializing
                   ? "Connecting to Voice OS..."
                   : isMuted
                   ? "Microphone is paused. Tap mic below to resume."
+                  : status === "speaking"
+                  ? "VyaparSetu is speaking..."
                   : "Speak naturally in Hindi, Hinglish, or English..."}
               </p>
             )}
-
           </div>
         )}
       </div>
