@@ -12,6 +12,7 @@
     "@ai-sdk/google-vertex": "^5.0.63",
     "@ai-sdk/openai": "^4.0.47",
     "@base-ui/react": "^1.7.0",
+    "@google/genai": "^2.19.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@shadcn/react": "^0.3.0",

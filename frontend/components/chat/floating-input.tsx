@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { Plus, ArrowUp, Mic, Brain, Sparkles, Paperclip } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, ArrowUp, Mic, Brain, AudioLines } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FloatingInputProps {
   onSend: (message: string) => void;
+  onStartVoiceMode?: () => void;
   isLoading?: boolean;
   isCentered?: boolean;
   placeholder?: string;
@@ -14,6 +14,7 @@ interface FloatingInputProps {
 
 export function FloatingInput({
   onSend,
+  onStartVoiceMode,
   isLoading = false,
   isCentered = false,
   placeholder = "Ask anything...",
@@ -50,13 +51,7 @@ export function FloatingInput({
   };
 
   return (
-    <div
-      className={cn(
-        "w-full transition-all duration-300 ease-out z-20"
-      )}
-    >
-
-
+    <div className="w-full transition-all duration-300 ease-out z-20">
       {/* Elevated Pill Container */}
       <div className="relative rounded-2xl md:rounded-3xl border border-zinc-800 bg-[#1e1e1e]/90 p-2 shadow-2xl backdrop-blur-xl transition-all focus-within:border-zinc-700 focus-within:ring-1 focus-within:ring-zinc-700/50">
         <div className="flex flex-col">
@@ -74,7 +69,7 @@ export function FloatingInput({
 
           {/* Bottom Action Bar */}
           <div className="flex items-center justify-between pt-1 px-1">
-            {/* Left Actions: Attach */}
+            {/* Left Actions: Attach & Think */}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -99,16 +94,28 @@ export function FloatingInput({
               </button>
             </div>
 
-            {/* Right Actions: Voice & Send */}
+            {/* Right Actions: Live Voice Agent & Send */}
             <div className="flex items-center gap-2">
+              {/* Gemini Live Voice Agent Trigger */}
               <button
                 type="button"
-                title="Voice input"
+                onClick={onStartVoiceMode}
+                title="Start Gemini Live Voice Agent"
+                className="size-8 rounded-full flex items-center justify-center bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 hover:border-sky-500/40 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
+              >
+                <AudioLines className="size-4" />
+              </button>
+
+              {/* Dictate / Mic */}
+              <button
+                type="button"
+                title="Voice dictation"
                 className="size-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <Mic className="size-4" />
               </button>
 
+              {/* Send Button */}
               <button
                 type="button"
                 onClick={handleSubmit}

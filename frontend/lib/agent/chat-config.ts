@@ -19,3 +19,18 @@ export const TITLE_GENERATION_CONFIG = {
   temperature: 0.3,
   maxTokens: 30,
 };
+
+/**
+ * Dedicated centralized configuration for the Multimodal Live Voice Agent OS.
+ * Uses official Live models with dedicated "google-live" provider.
+ */
+export const LIVE_VOICE_AGENT_CONFIG = {
+  provider: "google-live",
+  model: process.env.LIVE_VOICE_MODEL || "models/gemini-2.5-flash-native-audio-latest",
+  liveModels: [
+    "models/gemini-3.1-flash-live-preview",
+    "models/gemini-2.5-flash-native-audio-latest",
+  ] as const,
+  voiceName: process.env.LIVE_VOICE_NAME || "Puck",
+  responseModalities: ["AUDIO"],
+};

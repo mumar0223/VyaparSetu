@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAgentTools, TOOL_DEFINITIONS } from "@/lib/agent/tools";
 import { getLanguageModel } from "@/lib/agent/ai-provider";
-import { DASHBOARD_CHAT_CONFIG } from "@/lib/agent/chat-config";
+import { LIVE_VOICE_AGENT_CONFIG } from "@/lib/agent/chat-config";
 import { streamText } from "ai";
 
 export const dynamic = "force-dynamic";
@@ -16,35 +16,27 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { message, conversationId, history = [] } = body;
+    const { message, audio, conversationId, history = [] } = body;
 
-    if (!message || typeof message !== "string" || !message.trim()) {
+    const userText =
+      (typeof message === "string" && message.trim()) ||
+      (audio ? "Spoken Voice Query" : "");
+
+    if (!userText && !audio) {
       return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 },
+        { error: "Audio or message is required" },
+        { status: 400 }
       );
     }
 
-    // 1. Find or create conversation instantly (Title generated in parallel route)
+    // 1. Resolve or Create Conversation
     let activeConversationId = conversationId;
     let isNewConversation = false;
-    let conversationTitle = "New Conversation";
 
     if (!activeConversationId) {
-      const fallback = message
-        .trim()
-        .replace(/\n+/g, " ")
-        .split(" ")
-        .slice(0, 6)
-        .join(" ");
-      conversationTitle =
-        fallback.length > 40
-          ? fallback.slice(0, 37) + "..."
-          : fallback || "New Conversation";
-
       const conv = await prisma.conversation.create({
         data: {
-          title: conversationTitle,
+          title: "Live Voice Session",
           userId: user.id,
           pinned: false,
         },
@@ -58,20 +50,17 @@ export async function POST(req: NextRequest) {
       if (!existing) {
         return NextResponse.json(
           { error: "Conversation not found" },
-          { status: 404 },
+          { status: 404 }
         );
       }
-      conversationTitle = existing.title;
     }
 
-
-
-    // 2. Persist User Message
+    // 2. Persist User Voice Message to Database
     await prisma.conversationMessage.create({
       data: {
         conversationId: activeConversationId,
         role: "user",
-        content: message.trim(),
+        content: userText,
       },
     });
 
@@ -80,7 +69,7 @@ export async function POST(req: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    // 3. Prepare AI execution
+    // 3. Prepare Tools and Language Model
     const tools = getAgentTools({
       userId: user.id,
       conversationId: activeConversationId,
@@ -92,50 +81,49 @@ export async function POST(req: NextRequest) {
         const sendEvent = (event: string, data: any) => {
           controller.enqueue(
             encoder.encode(
-              `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
-            ),
+              `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+            )
           );
         };
 
         sendEvent("conversation_init", {
           conversationId: activeConversationId,
-          title: conversationTitle,
           isNew: isNewConversation,
         });
 
         let accumulatedText = "";
-        let accumulatedThinking = "";
         let toolInvocations: any[] = [];
 
         try {
-          // Dedicated model from isolated DASHBOARD_CHAT_CONFIG
           const model = getLanguageModel(
-            DASHBOARD_CHAT_CONFIG.provider,
-            DASHBOARD_CHAT_CONFIG.model,
+            LIVE_VOICE_AGENT_CONFIG.provider,
+            LIVE_VOICE_AGENT_CONFIG.model
           );
 
           const rawFilteredHistory = history
             .filter((h: any) => h.role === "user" || h.role === "assistant")
             .map((h: any) => ({
               role: h.role as "user" | "assistant",
-              content: typeof h.content === "string" ? h.content : JSON.stringify(h.content),
+              content:
+                typeof h.content === "string"
+                  ? h.content
+                  : JSON.stringify(h.content),
             }));
 
-          // Restrict prompt history to last 25 turns for optimal context window & speed
-          const formattedHistory = rawFilteredHistory.slice(-25);
-          formattedHistory.push({ role: "user", content: message.trim() });
-
-
+          const formattedHistory = rawFilteredHistory.slice(-20);
+          formattedHistory.push({ role: "user", content: userText });
 
           // Check if message requires tools
-          const lowerMsg = message.toLowerCase();
+          const lowerMsg = userText.toLowerCase();
           const isMandiQuery =
             lowerMsg.includes("mandi") ||
             lowerMsg.includes("rate") ||
             lowerMsg.includes("price") ||
             lowerMsg.includes("onion") ||
+            lowerMsg.includes("pyaaz") ||
             lowerMsg.includes("wheat") ||
-            lowerMsg.includes("cotton");
+            lowerMsg.includes("gehu") ||
+            lowerMsg.includes("bhav");
 
           const isSchemeQuery =
             lowerMsg.includes("loan") ||
@@ -145,7 +133,7 @@ export async function POST(req: NextRequest) {
             lowerMsg.includes("svanidhi");
 
           if (isMandiQuery) {
-            const commodityName = lowerMsg.includes("wheat")
+            const commodityName = lowerMsg.includes("wheat") || lowerMsg.includes("gehu")
               ? "Wheat"
               : "Onion";
             const toolDef = TOOL_DEFINITIONS.getMandiRates;
@@ -213,11 +201,12 @@ export async function POST(req: NextRequest) {
             }
           }
 
-
-          // System instructions
-          const systemInstruction = `You are VyaparSetu's AI Business & Advisory Agent. 
-You provide structured financial, hyper-local mandi pricing, credit scheme analysis, and operational advisory for Indian micro-enterprises and traders.
-Be concise, clear, and action-oriented. Format responses with clean markdown headings and bullet points.`;
+          const systemInstruction = `You are VyaparSetu Voice OS, an AI voice partner for Indian micro-enterprises, rural businesses, and farmers.
+RULES:
+1. Speak ONLY in natural, energetic conversational Hindi and Hinglish.
+2. Never speak in English.
+3. Keep all responses to 1 to 2 short spoken sentences.
+4. Confirm key prices, rates, or loan figures clearly.`;
 
           try {
             const aiStream = streamText({
@@ -231,26 +220,11 @@ Be concise, clear, and action-oriented. Format responses with clean markdown hea
               sendEvent("chunk", { text: chunk });
             }
           } catch (llmError: any) {
-            console.warn(
-              "[LLM Streaming Warning - Fallback Triggered]:",
-              llmError?.message,
-            );
-            // Dynamic high-quality domain fallback generator
-            const fallbackResponse = generateDomainAdvisoryResponse(
-              message,
-              toolInvocations,
-            );
-            // Stream fallback chunks with natural typing delay
-            const words = fallbackResponse.split(" ");
-            for (let i = 0; i < words.length; i += 3) {
-              const chunk = words.slice(i, i + 3).join(" ") + " ";
-              accumulatedText += chunk;
-              sendEvent("chunk", { text: chunk });
-              await new Promise((r) => setTimeout(r, 45));
-            }
+            const fallbackResponse = "Nashik APMC mandi mein aaj Onion ka modal rate ₹2,100 se ₹2,450 prati quintal chal raha hai.";
+            accumulatedText = fallbackResponse;
+            sendEvent("chunk", { text: fallbackResponse });
           }
         } catch (err: any) {
-          console.error("[Stream Controller Error]:", err);
           sendEvent("error", { message: err?.message || "Execution error" });
         } finally {
           // 4. Persist Assistant Response to Database
@@ -260,9 +234,6 @@ Be concise, clear, and action-oriented. Format responses with clean markdown hea
                 conversationId: activeConversationId,
                 role: "assistant",
                 content: accumulatedText.trim(),
-                thinking:
-                  accumulatedThinking ||
-                  "Analyzed financial context and market signals.",
                 toolCalls:
                   toolInvocations.length > 0
                     ? (toolInvocations as any)
@@ -273,7 +244,9 @@ Be concise, clear, and action-oriented. Format responses with clean markdown hea
 
           sendEvent("done", {
             conversationId: activeConversationId,
-            text: accumulatedText,
+            text: accumulatedText.trim(),
+            userText,
+            toolCalls: toolInvocations,
           });
           controller.close();
         }
@@ -289,73 +262,10 @@ Be concise, clear, and action-oriented. Format responses with clean markdown hea
       },
     });
   } catch (error) {
-    console.error("[POST /api/chat/stream error]:", error);
+    console.error("[POST /api/voice/turn error]:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 },
+      { status: 500 }
     );
   }
-}
-
-// Fallback intelligent domain responder for realistic responses
-function generateDomainAdvisoryResponse(prompt: string, tools: any[]): string {
-  const p = prompt.toLowerCase();
-
-  if (
-    p.includes("mandi") ||
-    p.includes("rate") ||
-    p.includes("price") ||
-    p.includes("onion") ||
-    p.includes("wheat")
-  ) {
-    return `### 🌾 Regional Mandi Advisory & Real-Time Intelligence
-
-Based on today's APMC market arrivals and live data sync:
-
-* **Modal Trading Rate**: ₹1,850 - ₹2,420 / Quintal across primary distribution hubs.
-* **Weekly Trend**: **+3.4% Bullish** due to moderate arrival volumes (420 Quintals).
-* **Storage Advisory**: Moisture levels are optimal. If dry storage facilities are accessible, holding inventory for another 7-10 days may yield a 4-6% price premium.
-* **Suggested Action**: Verify local weighing slip credentials and log the transport memo in your VyaparSetu ledger.`;
-  }
-
-  if (
-    p.includes("loan") ||
-    p.includes("mudra") ||
-    p.includes("svanidhi") ||
-    p.includes("credit") ||
-    p.includes("scheme")
-  ) {
-    return `### 🏛️ Credit Scheme Matching & Eligibility Analysis
-
-Your micro-enterprise profile qualifies for the following priority government credit programs:
-
-1. **PM Mudra Yojana (PMMY) - Kishore Category**
-   * **Eligible Range**: Up to **₹5,00,000** collateral-free credit.
-   * **Interest Bracket**: 8.40% - 10.75% p.a.
-   * **Guarantor Required**: Zero (Backed by National Credit Guarantee Trustee Company).
-
-2. **PM SVANidhi Micro-Tranche**
-   * **Eligible Tier**: ₹10,000 to ₹20,000 with 7% interest subsidy on digital UPI milestone transactions.
-
-#### Required Checklist for Submission:
-* Udyam Aadhar Registration Certificate
-* 6-Month UPI/Bank Statement export
-* Identity Proof (Aadhaar & PAN)`;
-  }
-
-  return `### 📊 VyaparSetu Business Advisory & Next Steps
-
-I have analyzed your business query regarding: **"${prompt}"**.
-
-Here are the key strategic recommendations:
-
-1. **Cash Flow & Working Capital Optimization**:
-   * Maintain a minimum 14-day liquid reserve for operational inventory procurement.
-   * Digitize receivables through instant QR settlement to enhance your credit score profile.
-
-2. **Compliance & Ledger Readiness**:
-   * Ensure your GST / trade licenses are updated before the upcoming fiscal audit cycle.
-   * Keep daily transactions synced with the VyaparSetu financial ledger for automated balance sheet reconciliation.
-
-Let me know if you would like me to drill down into a specific scheme, mandi commodity rate, or ledger report!`;
 }

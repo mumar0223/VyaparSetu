@@ -64,6 +64,7 @@ model Conversation {
   userId    String
   user      User                  @relation("UserConversations", fields: [userId], references: [id], onDelete: Cascade)
   messages  ConversationMessage[]
+  artifacts Artifact[]
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
 
@@ -80,8 +81,25 @@ model ConversationMessage {
   content        String       @db.Text
   thinking       String?      @db.Text
   toolCalls      Json?
+  artifacts      Artifact[]
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
 }
 
+model Artifact {
+  id             String               @id @default(cuid())
+  conversationId String
+  conversation   Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId      String?
+  message        ConversationMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  title          String
+  type           String               // "form" | "document" | "table" | "report"
+  content        Json                 // Structured schema / fields data / values
+  status         String               @default("draft") // "draft" | "filled" | "submitted"
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([conversationId])
+  @@index([messageId])
+}

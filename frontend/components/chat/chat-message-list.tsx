@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Volume2, VolumeX } from "lucide-react";
+import { Copy, Check, Volume2, VolumeX, AudioLines } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThinkingAccordion } from "./thinking-accordion";
 import { MarkdownMessage } from "./markdown-message";
@@ -56,7 +56,29 @@ export function ChatMessageList({
   return (
     <div className="flex flex-col space-y-6 w-full">
       {messages.map((msg, index) => {
+        const isSystem = msg.role === "system";
         const isUser = msg.role === "user";
+
+        if (isSystem) {
+          return (
+            <div
+              key={msg.id || index}
+              className="w-full flex items-center justify-center my-4 animate-in fade-in-50 select-none"
+            >
+              <div className="w-full max-w-sm flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-sky-950/50 via-indigo-950/40 to-zinc-900/70 border border-sky-500/25 text-sky-300 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <AudioLines className="size-4 text-sky-400 animate-pulse" />
+                  <span className="text-[12.5px] font-medium">Voice Agent OS Session</span>
+                </div>
+                <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                  Gemini Live
+                </span>
+              </div>
+            </div>
+          );
+        }
+
+
         return (
           <div
             key={msg.id || index}

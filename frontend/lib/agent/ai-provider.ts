@@ -8,11 +8,35 @@ export function getLanguageModel(
   model?: string,
 ): LanguageModel {
   switch (provider.toLowerCase()) {
+    case "live":
+    case "google-live":
+    case "gemini-live":
+    case "google-genai": {
+      const apiKey = process.env.GEMINI_API_KEY || "";
+      const selectedModel =
+        model ||
+        process.env.LIVE_VOICE_MODEL ||
+        "models/gemini-2.5-flash-native-audio-latest";
+      console.log(
+        `[AI-PROVIDER] Instantiating Multimodal Live GenAI model: ${selectedModel}`,
+      );
+
+      const liveClient = createOpenAI({
+        apiKey,
+        baseURL:
+          process.env.GEMINI_BASE_URL ||
+          "https://generativelanguage.googleapis.com/v1beta/openai/",
+      });
+
+      const cleanModelName = selectedModel.replace(/^models\//, "");
+      return liveClient.chat(cleanModelName);
+    }
+
     case "vertex":
     case "google-vertex":
     case "gemini-vertex": {
       const project = process.env.GOOGLE_VERTEX_PROJECT;
-      const location = process.env.GOOGLE_VERTEX_LOCATION || "us-central1";
+      const location = process.env.GOOGLE_VERTEX_LOCATION || "global";
       const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
       let privateKey = process.env.GOOGLE_PRIVATE_KEY;
 
@@ -21,7 +45,7 @@ export function getLanguageModel(
       }
 
       const selectedModel =
-        model || process.env.GOOGLE_VERTEX_MODEL || "gemini-2.5-flash";
+        model || process.env.GOOGLE_VERTEX_MODEL || "gemini-3.7-flash";
       console.log(
         `[AI-PROVIDER] Instantiating Vertex AI Gemini model: ${selectedModel} (Project: ${project}, Location: ${location})`,
       );
@@ -44,7 +68,7 @@ export function getLanguageModel(
     case "google": {
       const apiKey = process.env.GEMINI_API_KEY || "";
       const selectedModel =
-        model || process.env.GEMINI_MODEL || "gemini-2.0-flash";
+        model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
       console.log(`[AI-PROVIDER] Instantiating Gemini model: ${selectedModel}`);
 
       const geminiClient = createOpenAI({
@@ -54,7 +78,8 @@ export function getLanguageModel(
           "https://generativelanguage.googleapis.com/v1beta/openai/",
       });
 
-      return geminiClient.chat(selectedModel);
+      const cleanModelName = selectedModel.replace(/^models\//, "");
+      return geminiClient.chat(cleanModelName);
     }
 
     case "openai": {

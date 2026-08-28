@@ -13,6 +13,7 @@ import {
   Search,
   PanelRightClose,
   MoreHorizontal,
+  AudioLines,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,6 +32,7 @@ interface HistorySidebarProps {
   onToggle: () => void;
   onSelectChat: (id: string) => void;
   onNewChat: () => void;
+  onStartVoiceSession?: () => void;
   onDeleteChat: (id: string) => void;
   onRenameChat: (id: string, newTitle: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
@@ -43,10 +45,12 @@ export function HistorySidebar({
   onToggle,
   onSelectChat,
   onNewChat,
+  onStartVoiceSession,
   onDeleteChat,
   onRenameChat,
   onTogglePin,
 }: HistorySidebarProps) {
+
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -107,7 +111,7 @@ export function HistorySidebar({
         </div>
 
         {/* Search Bar */}
-        <div className="px-3 pt-2.5 pb-1.5">
+        <div className="px-3 pt-2.5 pb-1">
           <div className="flex h-9 items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-2.5 text-[12.5px] text-zinc-400">
             <Search className="size-3.5 shrink-0 text-zinc-500" />
             <input
@@ -127,6 +131,23 @@ export function HistorySidebar({
             )}
           </div>
         </div>
+
+        {/* Gemini Live Voice Session Trigger */}
+        <div className="px-3 pt-1 pb-1">
+          <button
+            onClick={onStartVoiceSession}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-sky-950/50 via-indigo-950/40 to-zinc-900/70 hover:from-sky-900/60 hover:to-indigo-900/50 border border-sky-500/25 hover:border-sky-500/45 text-sky-300 hover:text-sky-100 transition-all cursor-pointer shadow-xs group"
+          >
+            <div className="flex items-center gap-2">
+              <AudioLines className="size-4 text-sky-400 group-hover:scale-110 transition-transform animate-pulse" />
+              <span className="text-[12.5px] font-medium">Voice Agent OS</span>
+            </div>
+            <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              Live
+            </span>
+          </button>
+        </div>
+
 
         {/* Scrollable Conversation List */}
         <div className="flex-1 overflow-y-auto px-2.5 py-1.5 space-y-4">
