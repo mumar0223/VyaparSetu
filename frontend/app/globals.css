@@ -53,6 +53,22 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --color-navy: #0F2B40;
+  --color-navy-dark: #102735;
+  --color-cream: #FAF6EB;
+  --color-forest: #1B4332;
+  --color-forest-deep: #0B4632;
+  --color-mint: #4ADE80;
+  --color-mint-light: #C2FBE8;
+  --color-mint-pale: #EAFFFA;
+  --color-sage: #A8E3D1;
+  --color-orange: #D98E2A;
+  --color-orange-hover: #C27D22;
+  --color-ink: #1A1A1A;
+  --color-ink-muted: #5B6660;
+
+  --font-serif: "Playfair Display", serif;
 }
 
 /* Default :root IS the light theme. */
