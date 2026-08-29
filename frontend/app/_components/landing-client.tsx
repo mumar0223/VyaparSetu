@@ -7,6 +7,7 @@ import { Navbar } from "./navbar";
 import { HowItWorks } from "./how-it-works";
 import { Technologies } from "./technologies";
 import { Pricing } from "./pricing";
+import { TargetAudience } from "./target-audience";
 import { Code2, Network, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { AuthUser } from "@/lib/auth-types";
@@ -47,7 +48,7 @@ export function LandingClient({ currentUser }: LandingClientProps) {
   const scale = useTransform(scrollYProgress, [0, 1], [1, 0.95]);
 
   return (
-    <main className="bg-background selection:bg-indigo-500/30 text-foreground min-h-screen">
+    <main className="bg-[linear-gradient(180deg,#fdfbf7_0%,#f5f0e6_100%)] selection:bg-[#10b981]/30 min-h-screen">
       <Navbar currentUser={currentUser} />
 
       {/* Hero Wrapper */}
@@ -58,8 +59,8 @@ export function LandingClient({ currentUser }: LandingClientProps) {
             className="w-full flex-1 flex flex-col items-center justify-center min-h-0"
           >
             {/* Subtle Background Glows */}
-            <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-indigo-600/10 rounded-full blur-[120px] -z-10" />
-            <div className="absolute bottom-0 right-1/4 translate-x-1/2 translate-y-1/2 w-75 h-75 bg-purple-600/10 rounded-full blur-[100px] -z-10 animate-pulse" />
+            <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-[#10b981]/15 rounded-full blur-[120px] -z-10" />
+            <div className="absolute bottom-0 right-1/4 translate-x-1/2 translate-y-1/2 w-75 h-75 bg-[#f59e0b]/15 rounded-full blur-[100px] -z-10 animate-pulse" />
 
             {/* Diagram Background Layer */}
             <motion.div
@@ -89,15 +90,15 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="flex flex-col gap-5 md:gap-6 max-w-2xl z-10 pointer-events-auto"
               >
-                <h1 className="text-4xl sm:text-5xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] text-foreground">
+                <h1 className="text-4xl sm:text-5xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] text-[#0f172a]">
                   Grow your local business.
                   <br />
-                  <span className="text-indigo-400 font-medium">
+                  <span className="text-[#10b981] font-medium">
                     In your own language.
                   </span>
                 </h1>
 
-                <p className="text-sm md:text-base lg:text-lg text-muted-foreground leading-relaxed max-w-[90%]">
+                <p className="text-sm md:text-base lg:text-lg text-[#475569] leading-relaxed max-w-[90%]">
                   Empowering rural micro-entrepreneurs, artisans, and local
                   traders with instant business advisory, working capital
                   structuring, and government scheme access — directly through
@@ -108,18 +109,31 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                   {currentUser ? (
                     <Link
                       href="/dashboard"
-                      className="px-5 py-3 md:px-6 md:py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-2xl shadow-indigo-500/30 transition-all active:scale-95 text-sm inline-flex items-center justify-center"
+                      className="px-5 py-3 md:px-6 md:py-3 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-2xl shadow-2xl shadow-[#10b981]/30 transition-all active:scale-95 text-sm inline-flex items-center justify-center"
                     >
                       Go to Dashboard
                     </Link>
                   ) : (
                     <Link
                       href="/signup"
-                      className="px-5 py-3 md:px-6 md:py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-2xl shadow-indigo-500/30 transition-all active:scale-95 text-sm inline-flex items-center justify-center"
+                      className="px-5 py-3 md:px-6 md:py-3 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-2xl shadow-2xl shadow-[#10b981]/30 transition-all active:scale-95 text-sm inline-flex items-center justify-center"
                     >
                       Get Started Free
                     </Link>
                   )}
+                </div>
+
+                {/* Rural Metrics Banner */}
+                <div className="flex flex-wrap items-center gap-6 pt-4 text-xs md:text-sm font-medium text-[#475569]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#f59e0b]">★</span> 50+ Districts Mapped
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#f59e0b]">★</span> 200+ Opportunities
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#f59e0b]">★</span> 100+ Schemes Indexed
+                  </div>
                 </div>
               </motion.div>
             </div>
@@ -127,9 +141,11 @@ export function LandingClient({ currentUser }: LandingClientProps) {
         </div>
       </div>
 
-      <div className="bg-background relative z-10 w-full rounded-t-[2.5rem] md:rounded-t-[4rem] border-t border-border shadow-[0_-20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+      <div className="bg-[#fdfbf7] relative z-10 w-full rounded-t-[2.5rem] md:rounded-t-[4rem] border-t border-[#e7e5e4] shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
+        <TargetAudience />
+        
         {/* Feature Section */}
-        <section className="py-24 md:py-32 bg-muted/20 border-b border-border rounded-t-[2.5rem] md:rounded-t-[4rem]">
+        <section id="features" className="py-24 md:py-32 bg-transparent border-b border-[#e7e5e4]">
           <div className="container mx-auto px-6">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -137,10 +153,10 @@ export function LandingClient({ currentUser }: LandingClientProps) {
               viewport={{ once: true, margin: "-100px" }}
               className="text-center max-w-3xl mx-auto mb-16 md:mb-24"
             >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-tight text-foreground">
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-tight text-[#0f172a]">
                 The Rural Micro-Enterprise Bottleneck
               </h2>
-              <p className="text-muted-foreground text-lg md:text-xl leading-relaxed">
+              <p className="text-[#475569] text-lg md:text-xl leading-relaxed">
                 Grassroots businesses generate vital economic value, but lack
                 access to affordable financial guidance, formalized credit
                 structuring, and hyper-local market intelligence.
@@ -171,15 +187,15 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-100px" }}
                   transition={{ delay: i * 0.15, duration: 0.6 }}
-                  className="p-8 rounded-3xl border border-border bg-card shadow-sm hover:shadow-md transition-shadow group"
+                  className="p-8 rounded-3xl border border-[#e7e5e4] bg-[#f5f0e6] shadow-sm hover:shadow-md transition-shadow group"
                 >
-                  <div className="size-12 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300">
+                  <div className="size-12 rounded-2xl bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[#10b981] group-hover:text-white transition-all duration-300">
                     <feature.icon className="size-6" />
                   </div>
-                  <h3 className="font-bold text-xl mb-3 text-foreground">
+                  <h3 className="font-bold text-xl mb-3 text-[#0f172a]">
                     {feature.title}
                   </h3>
-                  <p className="text-muted-foreground leading-relaxed">
+                  <p className="text-[#475569] leading-relaxed">
                     {feature.desc}
                   </p>
                 </motion.div>

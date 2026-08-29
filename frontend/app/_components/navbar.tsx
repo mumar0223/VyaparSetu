@@ -33,52 +33,54 @@ export function Navbar({ currentUser }: NavbarProps) {
         borderColor: { duration: 0 },
         color: { duration: 0 },
       }}
-      className="fixed top-4 left-0 right-0 z-50 flex justify-center w-full px-4 md:px-8 pointer-events-none"
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 flex justify-center w-full px-4 md:px-8 bg-white border-b border-[#e7e5e4] transition-all duration-500",
+        isScrolled ? "shadow-sm" : ""
+      )}
     >
-      <div
-        className={cn(
-          "h-16 flex items-center justify-between px-6 w-full max-w-7xl pointer-events-auto rounded-2xl transition-all duration-500 border border-transparent shadow-none bg-transparent",
-          isScrolled &&
-            "bg-background/70 dark:bg-white/3 backdrop-blur-xl border-border/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
-        )}
-      >
+      <div className="h-16 flex items-center justify-between w-full max-w-7xl">
         <div className="flex items-center select-none">
           <Link
             href="/"
-            className="app-font text-xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/75 dark:from-white dark:to-white/60"
+            className="flex items-center gap-2.5 group transition-colors"
           >
-            VyaparSetu
+            <div className="size-7 rounded-full bg-[#d1fae5] flex items-center justify-center transition-colors group-hover:bg-[#a7f3d0]">
+              <div className="size-2.5 rounded-full bg-[#059669]"></div>
+            </div>
+            <span className="font-serif text-2xl font-bold tracking-tight text-[#064e3b] group-hover:text-[#047857]">
+              VyaparSetu
+            </span>
           </Link>
         </div>
 
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
+        <div className="hidden md:flex items-center gap-6 text-sm font-medium text-[#475569]">
           <button
-            onClick={() =>
-              document
-                .getElementById("how-it-works")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-            className="hover:text-foreground transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
+            onClick={() => document.getElementById("audience")?.scrollIntoView({ behavior: "smooth" })}
+            className="hover:text-[#10b981] transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
           >
-            Advisory
+            Audience
           </button>
           <button
-            onClick={() =>
-              document
-                .getElementById("technologies")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-            className="hover:text-foreground transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
+            onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+            className="hover:text-[#10b981] transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
+          >
+            Features
+          </button>
+          <button
+            onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}
+            className="hover:text-[#10b981] transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
+          >
+            How it Works
+          </button>
+          <button
+            onClick={() => document.getElementById("technologies")?.scrollIntoView({ behavior: "smooth" })}
+            className="hover:text-[#10b981] transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
           >
             Technology
           </button>
           <button
-            onClick={() =>
-              document
-                .getElementById("pricing")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-            className="hover:text-foreground transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
+            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+            className="hover:text-[#10b981] transition-colors bg-transparent border-none p-0 cursor-pointer font-medium"
           >
             Plans
           </button>
@@ -88,7 +90,7 @@ export function Navbar({ currentUser }: NavbarProps) {
           {currentUser ? (
             <Link
               href="/dashboard"
-              className="px-5 py-2.5 bg-foreground text-background dark:bg-white dark:text-black text-sm font-bold rounded-xl hover:bg-foreground/90 dark:hover:bg-white/90 transition-all shadow-lg active:scale-95 inline-flex items-center justify-center"
+              className="px-5 py-2.5 bg-[#10b981] text-white text-sm font-bold rounded-xl hover:bg-[#059669] transition-all shadow-lg active:scale-95 inline-flex items-center justify-center"
             >
               Dashboard
             </Link>
@@ -96,13 +98,13 @@ export function Navbar({ currentUser }: NavbarProps) {
             <>
               <Link
                 href="/login"
-                className="px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors text-center"
+                className="px-5 py-2.5 bg-white border border-[#e7e5e4] text-sm font-semibold text-[#475569] rounded-xl hover:text-[#10b981] hover:border-[#10b981]/50 transition-all shadow-sm active:scale-95 inline-flex items-center justify-center"
               >
                 Sign In
               </Link>
               <Link
                 href="/signup"
-                className="px-5 py-2.5 bg-foreground text-background dark:bg-white dark:text-black text-sm font-bold rounded-xl hover:bg-foreground/90 dark:hover:bg-white/90 transition-all shadow-lg active:scale-95 inline-flex items-center justify-center"
+                className="px-5 py-2.5 bg-[#10b981] text-white text-sm font-bold rounded-xl hover:bg-[#059669] transition-all shadow-lg active:scale-95 inline-flex items-center justify-center"
               >
                 Get Started
               </Link>

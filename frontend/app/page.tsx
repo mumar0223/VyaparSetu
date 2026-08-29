@@ -5,5 +5,9 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const user = await getCurrentUser();
-  return <LandingClient currentUser={user} />;
+  return (
+    <div className="landing-theme">
+      <LandingClient currentUser={user} />
+    </div>
+  );
 }

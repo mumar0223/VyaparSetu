@@ -41,9 +41,9 @@ export function Technologies() {
   const containerRef = useRef<HTMLDivElement>(null);
   
   return (
-    <section ref={containerRef} id="technologies" className="py-24 md:py-32 bg-black dark:bg-black/20 relative border-y border-border/50 overflow-hidden">
+    <section ref={containerRef} id="technologies" className="py-24 md:py-32 bg-[#f5f0e6] relative border-y border-[#e7e5e4] overflow-hidden">
       {/* Background styling */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(79,70,229,0.1),transparent_50%)]"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.1),transparent_50%)]"></div>
       
       <div className="container mx-auto px-6 relative z-10">
         <motion.div 
@@ -53,8 +53,8 @@ export function Technologies() {
           transition={{ backgroundColor: { duration: 0 }, borderColor: { duration: 0 }, color: { duration: 0 } }}
           className="text-center max-w-3xl mx-auto mb-16 md:mb-24"
         >
-          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6 text-white dark:text-foreground">Built for Rural Connectivity & Resilience</h2>
-          <p className="text-white/70 dark:text-muted-foreground text-lg md:text-xl">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6 text-[#0f172a]">Built for Rural Connectivity & Resilience</h2>
+          <p className="text-[#475569] text-lg md:text-xl">
             VyaparSetu combines multilingual generative intelligence, offline-first edge capabilities, and secure banking protocol integrations.
           </p>
         </motion.div>
@@ -67,13 +67,13 @@ export function Technologies() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
               transition={{ delay: i * 0.1, duration: 0.6, ease: "easeOut", backgroundColor: { duration: 0 }, borderColor: { duration: 0 }, color: { duration: 0 } }}
-              className="p-6 rounded-2xl border border-white/10 dark:border-border bg-white/5 dark:bg-card/50 backdrop-blur-sm hover:bg-white/10 dark:hover:bg-card transition-colors group"
+              className="p-6 rounded-2xl border border-[#e7e5e4] bg-white shadow-sm hover:shadow-md transition-shadow group"
             >
-              <div className="size-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300">
+              <div className="size-12 rounded-xl bg-[#ecfdf5] border border-[#10b981]/20 text-[#10b981] flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[#10b981] group-hover:text-white transition-all duration-300">
                 <tech.icon className="size-6" />
               </div>
-              <h3 className="font-bold text-xl mb-3 text-white dark:text-foreground">{tech.name}</h3>
-              <p className="text-white/60 dark:text-muted-foreground leading-relaxed text-sm">{tech.desc}</p>
+              <h3 className="font-bold text-xl mb-3 text-[#0f172a]">{tech.name}</h3>
+              <p className="text-[#475569] leading-relaxed text-sm">{tech.desc}</p>
             </motion.div>
           ))}
         </div>
