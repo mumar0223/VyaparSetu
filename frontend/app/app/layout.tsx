@@ -21,6 +21,7 @@ import {
   User,
   Menu,
   X,
+  Star,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,8 @@ const NAV_GROUPS = [
       { title: "Business Advisor", href: "/app/advisor", icon: TrendingUp },
       { title: "Business Profile", href: "/app/profile/business", icon: FileText },
       { title: "AI Recommendations", href: "/app/ai-recommendations", icon: Sparkles },
-      { title: "Schemes for You", href: "/app/schemes-for-you", icon: Award },
+      { title: "Govt. Schemes", href: "/app/schemes-for-you", icon: Award },
+      { title: "Success Stories", href: "/app/success-stories", icon: Star },
     ],
   },
   {
@@ -50,7 +52,7 @@ const NAV_GROUPS = [
       { title: "Savings", href: "/app/savings", icon: Target },
       { title: "Budget & Planning", href: "/app/budget", icon: PieChart },
       { title: "Debt", href: "/app/debt", icon: HandCoins },
-      { title: "Borrowing", href: "/app/borrowing", icon: Building },
+      { title: "Loans", href: "/app/borrowing", icon: Building },
       { title: "Business Credit", href: "/app/credit", icon: CreditCard },
     ],
   },
@@ -60,7 +62,7 @@ const NAV_GROUPS = [
       { title: "Recycle Bin", href: "/app/recycle-bin", icon: Trash2 },
       { title: "Privacy & Consent", href: "/app/privacy-consent", icon: ShieldCheck },
       { title: "Settings", href: "/app/settings", icon: Settings },
-      { title: "Profile", href: "/app/profile", icon: User },
+      { title: "User Profile", href: "/app/profile", icon: User },
     ],
   },
 ];
