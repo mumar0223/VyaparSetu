@@ -138,7 +138,7 @@ export function HowItWorks() {
     <section
       ref={containerRef}
       id="how-it-works"
-      className="relative h-[300vh] bg-[linear-gradient(180deg,#123524_0%,#0f2e20_100%)]"
+      className="relative h-[300vh] bg-background"
     >
       <div
         ref={stickyRef}
@@ -147,14 +147,14 @@ export function HowItWorks() {
         {/* Main Card Container */}
         <div
           ref={cardRef}
-          className="w-[92%] max-w-350 h-[85vh] border border-white/10 bg-[#0a1f15]/80 backdrop-blur-3xl rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-12 flex flex-col shadow-2xl relative overflow-hidden shrink-0"
+          className="w-[92%] max-w-350 h-[85vh] border border-mint/20 bg-[#081710]/95 backdrop-blur-3xl rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-12 flex flex-col shadow-2xl relative overflow-hidden shrink-0"
         >
           {/* Subtle bg glow inside card */}
-          <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(79,70,229,0.15),transparent_50%)] pointer-events-none" />
+          <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(74,222,128,0.12),transparent_50%)] pointer-events-none" />
 
           <div className="my-4 md:my-10 shrink-0">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-[#ffffff]">
-              <span className="text-[#10b981]">How</span> it works
+            <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight text-white">
+              <span className="text-mint">How</span> it works
             </h2>
           </div>
 
@@ -180,26 +180,26 @@ export function HowItWorks() {
                     )}
                     <div className="relative flex flex-col items-center shrink-0 z-20">
                       <div
-                        className={`size-8 md:size-10 rounded-full flex items-center justify-center font-bold transition-all duration-500 border-2 text-sm md:text-base relative bg-[#0a1f15]
+                        className={`size-8 md:size-10 rounded-full flex items-center justify-center font-bold transition-all duration-500 border-2 text-sm md:text-base relative bg-[#081710]
                         ${
                           isActive
-                            ? "border-[#10b981] text-[#10b981] shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                            ? "border-mint text-mint shadow-[0_0_15px_rgba(74,222,128,0.4)]"
                             : isPassed
-                              ? "border-[#10b981] text-[#10b981]/70"
-                              : "border-white/20 text-[rgba(255,255,255,0.55)]"
+                              ? "border-mint/60 text-mint-light"
+                              : "border-white/20 text-white/50"
                         }`}
                       >
                         {i + 1}
                       </div>
                     </div>
                     <div className="pt-1">
-                      <h4 className="text-base md:text-xl font-bold mb-1 md:mb-2 text-[#ffffff]">
+                      <h4 className="text-base md:text-xl font-bold mb-1 md:mb-2 text-white">
                         {step.title}
                       </h4>
                       <div
                         className={`grid transition-all duration-500 ease-in-out ${isActive ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
                       >
-                        <p className="text-[#d1fae5] leading-relaxed text-[11px] md:text-sm overflow-hidden">
+                        <p className="text-white/60 leading-relaxed text-[11px] md:text-sm overflow-hidden">
                           {step.desc}
                         </p>
                       </div>
@@ -322,31 +322,31 @@ export function HowItWorks() {
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.1, color: { duration: 0 } }}
                         >
-                          <span className="text-[#10b981]">➜</span>{" "}
-                          <span className="text-white">vyaparsetu</span> check-schemes --profile dairy_shg
+                          <span className="text-indigo-400">➜</span>{" "}
+                          <span className="text-white">vyaparsetu</span> verify-schemes --profile micro
                         </motion.p>
                         <motion.p
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.4, color: { duration: 0 } }}
                         >
-                          &gt; Scanning NABARD &amp; PMEGP criteria...
+                          &gt; Scanning PM Mudra &amp; SVANidhi criteria...
                         </motion.p>
                         <motion.p
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.7, color: { duration: 0 } }}
-                          className="text-[#f59e0b]"
+                          className="text-amber-400"
                         >
-                          Missing formalized dairy cash flow.
+                          Missing formal balance sheet.
                         </motion.p>
                         <motion.p
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.8, color: { duration: 0 } }}
-                          className="text-[#f59e0b]/80 text-xs"
+                          className="text-amber-400/80 text-xs"
                         >
-                          ./ledgers/shg-diary-entry.json
+                          ./ledgers/annual-khata.json
                           <br />
                           Resolving: Auto-formatting unstructured ledger data...
                         </motion.p>
@@ -374,9 +374,9 @@ export function HowItWorks() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 2.5, color: { duration: 0 } }}
-                          className="text-[#10b981] mt-2"
+                          className="text-green-400 mt-2"
                         >
-                          ✓ NABARD &amp; PMEGP pre-qualification verified.
+                          ✓ PM Mudra &amp; SVANidhi pre-qualification verified.
                         </motion.p>
                       </div>
                     </div>
@@ -441,7 +441,7 @@ function StepLine({
   return (
     <div className="absolute top-7 md:top-11 h-full left-3.75 md:left-4.75 w-0.5 bg-white/10 z-0">
       <div
-        className="w-full bg-[#10b981] shadow-[0_0_10px_rgba(16,185,129,0.8)] origin-top transition-all duration-75"
+        className="w-full bg-mint shadow-[0_0_10px_rgba(74,222,128,0.8)] origin-top transition-all duration-75"
         style={{ height: `${progress * 100}%` }}
       />
     </div>
@@ -456,7 +456,7 @@ function Step2Visualizer() {
         {/* Chat Header */}
         <div className="h-9 border-b border-white/5 bg-white/2 flex items-center justify-between px-3">
           <div className="flex items-center gap-2">
-            <div className="size-2 rounded-full bg-indigo-500 animate-pulse" />
+            <div className="size-2 rounded-full bg-mint animate-pulse" />
             <span className="text-[10px] font-bold text-white/80 tracking-wide">
               Khata Copilot
             </span>
@@ -469,9 +469,9 @@ function Step2Visualizer() {
         {/* Chat Messages */}
         <div className="flex-1 p-3 flex flex-col gap-3 overflow-y-auto text-[10px]">
           {/* User Message */}
-          <div className="self-end max-w-[90%] bg-[#10b981]/20 border border-[#10b981]/30 text-[#10b981] px-2.5 py-1.5 rounded-xl rounded-tr-none">
+          <div className="self-end max-w-[90%] bg-mint/20 border border-mint/30 text-mint-light px-2.5 py-1.5 rounded-xl rounded-tr-none">
             <p className="font-sans leading-normal">
-              "Meri dairy ki monthly income kitni hai?"
+              "Record ₹18,450 sales &amp; generate P&amp;L"
             </p>
           </div>
 
@@ -493,7 +493,7 @@ function Step2Visualizer() {
             {/* Fake progress bar */}
             <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden mt-1">
               <motion.div
-                className="h-full bg-[#10b981]"
+                className="h-full bg-mint"
                 animate={{ width: ["0%", "100%"] }}
                 transition={{
                   duration: 2,
@@ -613,7 +613,7 @@ function Step4Visualizer() {
               <div className="w-2/3 h-2 bg-white/5 rounded-full mx-auto" />
 
               {/* Glowing Button preview */}
-              <div className="w-20 h-6 bg-[#10b981] rounded-md mx-auto flex items-center justify-center text-[7px] font-bold text-white shadow-[0_0_15px_rgba(16,185,129,0.5)] border border-[#10b981]/20 mt-4 relative">
+              <div className="w-22 h-6 bg-forest rounded-md mx-auto flex items-center justify-center text-[7px] font-bold text-white shadow-[0_0_15px_rgba(74,222,128,0.4)] border border-mint/30 mt-4 relative">
                 Mandi Price Alert
                 {/* Glowing Comment Pin drop right on the button */}
                 <motion.div
@@ -625,7 +625,7 @@ function Step4Visualizer() {
                     borderColor: { duration: 0 },
                     color: { duration: 0 },
                   }}
-                  className="absolute -top-1.5 -right-1.5 size-4 bg-[#f59e0b] rounded-full border border-white flex items-center justify-center text-[7px] font-black text-white shadow-lg"
+                  className="absolute -top-1.5 -right-1.5 size-4 bg-orange rounded-full border border-white flex items-center justify-center text-[7px] font-black text-white shadow-lg"
                 >
                   1
                 </motion.div>
@@ -642,16 +642,16 @@ function Step4Visualizer() {
                 borderColor: { duration: 0 },
                 color: { duration: 0 },
               }}
-              className="absolute left-2.5 top-[28%] right-2.5 p-2 bg-[#fdfbf7]/10 border border-[#10b981]/40 rounded-xl shadow-xl z-20 backdrop-blur-md"
+              className="absolute left-2.5 top-[28%] right-2.5 p-2 bg-[#064e3b]/90 border border-mint/40 rounded-xl shadow-xl z-20 backdrop-blur-md"
             >
               <div className="flex gap-1.5 items-start">
-                <MessageSquare className="size-2.5 text-[#10b981] shrink-0 mt-0.5" />
-                <p className="text-[7px] text-[#fdfbf7] leading-normal font-sans">
-                  "Wholesale Alert: Jalgaon Mandi rate for Turmeric is up 12% today."
+                <MessageSquare className="size-2.5 text-mint shrink-0 mt-0.5" />
+                <p className="text-[7px] text-mint-light leading-normal font-sans">
+                  "Wholesale Alert: Save 12% on crates with nearby cluster"
                 </p>
               </div>
               {/* Arrow */}
-              <div className="absolute -bottom-1 left-[62%] -translate-x-1/2 size-2 bg-black border-r border-b border-[#10b981]/40 rotate-45" />
+              <div className="absolute -bottom-1 left-[62%] -translate-x-1/2 size-2 bg-[#064e3b] border-r border-b border-mint/40 rotate-45" />
             </motion.div>
           </div>
 
@@ -708,7 +708,7 @@ function Step1Visualizer() {
 
   const prompts = [
     { text: "Aaj mandi mein 5 quintal pyaaz becha ₹1,850 par", target: "site" },
-    { text: "PM Mudra ke liye eligible hu?", target: "social" },
+    { text: "Check PM Mudra loan eligibility", target: "social" },
     { text: "Record sales & check tomorrow's mandi rate", target: "both" },
   ];
 
@@ -730,10 +730,10 @@ function Step1Visualizer() {
         </g>
 
         {/* Animated Pulses */}
-        {/* 1. Prompt to AI (Harvest) */}
+        {/* 1. Prompt to AI (Blue) */}
         <motion.path
           d="M 200 340 L 200 200"
-          stroke="#f59e0b"
+          stroke="#6366f1"
           strokeWidth="2.5"
           fill="none"
           initial={{ pathLength: 0 }}
@@ -741,10 +741,10 @@ function Step1Visualizer() {
           transition={{ duration: 1.0, ease: "easeInOut" }}
         />
 
-        {/* 2. AI to Site Hub (Harvest) */}
+        {/* 2. AI to Site Hub (Blue) */}
         <motion.path
           d="M 200 200 L 100 80"
-          stroke="#f59e0b"
+          stroke="#6366f1"
           strokeWidth="2.5"
           fill="none"
           initial={{ pathLength: 0 }}
@@ -757,10 +757,10 @@ function Step1Visualizer() {
           transition={{ duration: 1.0, ease: "easeInOut" }}
         />
 
-        {/* 3. AI to Social Hub (Harvest) */}
+        {/* 3. AI to Social Hub (Blue) */}
         <motion.path
           d="M 200 200 L 300 80"
-          stroke="#f59e0b"
+          stroke="#6366f1"
           strokeWidth="2.5"
           fill="none"
           initial={{ pathLength: 0 }}
@@ -774,7 +774,7 @@ function Step1Visualizer() {
           transition={{ duration: 1.0, ease: "easeInOut" }}
         />
 
-        {/* 4. Return Site Hub -> AI (Emerald) */}
+        {/* 4. Return Site Hub -> AI (Green) */}
         <motion.path
           d="M 100 80 L 200 200"
           stroke="#10b981"
@@ -823,17 +823,17 @@ function Step1Visualizer() {
       {/* 1. Center AI Model */}
       <div
         className={cn(
-          "absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-center backdrop-blur-sm z-10 transition-all duration-500",
+          "absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-mint/10 border border-mint/30 rounded-2xl flex items-center justify-center backdrop-blur-sm z-10 transition-all duration-500",
           subStep === 1 &&
-            "border-indigo-500/80 shadow-[0_0_25px_rgba(99,102,241,0.5)] scale-105",
+            "border-mint shadow-[0_0_25px_rgba(74,222,128,0.5)] scale-105",
         )}
       >
-        <Bot className="size-8 text-indigo-400" />
+        <Bot className="size-8 text-mint" />
       </div>
 
       {/* 2. Prompt Card (Bottom) */}
-      <div className="absolute top-[85%] left-[50%] -translate-x-1/2 -translate-y-1/2 p-2.5 bg-indigo-500/10 border border-indigo-500/30 rounded-xl shadow-xl backdrop-blur-sm whitespace-nowrap min-w-37.5 text-center">
-        <span className="text-[9px] text-indigo-400 font-semibold block mb-0.5 uppercase tracking-wider">
+      <div className="absolute top-[85%] left-[50%] -translate-x-1/2 -translate-y-1/2 p-2.5 bg-mint/10 border border-mint/30 rounded-xl shadow-xl backdrop-blur-sm whitespace-nowrap min-w-37.5 text-center">
+        <span className="text-[9px] text-mint font-semibold block mb-0.5 uppercase tracking-wider">
           Prompt Input
         </span>
         <AnimatePresence mode="wait">
@@ -843,7 +843,7 @@ function Step1Visualizer() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.3, color: { duration: 0 } }}
-            className="text-[10px] text-indigo-200 font-medium font-mono"
+            className="text-[10px] text-mint-light font-medium font-mono"
           >
             "{currentPrompt.text}"
           </motion.p>
@@ -855,12 +855,12 @@ function Step1Visualizer() {
         className={cn(
           "absolute top-[50%] left-[15%] -translate-x-1/2 -translate-y-1/2 p-2.5 bg-white/5 border border-white/10 rounded-xl shadow-xl backdrop-blur-sm transition-all duration-500",
           subStep === 3 &&
-            "border-emerald-500/80 shadow-[0_0_20px_rgba(16,185,129,0.5)] bg-emerald-500/10",
+            "border-mint shadow-[0_0_20px_rgba(74,222,128,0.5)] bg-mint/10",
         )}
       >
         <div className="flex gap-1.5 relative">
           <MessageSquare className="size-4 text-[#25D366]" />
-          <div className="size-4 bg-[#4A154B] rounded-md flex items-center justify-center text-[8px] font-bold text-white">
+          <div className="size-4 bg-forest rounded-md flex items-center justify-center text-[8px] font-bold text-white">
             S
           </div>
 
@@ -874,10 +874,10 @@ function Step1Visualizer() {
                 borderColor: { duration: 0 },
                 color: { duration: 0 },
               }}
-              className="absolute -top-4 -right-4 size-4.5 bg-emerald-500 rounded-full flex items-center justify-center border border-[#0a0a0a]"
+              className="absolute -top-4 -right-4 size-4.5 bg-mint rounded-full flex items-center justify-center border border-[#081710]"
             >
               <svg
-                className="size-2.5 text-white"
+                className="size-2.5 text-black"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -901,15 +901,15 @@ function Step1Visualizer() {
           subStep === 1 &&
             (currentPrompt.target === "site" ||
               currentPrompt.target === "both") &&
-            "border-indigo-500/80 shadow-[0_0_20px_rgba(99,102,241,0.4)] bg-indigo-500/10",
+            "border-mint shadow-[0_0_20px_rgba(74,222,128,0.4)] bg-mint/10",
           subStep === 2 &&
             (currentPrompt.target === "site" ||
               currentPrompt.target === "both") &&
-            "border-emerald-500/80 bg-emerald-500/5",
+            "border-mint bg-mint/5",
         )}
       >
         <div className="flex items-center gap-1.5">
-          <BookOpen className="size-4 text-indigo-400" />
+          <BookOpen className="size-4 text-mint" />
           <span className="text-[8.5px] font-mono text-white/80">Khata Hub</span>
         </div>
       </div>
@@ -921,15 +921,15 @@ function Step1Visualizer() {
           subStep === 1 &&
             (currentPrompt.target === "social" ||
               currentPrompt.target === "both") &&
-            "border-indigo-500/80 shadow-[0_0_20px_rgba(99,102,241,0.4)] bg-indigo-500/10",
+            "border-orange shadow-[0_0_20px_rgba(217,142,42,0.4)] bg-orange/10",
           subStep === 2 &&
             (currentPrompt.target === "social" ||
               currentPrompt.target === "both") &&
-            "border-emerald-500/80 bg-emerald-500/5",
+            "border-mint bg-mint/5",
         )}
       >
         <div className="flex items-center gap-1.5">
-          <TrendingUp className="size-4 text-amber-400" />
+          <TrendingUp className="size-4 text-orange" />
           <span className="text-[8.5px] font-mono text-white/80">Mandi Hub</span>
         </div>
       </div>

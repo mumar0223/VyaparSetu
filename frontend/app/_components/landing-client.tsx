@@ -7,8 +7,18 @@ import { Navbar } from "./navbar";
 import { HowItWorks } from "./how-it-works";
 import { Technologies } from "./technologies";
 import { Pricing } from "./pricing";
-import { TargetAudience } from "./target-audience";
-import { Code2, Network, ShieldCheck } from "lucide-react";
+import {
+  Code2,
+  Network,
+  ShieldCheck,
+  Sparkles,
+  ArrowRight,
+  IndianRupee,
+  Bot,
+  Award,
+  Globe2,
+  CheckCircle2,
+} from "lucide-react";
 import Link from "next/link";
 import type { AuthUser } from "@/lib/auth-types";
 
@@ -33,45 +43,52 @@ export function LandingClient({ currentUser }: LandingClientProps) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const HERO_SCALE_CONSTANT = 0.0006;
+  const HERO_SCALE_CONSTANT = 0.00055;
   const calculatedHeroScale = Math.min(
-    1.2,
-    Math.max(0.45, windowWidth * HERO_SCALE_CONSTANT),
+    1.1,
+    Math.max(0.5, windowWidth * HERO_SCALE_CONSTANT),
   );
   const calculatedHeroLeft = Math.min(
-    76,
-    Math.max(68, 68 + ((windowWidth - 1024) * 8) / (1920 - 1024)),
+    74,
+    Math.max(65, 65 + ((windowWidth - 1024) * 9) / (1920 - 1024)),
   );
 
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
   const opacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
-  const scale = useTransform(scrollYProgress, [0, 1], [1, 0.95]);
+  const scale = useTransform(scrollYProgress, [0, 1], [1, 0.96]);
+
+  const STATS = [
+    { label: "Subsidies Mapped", value: "₹50Cr+" },
+    { label: "Indian Dialects", value: "8 Languages" },
+    { label: "Mudra Pre-Approved", value: "100% Digital" },
+    { label: "Ledger Security", value: "PBKDF2 Salted" },
+  ];
 
   return (
-    <main className="bg-[linear-gradient(180deg,#fdfbf7_0%,#f5f0e6_100%)] selection:bg-[#10b981]/30 min-h-screen">
+    <main className="bg-cream dark:bg-background text-foreground selection:bg-mint-pale selection:text-forest min-h-screen font-sans">
       <Navbar currentUser={currentUser} />
 
-      {/* Hero Wrapper */}
-      <div ref={heroRef} className="h-[130vh] relative">
-        <div className="sticky top-0 h-svh w-full overflow-hidden flex flex-col items-center pt-17.5 md:pt-25 pb-4">
+      {/* Hero Section */}
+      <div ref={heroRef} className="min-h-[110vh] lg:h-[125vh] relative">
+        <div className="sticky top-0 h-svh w-full overflow-hidden flex flex-col items-center pt-20 md:pt-28 pb-4">
           <motion.section
             style={{ y, opacity, scale }}
-            className="w-full flex-1 flex flex-col items-center justify-center min-h-0"
+            className="w-full flex-1 flex flex-col items-center justify-center min-h-0 relative"
           >
-            {/* Subtle Background Glows */}
-            <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-[#10b981]/15 rounded-full blur-[120px] -z-10" />
-            <div className="absolute bottom-0 right-1/4 translate-x-1/2 translate-y-1/2 w-75 h-75 bg-[#f59e0b]/15 rounded-full blur-[100px] -z-10 animate-pulse" />
+            {/* Ambient Radial Lighting */}
+            <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 sm:w-[500px] h-96 sm:h-[500px] bg-mint/15 dark:bg-mint/5 rounded-full blur-[140px] -z-10 pointer-events-none" />
+            <div className="absolute bottom-10 right-1/4 translate-x-1/2 translate-y-1/2 w-80 sm:w-[400px] h-80 sm:h-[400px] bg-orange/10 dark:bg-orange/5 rounded-full blur-[120px] -z-10 pointer-events-none" />
 
-            {/* Diagram Background Layer */}
+            {/* Connection Diagram Layer */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-              className="hidden lg:flex absolute inset-0 z-0 items-center justify-end overflow-hidden pointer-events-none opacity-100 mt-0"
+              transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+              className="hidden lg:flex absolute inset-0 z-0 items-center justify-end overflow-hidden pointer-events-none opacity-100"
             >
               <div className="w-full h-full max-w-7xl mx-auto relative">
                 <div
-                  className="absolute top-1/2 origin-center w-250"
+                  className="absolute top-1/2 origin-center w-[950px]"
                   style={{
                     left: `${calculatedHeroLeft}%`,
                     transform: `translate(-50%, -50%) scale(${calculatedHeroScale})`,
@@ -82,58 +99,76 @@ export function LandingClient({ currentUser }: LandingClientProps) {
               </div>
             </motion.div>
 
+            {/* Left Hero Content */}
             <div className="container lg:pl-16 mx-auto px-4 md:px-8 flex items-center flex-1 min-h-0 pb-6 md:pb-10 w-full h-full relative z-10 pointer-events-none">
-              {/* Left Side: Text / CTA */}
               <motion.div
-                initial={{ opacity: 0, x: -50 }}
+                initial={{ opacity: 0, x: -40 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="flex flex-col gap-5 md:gap-6 max-w-2xl z-10 pointer-events-auto"
+                transition={{ duration: 0.7, ease: "easeOut" }}
+                className="flex flex-col gap-4 sm:gap-6 max-w-xl lg:max-w-2xl z-10 pointer-events-auto"
               >
-                <h1 className="text-4xl sm:text-5xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] text-[#0f172a]">
-                  Grow your local business.
-                  <br />
-                  <span className="text-[#10b981] font-medium">
+                {/* Grassroots Badge */}
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-mint-pale dark:bg-mint/10 border border-mint/30 dark:border-mint/20 text-forest dark:text-mint text-xs font-bold shadow-xs w-fit">
+                  <Sparkles className="size-3.5 text-mint" />
+                  <span>AI Business Advisory for Bharat</span>
+                </div>
+
+                <h1 className="text-3xl sm:text-5xl md:text-5xl lg:text-6xl font-serif font-bold tracking-tight leading-[1.12] text-forest dark:text-foreground">
+                  Grow your local business.{" "}
+                  <span className="text-forest dark:text-mint block mt-1">
                     In your own language.
                   </span>
                 </h1>
 
-                <p className="text-sm md:text-base lg:text-lg text-[#475569] leading-relaxed max-w-[90%]">
-                  Empowering rural micro-entrepreneurs, artisans, and local
-                  traders with instant business advisory, working capital
-                  structuring, and government scheme access — directly through
-                  WhatsApp, voice, and our intelligent portal.
+                <p className="text-xs sm:text-sm md:text-base text-ink-muted dark:text-muted-foreground leading-relaxed max-w-xl">
+                  Empowering rural shopkeepers, artisans, and micro-enterprises
+                  with AI pricing advisory, automated ledger structuring, and
+                  direct government scheme access — seamlessly via WhatsApp and
+                  voice.
                 </p>
 
+                {/* Primary Action Buttons */}
                 <div className="flex flex-wrap items-center gap-3 pt-2">
                   {currentUser ? (
                     <Link
                       href="/dashboard"
-                      className="px-5 py-3 md:px-6 md:py-3 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-2xl shadow-2xl shadow-[#10b981]/30 transition-all active:scale-95 text-sm inline-flex items-center justify-center"
+                      className="px-6 py-3.5 bg-forest dark:bg-mint hover:bg-forest-deep dark:hover:bg-mint-light text-white dark:text-black font-bold rounded-xl shadow-lg transition-all active:scale-95 text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer"
                     >
-                      Go to Dashboard
+                      <span>Open Workspace Dashboard</span>
+                      <ArrowRight className="size-4" />
                     </Link>
                   ) : (
-                    <Link
-                      href="/login"
-                      className="px-5 py-3 md:px-6 md:py-3 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-2xl shadow-2xl shadow-[#10b981]/30 transition-all active:scale-95 text-sm inline-flex items-center justify-center"
-                    >
-                      Get Started Free
-                    </Link>
+                    <>
+                      <Link
+                        href="/signup"
+                        className="px-6 py-3.5 bg-orange hover:bg-orange-hover text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer"
+                      >
+                        <span>Start Free Advisory</span>
+                        <ArrowRight className="size-4" />
+                      </Link>
+                      <Link
+                        href="/schemes-for-you"
+                        className="px-5 py-3.5 bg-white dark:bg-card border border-sage/40 dark:border-border hover:bg-cream dark:hover:bg-muted text-forest dark:text-foreground font-bold rounded-xl transition-all shadow-xs text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer"
+                      >
+                        <Award className="size-4 text-mint" />
+                        <span>Explore Govt Subsidies</span>
+                      </Link>
+                    </>
                   )}
                 </div>
 
-                {/* Rural Metrics Banner */}
-                <div className="flex flex-wrap items-center gap-6 pt-4 text-xs md:text-sm font-medium text-[#475569]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#f59e0b]">★</span> 50+ Districts Mapped
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#f59e0b]">★</span> 200+ Opportunities
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#f59e0b]">★</span> 100+ Schemes Indexed
-                  </div>
+                {/* Trust Points */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-sage/20 dark:border-border max-w-xl">
+                  {STATS.map((s, idx) => (
+                    <div key={idx} className="leading-tight">
+                      <span className="text-xs sm:text-sm font-serif font-bold text-forest dark:text-mint block">
+                        {s.value}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-medium">
+                        {s.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             </div>
@@ -141,44 +176,46 @@ export function LandingClient({ currentUser }: LandingClientProps) {
         </div>
       </div>
 
-      <div className="bg-[#fdfbf7] relative z-10 w-full rounded-t-[2.5rem] md:rounded-t-[4rem] border-t border-[#e7e5e4] shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
-        <TargetAudience />
-        
-        {/* Feature Section */}
-        <section id="features" className="py-24 md:py-32 bg-transparent border-b border-[#e7e5e4]">
-          <div className="container mx-auto px-6">
+      {/* Content Wrapper */}
+      <div className="bg-cream dark:bg-background relative z-10 w-full rounded-t-[2.5rem] md:rounded-t-[3.5rem] border-t border-sage/30 dark:border-border shadow-2xl">
+        {/* Core Bottleneck Section */}
+        <section className="py-20 md:py-28 bg-white/70 dark:bg-card/30 border-b border-sage/30 dark:border-border rounded-t-[2.5rem] md:rounded-t-[3.5rem]">
+          <div className="container mx-auto px-6 max-w-6xl">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
-              className="text-center max-w-3xl mx-auto mb-16 md:mb-24"
+              className="text-center max-w-3xl mx-auto mb-16"
             >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-tight text-[#0f172a]">
-                The Rural Micro-Enterprise Bottleneck
+              <span className="text-xs font-bold text-forest dark:text-mint uppercase tracking-wider block mb-2">
+                Grassroots Challenges Solved
+              </span>
+              <h2 className="text-3xl md:text-5xl font-serif font-bold mb-4 tracking-tight text-forest dark:text-foreground">
+                Built for the Realities of Local Commerce
               </h2>
-              <p className="text-[#475569] text-lg md:text-xl leading-relaxed">
-                Grassroots businesses generate vital economic value, but lack
-                access to affordable financial guidance, formalized credit
-                structuring, and hyper-local market intelligence.
+              <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
+                Micro-enterprises power 45% of national manufacturing and
+                employment, yet face severe hurdles in credit formality, pricing
+                discovery, and scheme awareness.
               </p>
             </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-3 gap-6">
               {[
                 {
                   icon: Code2,
-                  title: "No Complex Paperwork",
-                  desc: "Securing working capital shouldn't require confusing bank visits or predatory middlemen. VyaparSetu formats informal ledgers into bank-ready statements and matches you with verified government credit schemes.",
+                  title: "Zero Complex Paperwork",
+                  desc: "Securing working capital shouldn't require confusing bank visits or third-party brokers. VyaparSetu structures informal receipts into bankable statements matching PM Mudra requirements.",
                 },
                 {
                   icon: Network,
-                  title: "Actionable Regional Advisory",
-                  desc: "Rural traders often lack real-time insights on regional commodity rates, seasonal demand shifts, and supplier bargaining power. Receive actionable price guidance tailored to your exact pin code.",
+                  title: "Actionable Mandi Intelligence",
+                  desc: "Traders often lack real-time regional commodity trends and distributor pricing power. Receive actionable price guidance tailored directly to your local district.",
                 },
                 {
                   icon: ShieldCheck,
-                  title: "Conversational & Voice First",
-                  desc: "No steep technological hurdle. Speak or text naturally in regional languages through WhatsApp, voice notes, and simplified dashboards without needing complex accounting software.",
+                  title: "Voice & Regional Dialects",
+                  desc: "No steep technical hurdles. Speak or message naturally in 8 Indian regional dialects through WhatsApp and simplified dashboards without needing complex accounting tools.",
                 },
               ].map((feature, i) => (
                 <motion.div
@@ -186,16 +223,16 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-100px" }}
-                  transition={{ delay: i * 0.15, duration: 0.6 }}
-                  className="p-8 rounded-3xl border border-[#e7e5e4] bg-[#f5f0e6] shadow-sm hover:shadow-md transition-shadow group"
+                  transition={{ delay: i * 0.1, duration: 0.5 }}
+                  className="p-7 rounded-3xl border border-sage/30 dark:border-border bg-white dark:bg-card shadow-xs hover:shadow-md transition-all group"
                 >
-                  <div className="size-12 rounded-2xl bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[#10b981] group-hover:text-white transition-all duration-300">
+                  <div className="size-12 rounded-2xl bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint border border-mint/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:bg-mint group-hover:text-black transition-all duration-300">
                     <feature.icon className="size-6" />
                   </div>
-                  <h3 className="font-bold text-xl mb-3 text-[#0f172a]">
+                  <h3 className="font-serif font-bold text-lg mb-2 text-forest dark:text-foreground">
                     {feature.title}
                   </h3>
-                  <p className="text-[#475569] leading-relaxed">
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                     {feature.desc}
                   </p>
                 </motion.div>
@@ -204,13 +241,37 @@ export function LandingClient({ currentUser }: LandingClientProps) {
           </div>
         </section>
 
+        {/* How It Works, Tech & Pricing */}
         <HowItWorks />
         <Technologies />
         <Pricing currentUser={currentUser} />
 
         {/* Footer */}
-        <footer className="border-t border-border py-12 bg-muted/10 text-center text-muted-foreground">
-          <p>© {new Date().getFullYear()} VyaparSetu. All rights reserved.</p>
+        <footer className="border-t border-sage/30 dark:border-border py-10 bg-white dark:bg-zinc-950 text-center text-xs text-muted-foreground">
+          <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 font-serif font-bold text-sm text-forest dark:text-mint">
+              <div className="size-2.5 bg-mint rounded-full" />
+              <span>VyaparSetu</span>
+            </div>
+            <p>
+              © {new Date().getFullYear()} VyaparSetu. DPDP Act 2023 Compliant
+              &amp; Encrypted.
+            </p>
+            <div className="flex items-center gap-4 text-xs font-medium">
+              <Link
+                href="/privacy-consent"
+                className="hover:text-forest dark:hover:text-mint"
+              >
+                Privacy Consent
+              </Link>
+              <Link
+                href="/schemes-for-you"
+                className="hover:text-forest dark:hover:text-mint"
+              >
+                Govt Schemes
+              </Link>
+            </div>
+          </div>
         </footer>
       </div>
     </main>

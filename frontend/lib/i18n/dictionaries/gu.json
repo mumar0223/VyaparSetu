@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "વ્યાપારસેતુ",
+    "tagline": "ભારતનો AI વ્યાપાર અને નાણાકીય ભાગીદાર",
+    "save": "સાચવો",
+    "cancel": "રદ કરો",
+    "delete": "કાઢી નાખો",
+    "edit": "સંપાદિત કરો",
+    "approve": "મંજૂર કરો",
+    "review": "સમીક્ષા",
+    "reviewAndEdit": "સમીક્ષા અને સંપાદન",
+    "loading": "લોડ થઈ રહ્યું છે...",
+    "submitting": "સબમિટ કરી રહ્યું છે...",
+    "success": "સફળ",
+    "error": "ભૂલ",
+    "retry": "ફરી પ્રયાસ કરો",
+    "search": "શોધો...",
+    "holdToSpeak": "બોલવા માટે દબાવી રાખો",
+    "listening": "સાંભળી રહ્યો છું...",
+    "speaking": "બોલી રહ્યો છું...",
+    "thinking": "વિચારી રહ્યો છું...",
+    "voiceAgent": "વોઇસ એજન્ટ ઓએસ",
+    "newChat": "નવી ચેટ",
+    "clearChat": "ચેટ સાફ કરો",
+    "language": "ભાષા",
+    "lightMode": "લાઇટ મોડ",
+    "darkMode": "ડાર્ક મોડ",
+    "signIn": "સાઇન ઇન",
+    "signOut": "સાઇન આઉટ"
+  },
+  "sidebar": {
+    "dashboard": "ડેશબોર્ડ",
+    "swotScanner": "SWOT બજાર સ્કેનર",
+    "enterpriseProfile": "ઉદ્યોગ પ્રોફાઇલ",
+    "aiRecommendations": "AI સલાહકાર",
+    "govtSchemes": "સરકારી યોજનાઓ",
+    "successStories": "સફળતાની વાર્તાઓ",
+    "dailyExpenses": "દૈનિક ખર્ચ",
+    "cashFlowRunway": "કેશ ફ્લો રનવે",
+    "savingsGoals": "બચત લક્ષ્યાંકો",
+    "budgetPlanning": "બજેટ આયોજન",
+    "debtNavigator": "લોન / EMI નેવિગેટર",
+    "loanSimulator": "લોન સિમ્યુલેટર",
+    "businessCredit": "બિઝનેસ ક્રેડિટ",
+    "masterLedger": "માસ્ટર ખાતાવહી"
+  },
+  "dashboard": {
+    "healthScore": "નાણાકીય સ્વાસ્થ્ય સ્કોર",
+    "workingCapital": "કાર્યકારી મૂડી બફર",
+    "monthlyBurn": "માસિક ખર્ચ",
+    "apmcSpotRates": "લાઇવ APMC બજાર ભાવ",
+    "activeAlerts": "મહત્વપૂર્ણ કાર્યો",
+    "viewMore": "વિગતો જુઓ"
+  },
+  "chat": {
+    "placeholder": "મંડી ભાવ, મુદ્રા લોન અથવા ખાતાવહી વિશે પૂછો...",
+    "disclaimer": "વ્યાપારસેતુ AI થી ભૂલો થઈ શકે છે. મહત્વપૂર્ણ નાણાકીય નિર્ણયો ચકાસો.",
+    "stagedDraft": "ડ્રાફ્ટ તૈયાર છે",
+    "clickToReview": "મંજૂરી માટે અહીં ક્લિક કરો"
+  },
+  "voice": {
+    "aiSpeaking": "AI બોલી રહ્યું છે • માઇક લૉક",
+    "holdToSpeak": "તમારી ભાષામાં બોલવા માટે બટન દબાવી રાખો...",
+    "captions": "સબટાઇટલ",
+    "selectLanguage": "ભાષા પસંદ કરો"
+  }
+}

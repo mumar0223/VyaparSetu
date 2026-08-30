@@ -6,27 +6,91 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   LayoutDashboard,
   Activity,
-  Workflow,
+  TrendingUp,
+  Building2,
+  Sparkles,
+  Award,
+  Star,
+  IndianRupee,
+  Target,
+  PieChart,
+  HandCoins,
+  Building,
+  CreditCard,
+  FileText,
+  Bell,
+  ShieldCheck,
+  Trash2,
+  Shield,
   Settings,
   User,
-  CreditCard,
-  Shield,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/lib/auth-types";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/activity", label: "Activity", icon: Activity },
-  { href: "/architecture", label: "Architecture", icon: Workflow },
-];
+import { useTranslation } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
-const secondary = [
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/billing", label: "Billing", icon: CreditCard },
-  { href: "/security", label: "Security", icon: Shield },
-  { href: "/settings", label: "Settings", icon: Settings },
+const I18N_NAV_MAP: Record<string, string> = {
+  "/dashboard": "sidebar.dashboard",
+  "/scanner": "sidebar.swotScanner",
+  "/profile/business": "sidebar.enterpriseProfile",
+  "/ai-recommendations": "sidebar.aiRecommendations",
+  "/schemes-for-you": "sidebar.govtSchemes",
+  "/success-stories": "sidebar.successStories",
+  "/expenses": "sidebar.dailyExpenses",
+  "/cashflow": "sidebar.cashFlowRunway",
+  "/savings": "sidebar.savingsGoals",
+  "/budget": "sidebar.budgetPlanning",
+  "/debt": "sidebar.debtNavigator",
+  "/borrowing": "sidebar.loanSimulator",
+  "/credit": "sidebar.businessCredit",
+  "/transactions": "sidebar.masterLedger",
+};
+
+const NAV_SECTIONS = [
+  {
+    title: "Workspace",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: "Grow & Advisory",
+    items: [
+      { href: "/scanner", label: "SWOT Market Scanner", icon: TrendingUp },
+      { href: "/profile/business", label: "Enterprise Profile", icon: Building2 },
+      { href: "/ai-recommendations", label: "AI Recommendations", icon: Sparkles },
+      { href: "/schemes-for-you", label: "Govt. Schemes", icon: Award },
+      { href: "/success-stories", label: "Success Stories", icon: Star },
+    ],
+  },
+  {
+    title: "Money & Credit",
+    items: [
+      { href: "/expenses", label: "Daily Expenses", icon: IndianRupee },
+      { href: "/cashflow", label: "Cash Flow Runway", icon: Activity },
+      { href: "/savings", label: "Savings Goals", icon: Target },
+      { href: "/budget", label: "Budget Planning", icon: PieChart },
+      { href: "/debt", label: "Debt Navigator", icon: HandCoins },
+      { href: "/borrowing", label: "Loan Simulator", icon: Building },
+      { href: "/credit", label: "Business Credit", icon: CreditCard },
+      { href: "/transactions", label: "Master Ledger", icon: FileText },
+    ],
+  },
+  {
+    title: "Account & Governance",
+    items: [
+      { href: "/notifications", label: "Alerts & Deadlines", icon: Bell },
+      { href: "/privacy-consent", label: "Privacy & DPDP", icon: ShieldCheck },
+      { href: "/recycle-bin", label: "Recycle Bin", icon: Trash2 },
+      { href: "/billing", label: "Subscription", icon: CreditCard },
+      { href: "/security", label: "Security & Access", icon: Shield },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 interface AppSidebarProps {
@@ -38,14 +102,15 @@ interface AppSidebarProps {
 export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const isActive = (href: string) =>
     href === "/dashboard"
       ? pathname === "/dashboard"
-      : pathname.startsWith(href);
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   const userName = currentUser?.name || "Operator";
-  const userRole = currentUser?.role || "User";
+  const userRole = currentUser?.role || "Enterprise";
   const avatarUrl = currentUser?.avatar || "";
 
   const avatarInitials = userName
@@ -70,106 +135,93 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
   return (
     <aside
       className={cn(
-        "flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar h-full",
+        "flex w-64 shrink-0 flex-col border-r border-sage/30 bg-white h-full font-sans text-ink select-none",
         className
       )}
     >
-      <div className="flex h-14 items-center px-4 select-none border-b border-sidebar-border/40">
-        <Link href="/dashboard" className="app-font text-xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/75 dark:from-white dark:to-white/60">
-          VyaparSetu
+      {/* Brand Header */}
+      <div className="flex h-16 items-center justify-between px-4 border-b border-sage/30 shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_10px_rgba(74,222,128,0.7)] shrink-0" />
+          <span className="font-serif font-bold text-lg text-forest tracking-tight truncate">
+            {t("common.appName", "VyaparSetu")}
+          </span>
         </Link>
+        <LanguageSwitcher variant="brand" className="shrink-0" />
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Workspace
-        </p>
-        <ul className="flex flex-col gap-0.5">
-          {nav.map((item) => (
-            <NavLink
-              key={item.href}
-              {...item}
-              active={isActive(item.href)}
-              onClick={onClose}
-            />
-          ))}
-        </ul>
-        <p className="px-2 pb-1 pt-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Manage
-        </p>
-        <ul className="flex flex-col gap-0.5">
-          {secondary.map((item) => (
-            <NavLink
-              key={item.href}
-              {...item}
-              active={isActive(item.href)}
-              onClick={onClose}
-            />
-          ))}
-        </ul>
+      {/* Navigation Groups */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.title}>
+            <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted/70">
+              {section.title}
+            </p>
+            <ul className="flex flex-col gap-0.5">
+              {section.items.map((item) => {
+                const active = isActive(item.href);
+                const translatedLabel = I18N_NAV_MAP[item.href]
+                  ? t(I18N_NAV_MAP[item.href], item.label)
+                  : item.label;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onClose}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all",
+                        active
+                          ? "bg-mint-pale text-forest font-bold shadow-xs border border-mint/20"
+                          : "text-ink-muted hover:bg-cream hover:text-forest"
+                      )}
+                    >
+                      <item.icon
+                        className={cn(
+                          "size-4 shrink-0",
+                          active ? "text-forest" : "text-ink-muted group-hover:text-forest"
+                        )}
+                      />
+                      <span className="truncate">{translatedLabel}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3 flex items-center justify-between gap-2">
+      {/* Footer Profile & Logout */}
+      <div className="border-t border-sage/30 p-3 flex items-center justify-between gap-2 shrink-0 bg-white">
         <Link
           href="/profile"
           onClick={onClose}
-          className="flex flex-1 items-center gap-2 rounded-lg bg-accent/50 p-1.5 hover:bg-accent/80 transition-colors min-w-0"
+          className="flex flex-1 items-center gap-2.5 rounded-xl bg-cream/70 p-2 hover:bg-cream transition-colors min-w-0 border border-sage/20"
         >
-          <Avatar className="size-8 border border-zinc-800 shrink-0">
+          <Avatar className="size-8 border border-mint shrink-0">
             <AvatarImage src={avatarUrl} alt={userName} />
-            <AvatarFallback className="text-[10px] font-semibold bg-zinc-800 text-zinc-200">
+            <AvatarFallback className="text-[10px] font-bold bg-mint-pale text-forest">
               {avatarInitials}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 leading-tight">
-            <p className="truncate text-xs font-semibold text-foreground">
+            <p className="truncate text-xs font-bold text-forest">
               {userName}
             </p>
-            <p className="truncate text-[10px] text-muted-foreground">
+            <p className="truncate text-[10px] text-ink-muted">
               {userRole}
             </p>
           </div>
         </Link>
+        <ThemeToggle />
         <button
           onClick={handleLogout}
           title="Log out"
-          className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+          className="size-9 rounded-xl flex items-center justify-center text-ink-muted hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
         >
           <LogOut className="size-4" />
         </button>
       </div>
     </aside>
-  );
-}
-
-function NavLink({
-  href,
-  label,
-  icon: Icon,
-  active,
-  onClick,
-}: {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  active: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <li>
-      <Link
-        href={href}
-        onClick={onClick}
-        className={cn(
-          "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
-          active
-            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
-        )}
-      >
-        <Icon className="size-4 shrink-0" />
-        {label}
-      </Link>
-    </li>
   );
 }

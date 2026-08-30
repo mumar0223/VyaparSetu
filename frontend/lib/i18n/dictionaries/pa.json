@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "ਵਪਾਰਸੇਤੂ",
+    "tagline": "ਭਾਰਤ ਦਾ AI ਵਪਾਰ ਅਤੇ ਵਿੱਤੀ ਭਾਈਵਾਲ",
+    "save": "ਸੰਭਾਲੋ",
+    "cancel": "ਰੱਦ ਕਰੋ",
+    "delete": "ਮਿਟਾਓ",
+    "edit": "ਸੋਧੋ",
+    "approve": "ਮਨਜ਼ੂਰ ਕਰੋ",
+    "review": "ਸਮੀਖਿਆ",
+    "reviewAndEdit": "ਸਮੀਖਿਆ ਅਤੇ ਸੋਧ",
+    "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
+    "submitting": "ਜਮ੍ਹਾ ਕਰ ਰਿਹਾ ਹੈ...",
+    "success": "ਸਫਲ",
+    "error": "ਗਲਤੀ",
+    "retry": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+    "search": "ਖੋਜੋ...",
+    "holdToSpeak": "ਬੋਲਣ ਲਈ ਦਬਾ ਕੇ ਰੱਖੋ",
+    "listening": "ਸੁਣ ਰਿਹਾ ਹਾਂ...",
+    "speaking": "ਬੋਲ ਰਿਹਾ ਹਾਂ...",
+    "thinking": "ਸੋਚ ਰਿਹਾ ਹਾਂ...",
+    "voiceAgent": "ਵੌਇਸ ਏਜੰਟ OS",
+    "newChat": "ਨਵੀਂ ਗੱਲਬਾਤ",
+    "clearChat": "ਚੈਟ ਸਾਫ਼ ਕਰੋ",
+    "language": "ਭਾਸ਼ਾ",
+    "lightMode": "ਲਾਈਟ ਮੋਡ",
+    "darkMode": "ਡਾਰਕ ਮੋਡ",
+    "signIn": "ਸਾਈਨ ਇਨ",
+    "signOut": "ਸਾਈਨ ਆਊਟ"
+  },
+  "sidebar": {
+    "dashboard": "ਡੈਸ਼ਬੋਰਡ",
+    "swotScanner": "SWOT ਮਾਰਕੀਟ ਸਕੈਨਰ",
+    "enterpriseProfile": "ਉੱਦਮ ਪ੍ਰੋਫਾਈਲ",
+    "aiRecommendations": "AI ਸਲਾਹਕਾਰ",
+    "govtSchemes": "ਸਰਕਾਰੀ ਸਕੀਮਾਂ",
+    "successStories": "ਸਫਲਤਾ ਦੀਆਂ ਕਹਾਣੀਆਂ",
+    "dailyExpenses": "ਰੋਜ਼ਾਨਾ ਖਰਚੇ",
+    "cashFlowRunway": "ਕੈਸ਼ ਫਲੋ ਰਨਵੇਅ",
+    "savingsGoals": "ਬੱਚਤ ਟੀਚੇ",
+    "budgetPlanning": "ਬਜਟ ਯੋਜਨਾਬੰਦੀ",
+    "debtNavigator": "ਕਰਜ਼ਾ / EMI ਨੈਵੀਗੇਟਰ",
+    "loanSimulator": "ਕਰਜ਼ਾ ਸਿਮੂਲੇਟਰ",
+    "businessCredit": "ਕਾਰੋਬਾਰੀ ਕ੍ਰੈਡਿਟ",
+    "masterLedger": "ਮਾਸਟਰ ਖਾਤਾ ਬਹੀ"
+  },
+  "dashboard": {
+    "healthScore": "ਵਿੱਤੀ ਸਿਹਤ ਸਕੋਰ",
+    "workingCapital": "ਵਰਕਿੰਗ ਕੈਪੀਟਲ",
+    "monthlyBurn": "ਮਹੀਨਾਵਾਰ ਖਰਚਾ",
+    "apmcSpotRates": "ਲਾਈਵ APMC ਮੰਡੀ ਰੇਟ",
+    "activeAlerts": "ਜ਼ਰੂਰੀ ਕਾਰਵਾਈਆਂ",
+    "viewMore": "ਵੇਰਵੇ ਦੇਖੋ"
+  },
+  "chat": {
+    "placeholder": "ਮੰਡੀ ਰੇਟ, ਮੁਦਰਾ ਲੋਨ ਜਾਂ ਖਾਤੇ ਬਾਰੇ ਪੁੱਛੋ...",
+    "disclaimer": "AI ਗਲਤੀਆਂ ਕਰ ਸਕਦਾ ਹੈ। ਵਿੱਤੀ ਫੈਸਲਿਆਂ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ।",
+    "stagedDraft": "ਡਰਾਫਟ ਤਿਆਰ ਹੈ",
+    "clickToReview": "ਮਨਜ਼ੂਰੀ ਲਈ ਇੱਥੇ ਕਲਿੱਕ ਕਰੋ"
+  },
+  "voice": {
+    "aiSpeaking": "AI ਬੋਲ ਰਿਹਾ ਹੈ • ਮਾਈਕ ਲਾਕ",
+    "holdToSpeak": "ਆਪਣੀ ਭਾਸ਼ਾ ਵਿੱਚ ਬੋਲਣ ਲਈ ਬਟਨ ਦਬਾ ਕੇ ਰੱਖੋ...",
+    "captions": "ਸਿਰਲੇਖ",
+    "selectLanguage": "ਭਾਸ਼ਾ ਚੁਣੋ"
+  }
+}

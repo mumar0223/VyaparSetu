@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
+
 import {
   PanelRightOpen,
   PanelRightClose,
@@ -16,6 +23,9 @@ import {
 import { FloatingInput } from "./floating-input";
 import { HistorySidebar } from "./history-sidebar";
 import { ChatMessageList } from "./chat-message-list";
+import { VoiceAgentView, type VoiceAgentStatus } from "./voice-agent-view";
+import { useLiveAgent } from "./use-live-agent";
+import { ArtifactModal, type ArtifactPayload } from "./artifact-modal";
 import type { ChatMessage, ConversationSummary, ToolCallItem } from "./types";
 import type { AuthUser } from "@/lib/auth-types";
 import { cn } from "@/lib/utils";
@@ -37,36 +47,24 @@ export function ChatWorkspace({
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsSidebarOpen(window.innerWidth >= 1024);
+    }
+  }, []);
+
   const [isInitialLoading, setIsInitialLoading] = useState(
     Boolean(initialChatId),
   );
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [activeArtifact, setActiveArtifact] = useState<ArtifactPayload | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const savedScrollPositionRef = useRef<number>(0);
 
-  const chatCache = useRef<Map<string, ChatMessage[]>>(new Map());
-
-  // Auto-scroll to bottom on message update / stream if user hasn't scrolled up
-  useEffect(() => {
-    if (!showScrollBottom) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isLoading, showScrollBottom]);
-
-  const handleScroll = () => {
-    if (!scrollViewportRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollViewportRef.current;
-    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 100);
-  };
-
-  const scrollToBottom = () => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    setShowScrollBottom(false);
-  };
-
-
-  // 1. Fetch Conversations History
+  // ── 1. Fetch Conversations History ──
   const fetchConversations = useCallback(async () => {
     try {
       const res = await fetch("/api/chats");
@@ -82,6 +80,226 @@ export function ChatWorkspace({
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  // ── Voice Agent Mode State & Live Agent Orchestrator ──
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isEndingVoiceSession, setIsEndingVoiceSession] = useState(false);
+  const [isStartingVoiceSession, setIsStartingVoiceSession] = useState(false);
+  const voiceStartInFlightRef = useRef(false);
+  const voiceTurnsRef = useRef<Array<{ user: string; assistant?: string }>>([]);
+
+  const liveAgent = useLiveAgent({
+    activeChatId,
+    onTurnComplete: (turn) => {
+      const userText = turn.userTranscript.trim();
+      const asstText = turn.assistantTranscript.trim();
+      if (userText) {
+        voiceTurnsRef.current.push({
+          user: userText,
+          assistant: asstText,
+        });
+        const currentCount = voiceTurnsRef.current.length;
+        const currentChatId = activeChatId;
+
+        // On Turn 1 (instant title) or Turn 3 (refined multi-turn dialogue title)
+        if (currentChatId && (currentCount === 1 || currentCount === 3)) {
+          fetch(`/api/chats/${currentChatId}/title`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              turns: voiceTurnsRef.current.slice(0, 3),
+            }),
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.title) {
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === currentChatId ? { ...c, title: data.title } : c
+                  )
+                );
+              }
+            })
+            .catch((err) => console.warn("Voice title generation error:", err));
+        }
+      }
+
+      setMessages((prev) => {
+        const next: ChatMessage[] = [...prev, {
+          id: `user_${Date.now()}`,
+          role: "user",
+          content: turn.userTranscript,
+          createdAt: new Date(),
+        }];
+        if (turn.assistantTranscript.trim()) {
+          next.push({
+            id: `asst_${Date.now()}`,
+            role: "assistant",
+            content: turn.assistantTranscript,
+            toolCalls: turn.toolCalls,
+            createdAt: new Date(),
+          });
+        }
+        return next;
+      });
+      fetchConversations();
+    },
+  });
+
+  const chatCache = useRef<Map<string, ChatMessage[]>>(new Map());
+
+  // Auto-scroll to bottom on message update / stream if user hasn't scrolled up
+  useEffect(() => {
+    if (!showScrollBottom && !isVoiceMode) {
+      bottomRef.current?.scrollIntoView({ behavior: "instant" });
+    }
+  }, [messages, isLoading, showScrollBottom, isVoiceMode]);
+
+  // Synchronous pre-paint scroll restoration: Locks directly to bottom with ZERO jumping
+  useLayoutEffect(() => {
+    if (!isVoiceMode && scrollViewportRef.current) {
+      scrollViewportRef.current.scrollTop =
+        scrollViewportRef.current.scrollHeight;
+    }
+  }, [isVoiceMode, activeChatId]);
+
+  const handleScroll = () => {
+    if (!scrollViewportRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollViewportRef.current;
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 100);
+  };
+
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollBottom(false);
+  };
+
+  // ── 5. Delete Chat ──
+  const handleDeleteChat = useCallback(
+    async (id: string) => {
+      try {
+        chatCache.current.delete(id);
+        const res = await fetch(`/api/chats/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          setConversations((prev) => prev.filter((c) => c.id !== id));
+          if (activeChatId === id) {
+            setActiveChatId(null);
+            setMessages([]);
+            window.history.pushState(null, "", "/dashboard");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to delete chat:", err);
+      }
+    },
+    [activeChatId],
+  );
+
+  // ── Start Live Voice Session ──
+  const handleStartVoiceSession = useCallback(async () => {
+    if (isVoiceMode || voiceStartInFlightRef.current) return;
+    voiceStartInFlightRef.current = true;
+    voiceTurnsRef.current = [];
+    setIsStartingVoiceSession(true);
+    if (scrollViewportRef.current) {
+      savedScrollPositionRef.current = scrollViewportRef.current.scrollTop;
+    }
+    setIsVoiceMode(true);
+    // This screen is intentionally shown before any model/WebSocket work. It
+    // represents only creation or resolution of the durable chat session.
+    liveAgent.setStatus("initializing");
+
+    try {
+      let targetId = activeChatId;
+      if (!targetId) {
+        const res = await fetch("/api/chats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "Live Voice Session" }),
+        });
+        if (!res.ok) throw new Error("Could not create a chat for this voice session.");
+        const data = await res.json();
+        targetId = data?.conversation?.id;
+        if (!targetId) throw new Error("Voice session chat creation returned no chat ID.");
+        setActiveChatId(targetId);
+        fetchConversations();
+      }
+
+      // The URL update is also complete before any Vertex connection begins.
+      window.history.pushState(null, "", `/dashboard/c/${targetId}?mode=voice`);
+      await liveAgent.connect(targetId);
+    } catch (error) {
+      console.error("Failed to initialize voice session:", error);
+      liveAgent.reportError(error instanceof Error ? error.message : "Unable to start the voice session.");
+    } finally {
+      voiceStartInFlightRef.current = false;
+      setIsStartingVoiceSession(false);
+    }
+  }, [activeChatId, liveAgent, fetchConversations, isVoiceMode]);
+
+  // ── End Live Voice Session (Auto-Delete Empty Voice Sessions) ──
+  const handleEndVoiceSession = useCallback(async () => {
+    setIsEndingVoiceSession(true);
+    liveAgent.disconnect();
+
+    const currentChatId = activeChatId;
+    if (currentChatId && messages.length === 0) {
+      try {
+        chatCache.current.delete(currentChatId);
+        await fetch(`/api/chats/${currentChatId}`, { method: "DELETE" });
+        setConversations((prev) => prev.filter((c) => c.id !== currentChatId));
+        setActiveChatId(null);
+        setMessages([]);
+      } catch (err) {
+        console.error("Failed to delete empty chat on exit:", err);
+      }
+      window.history.replaceState(null, "", "/dashboard");
+    } else if (currentChatId) {
+      // Trigger background title generation if title is still default
+      if (voiceTurnsRef.current.length > 0) {
+        const existingConv = conversations.find((c) => c.id === currentChatId);
+        if (existingConv && (existingConv.title === "Live Voice Session" || existingConv.title === "New Conversation")) {
+          fetch(`/api/chats/${currentChatId}/title`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              turns: voiceTurnsRef.current.slice(0, 3),
+            }),
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.title) {
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === currentChatId ? { ...c, title: data.title } : c
+                  )
+                );
+              }
+            })
+            .catch((err) => console.warn("Voice session end title generation error:", err));
+        }
+      }
+      window.history.replaceState(null, "", `/dashboard/c/${currentChatId}`);
+    } else {
+      window.history.replaceState(null, "", "/dashboard");
+    }
+
+    setIsVoiceMode(false);
+    setIsEndingVoiceSession(false);
+    fetchConversations();
+  }, [activeChatId, messages.length, liveAgent, fetchConversations]);
+
+  // Check URL search parameter for initial mode=voice (strictly once on mount)
+  const hasCheckedUrlVoiceMode = useRef(false);
+  useEffect(() => {
+    if (typeof window !== "undefined" && !hasCheckedUrlVoiceMode.current) {
+      hasCheckedUrlVoiceMode.current = true;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("mode") === "voice") {
+        handleStartVoiceSession();
+      }
+    }
+  }, []);
 
   // 2. Load Active Conversation Messages if initialChatId provided
   useEffect(() => {
@@ -135,66 +353,69 @@ export function ChatWorkspace({
   }, [initialChatId]);
 
   // 3. Start New Chat
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
+    if (isVoiceMode) {
+      liveAgent.disconnect();
+      if (activeChatId && messages.length === 0) {
+        handleDeleteChat(activeChatId);
+      }
+      setIsVoiceMode(false);
+    }
     setActiveChatId(null);
     setMessages([]);
     window.history.pushState(null, "", "/dashboard");
-  };
+  }, [isVoiceMode, liveAgent, activeChatId, messages.length, handleDeleteChat]);
 
   // 4. Select existing chat from history (Instant Cache / Clear Old Messages Immediately)
-  const handleSelectChat = async (id: string) => {
-    if (id === activeChatId) return;
-    setActiveChatId(id);
-    window.history.pushState(null, "", `/dashboard/c/${id}`);
+  const handleSelectChat = useCallback(
+    async (id: string) => {
+      if (id === activeChatId && !isVoiceMode) return;
 
-    // If cached in RAM: Instant 0ms load!
-    if (chatCache.current.has(id)) {
-      setMessages(chatCache.current.get(id)!);
-      return;
-    }
-
-    // If not in cache: immediately clear old messages so they disappear
-    setMessages([]);
-    setIsInitialLoading(true);
-    try {
-      const res = await fetch(`/api/chats/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.conversation) {
-          const loaded = (data.conversation.messages || []).map((m: any) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            thinking: m.thinking,
-            toolCalls: m.toolCalls,
-            createdAt: m.createdAt,
-          }));
-          chatCache.current.set(id, loaded);
-          setMessages(loaded);
+      if (isVoiceMode) {
+        liveAgent.disconnect();
+        if (activeChatId && messages.length === 0) {
+          handleDeleteChat(activeChatId);
         }
+        setIsVoiceMode(false);
       }
-    } catch (err) {
-      console.error("Failed to select chat:", err);
-    } finally {
-      setIsInitialLoading(false);
-    }
-  };
 
-  // 5. Delete Chat
-  const handleDeleteChat = async (id: string) => {
-    try {
-      chatCache.current.delete(id);
-      const res = await fetch(`/api/chats/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-        if (activeChatId === id) {
-          handleNewChat();
-        }
+      setActiveChatId(id);
+      window.history.pushState(null, "", `/dashboard/c/${id}`);
+
+      // If cached in RAM: Instant 0ms load!
+      if (chatCache.current.has(id)) {
+        setMessages(chatCache.current.get(id)!);
+        return;
       }
-    } catch (err) {
-      console.error("Failed to delete chat:", err);
-    }
-  };
+
+      // If not in cache: immediately clear old messages so they disappear
+      setMessages([]);
+      setIsInitialLoading(true);
+      try {
+        const res = await fetch(`/api/chats/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.conversation) {
+            const loaded = (data.conversation.messages || []).map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              thinking: m.thinking,
+              toolCalls: m.toolCalls,
+              createdAt: m.createdAt,
+            }));
+            chatCache.current.set(data.conversation.id, loaded);
+            setMessages(loaded);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to select chat:", err);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    },
+    [activeChatId, isVoiceMode, liveAgent, messages.length, handleDeleteChat],
+  );
 
   // 6. Rename Chat
   const handleRenameChat = async (id: string, newTitle: string) => {
@@ -453,39 +674,63 @@ export function ChatWorkspace({
   const activeConversation = conversations.find((c) => c.id === activeChatId);
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-[#131314] text-foreground">
-      {/* ── Floating Controls (Visible ONLY when Sidebar is Closed) ── */}
-      {!isSidebarOpen && (
-        <div className="absolute top-3.5 right-8 z-30 flex items-center gap-2 pointer-events-auto">
-          <button
-            onClick={handleNewChat}
-            title="New chat"
-            className="size-9 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/80 backdrop-blur border border-zinc-800"
-          >
-            <Plus className="size-4" />
-          </button>
+    <div className="relative flex h-screen w-full overflow-hidden bg-cream dark:bg-background text-foreground font-sans">
+      {/* ── Top-Right Floating Controls (ChatGPT Style Mobile & Collapsed Desktop) ── */}
+      {(!isSidebarOpen || (typeof window !== "undefined" && window.innerWidth < 1024)) && (
+        <div className="absolute top-3 right-3 z-30 flex items-center pointer-events-auto select-none">
+          <div className="h-10 px-1.5 flex items-center gap-1 bg-white/90 dark:bg-card/90 backdrop-blur-md border border-sage/40 dark:border-border rounded-2xl shadow-xs">
+            <button
+              onClick={handleNewChat}
+              title="New chat"
+              className="size-8 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
+            >
+              <Plus className="size-4" />
+            </button>
 
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            title="Show chat history"
-            className="size-9 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/80 backdrop-blur border border-zinc-800"
-          >
-            <PanelRightOpen className="size-4" />
-          </button>
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              title="Show chat history"
+              className="size-8 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
+            >
+              <PanelRightOpen className="size-4" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* ── Main Chat Area (Edge-to-Edge Full Width) ── */}
       <div className="relative flex flex-1 flex-col h-full overflow-hidden min-w-0">
-        {/* ── View State: New Chat View vs Active Chat Thread View ── */}
-        {isNewChatView ? (
+        {isVoiceMode ? (
+          /* ── LIVE VOICE AGENT MODE (In-Place Ambient Viewport) ── */
+          <VoiceAgentView
+            status={liveAgent.status}
+            isMuted={liveAgent.isMuted}
+            micVolume={liveAgent.micVolume}
+            isUserSpeaking={liveAgent.isUserSpeaking}
+            isHoldingToSpeak={liveAgent.isHoldingToSpeak}
+            isEnding={isEndingVoiceSession}
+            errorMessage={liveAgent.errorMessage}
+            selectedLanguage={liveAgent.selectedLanguage}
+            onSelectLanguage={liveAgent.setLanguage}
+            onToggleMute={liveAgent.toggleMute}
+            onStartSpeaking={liveAgent.startSpeaking}
+            onStopSpeaking={liveAgent.stopSpeaking}
+            onEndSession={handleEndVoiceSession}
+            onRetry={liveAgent.connect}
+            liveTranscript={liveAgent.liveUserTranscript}
+            assistantTranscript={liveAgent.liveAssistantTranscript}
+            activeToolName={liveAgent.activeToolName}
+            activeArtifact={liveAgent.liveArtifact}
+            onOpenArtifact={(art) => setActiveArtifact(art)}
+          />
+        ) : isNewChatView ? (
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
           <div className="w-full h-full overflow-y-auto flex flex-col justify-center items-center px-4 py-8 -mt-6">
             <div className="w-full max-w-3xl text-center mb-8 animate-in fade-in-50 duration-300">
-              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-zinc-100 mb-2">
+              <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-forest dark:text-foreground mb-2">
                 What&apos;s on the agenda today?
               </h1>
-              <p className="text-sm text-zinc-400">
+              <p className="text-xs sm:text-sm text-ink-muted dark:text-muted-foreground">
                 Hyper-local mandi intelligence, financial structuring, and
                 government credit scheme advisor
               </p>
@@ -495,6 +740,7 @@ export function ChatWorkspace({
             <div className="w-full max-w-3xl px-4 md:px-6">
               <FloatingInput
                 onSend={handleSendMessage}
+                onStartVoiceMode={handleStartVoiceSession}
                 isLoading={isLoading}
                 isCentered={true}
               />
@@ -535,16 +781,16 @@ export function ChatWorkspace({
                 <button
                   key={i}
                   onClick={() => handleSendMessage(chip.prompt)}
-                  className="p-3 rounded-2xl border border-zinc-800/80 bg-zinc-900/50 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all text-left group flex items-start gap-3 cursor-pointer"
+                  className="p-3.5 rounded-2xl border border-sage/30 dark:border-border bg-white dark:bg-card hover:border-mint transition-all shadow-xs hover:shadow-md text-left group flex items-start gap-3.5 cursor-pointer"
                 >
-                  <div className="size-8 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-300 group-hover:text-white shrink-0">
+                  <div className="size-9 rounded-xl bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint flex items-center justify-center shrink-0 group-hover:bg-mint group-hover:text-black transition-colors">
                     <chip.icon className="size-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-zinc-200 group-hover:text-white truncate">
+                    <p className="text-xs font-serif font-bold text-forest dark:text-foreground group-hover:text-mint transition-colors truncate">
                       {chip.label}
                     </p>
-                    <p className="text-[11px] text-zinc-500 truncate mt-0.5">
+                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                       {chip.desc}
                     </p>
                   </div>
@@ -559,14 +805,24 @@ export function ChatWorkspace({
             onScroll={handleScroll}
             className="relative flex-1 flex flex-col h-full overflow-y-auto w-full"
           >
+            {/* Top Sentinel for future-proof infinite scroll */}
+            <div
+              id="top-scroll-sentinel"
+              className="h-1 w-full shrink-0 pointer-events-none"
+            />
+
             {/* Scrollable Message List */}
             <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-6 py-6">
-              <ChatMessageList messages={messages} isLoading={isLoading} />
+              <ChatMessageList
+                messages={messages}
+                isLoading={isLoading}
+                onOpenArtifact={(art) => setActiveArtifact(art)}
+              />
               <div ref={bottomRef} className="h-6" />
             </div>
 
             {/* Sticky Bottom Input Bar (Sticks to bottom of scroll viewport with frosted backdrop) */}
-            <div className="sticky bottom-0 w-full max-w-3xl mx-auto px-4 md:px-6 pb-4 pt-2 bg-gradient-to-t from-[#131314] via-[#131314]/95 to-transparent pointer-events-none z-20">
+            <div className="sticky bottom-0 w-full max-w-3xl mx-auto px-4 md:px-6 pb-4 pt-2 bg-gradient-to-t from-cream via-cream/90 to-transparent dark:from-background dark:via-background/90 pointer-events-none z-20">
               <div className="relative pointer-events-auto">
                 {/* Dynamic Scroll to Bottom Button anchored directly above the input */}
                 {showScrollBottom && (
@@ -574,14 +830,15 @@ export function ChatWorkspace({
                     type="button"
                     onClick={scrollToBottom}
                     title="Scroll to bottom"
-                    className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 size-8 rounded-full bg-[#212121]/95 hover:bg-[#2e2e2e] border border-zinc-700/60 shadow-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer backdrop-blur animate-in fade-in-0 zoom-in-90 duration-150 group"
+                    className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 size-8 rounded-full bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted border border-sage/40 dark:border-border shadow-lg flex items-center justify-center text-forest dark:text-mint transition-all cursor-pointer backdrop-blur animate-in fade-in-0 zoom-in-90 duration-150 group"
                   >
-                    <ArrowDown className="size-4 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-y-0.5 duration-150" />
+                    <ArrowDown className="size-4 text-forest dark:text-mint group-hover:translate-y-0.5 transition-transform duration-150" />
                   </button>
                 )}
 
                 <FloatingInput
                   onSend={handleSendMessage}
+                  onStartVoiceMode={handleStartVoiceSession}
                   isLoading={isLoading}
                   isCentered={false}
                 />
@@ -589,7 +846,6 @@ export function ChatWorkspace({
             </div>
           </div>
         )}
-
       </div>
 
       {/* ── Right-Side History Sidebar (Width = 240px / w-60) ── */}
@@ -600,9 +856,22 @@ export function ChatWorkspace({
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         onSelectChat={handleSelectChat}
         onNewChat={handleNewChat}
+        onStartVoiceSession={handleStartVoiceSession}
         onDeleteChat={handleDeleteChat}
         onRenameChat={handleRenameChat}
         onTogglePin={handleTogglePin}
+      />
+
+      {/* ── Interactive Artifact Review & Approval Modal ── */}
+      <ArtifactModal
+        isOpen={Boolean(activeArtifact)}
+        onClose={() => setActiveArtifact(null)}
+        artifact={activeArtifact}
+        isVoiceMode={isVoiceMode}
+        onVoiceHoldStart={liveAgent.startSpeaking}
+        onVoiceHoldEnd={liveAgent.stopSpeaking}
+        isUserSpeaking={liveAgent.isUserSpeaking}
+        isHoldingToSpeak={liveAgent.isHoldingToSpeak}
       />
     </div>
   );

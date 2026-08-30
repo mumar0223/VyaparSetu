@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "ವ್ಯಾಪಾರಸೇತು",
+    "tagline": "ಭಾರತದ AI ವ್ಯಾಪಾರ ಮತ್ತು ಹಣಕಾಸು ಪಾಲುದಾರ",
+    "save": "ಉಳಿಸಿ",
+    "cancel": "ರದ್ದುಮಾಡಿ",
+    "delete": "ಅಳಿಸಿ",
+    "edit": "ಸಂಪಾದಿಸಿ",
+    "approve": "ಅನುಮೋದಿಸಿ",
+    "review": "ಪರಿಶೀಲನೆ",
+    "reviewAndEdit": "ಪರಿಶೀಲಿಸಿ & ಸಂಪಾದಿಸಿ",
+    "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    "submitting": "ಸಲ್ಲಿಸಲಾಗುತ್ತಿದೆ...",
+    "success": "ಯಶಸ್ವಿ",
+    "error": "ದೋಷ",
+    "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+    "search": "ಹುಡುಕಿ...",
+    "holdToSpeak": "ಮಾತನಾಡಲು ಒತ್ತಿ ಹಿಡಿಯಿರಿ",
+    "listening": "ಕೇಳಿಸಿಕೊಳ್ಳುತ್ತಿದ್ದೇನೆ...",
+    "speaking": "ಮಾತನಾಡುತ್ತಿದ್ದೇನೆ...",
+    "thinking": "ಚಿಂತಿಸುತ್ತಿದ್ದೇನೆ...",
+    "voiceAgent": "ಧ್ವನಿ ಏಜೆಂಟ್ OS",
+    "newChat": "ಹೊಸ ಚಾಟ್",
+    "clearChat": "ಚಾಟ್ ತೆರವುಗೊಳಿಸಿ",
+    "language": "ಭಾಷೆ",
+    "lightMode": "ಲೈಟ್ ಮೋಡ್",
+    "darkMode": "ಡಾರ್ಕ್ ಮೋಡ್",
+    "signIn": "ಸೈನ್ ಇನ್",
+    "signOut": "ಸೈನ್ ಔಟ್"
+  },
+  "sidebar": {
+    "dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+    "swotScanner": "SWOT ಮಾರುಕಟ್ಟೆ ಸ್ಕ್ಯಾನರ್",
+    "enterpriseProfile": "ಉದ್ಯಮ ಪ್ರೊಫೈಲ್",
+    "aiRecommendations": "AI ಸಲಹೆಗಾರ",
+    "govtSchemes": "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು",
+    "successStories": "ಯಶೋಗಾಥೆಗಳು",
+    "dailyExpenses": "ದೈನಂದಿನ ವೆಚ್ಚಗಳು",
+    "cashFlowRunway": "ಹಣದ ಹರಿವು",
+    "savingsGoals": "ಉಳಿತಾಯ ಗುರಿಗಳು",
+    "budgetPlanning": "ಬಜೆಟ್ ಯೋಜನೆ",
+    "debtNavigator": "ಸಾಲ / EMI ನ್ಯಾವಿಗೇಟರ್",
+    "loanSimulator": "ಸಾಲ ಸಿಮ್ಯುಲೇಟರ್",
+    "businessCredit": "ವ್ಯಾಪಾರ ಕ್ರೆಡಿಟ್",
+    "masterLedger": "ಮುಖ್ಯ ಖಾತೆ ಪುಸ್ತಕ"
+  },
+  "dashboard": {
+    "healthScore": "ಹಣಕಾಸು ಆರೋಗ್ಯ ಸ್ಕೋರ್",
+    "workingCapital": "ದುಡಿಯುವ ಬಂಡವಾಳ",
+    "monthlyBurn": "ಮಾಸಿಕ ವೆಚ್ಚ",
+    "apmcSpotRates": "ಲೈವ್ APMC ಮಾರುಕಟ್ಟೆ ದರಗಳು",
+    "activeAlerts": "ಮುಖ್ಯ ಕ್ರಮಗಳು",
+    "viewMore": "ವಿವರಗಳನ್ನು ನೋಡಿ"
+  },
+  "chat": {
+    "placeholder": "ಮಾರುಕಟ್ಟೆ ದರಗಳು, ಮುದ್ರಾ ಸಾಲಗಳ ಬಗ್ಗೆ ಕೇಳಿ...",
+    "disclaimer": "AI ತಪ್ಪುಗಳನ್ನು ಮಾಡಬಹುದು. ಹಣಕಾಸು ನಿರ್ಧಾರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+    "stagedDraft": "ಕರಡು ಸಿದ್ಧವಾಗಿದೆ",
+    "clickToReview": "ಅನುಮೋದಿಸಲು ಇಲ್ಲಿ ಕ್ಲಿಕ್ ಮಾಡಿ"
+  },
+  "voice": {
+    "aiSpeaking": "AI ಮಾತನಾಡುತ್ತಿದೆ • ಮೈಕ್ ಲಾಕ್ ಆಗಿದೆ",
+    "holdToSpeak": "ನಿಮ್ಮ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡಲು ಬಟನ್ ಒತ್ತಿ ಹಿಡಿಯಿರಿ...",
+    "captions": "ಶೀರ್ಷಿಕೆಗಳು",
+    "selectLanguage": "ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ"
+  }
+}

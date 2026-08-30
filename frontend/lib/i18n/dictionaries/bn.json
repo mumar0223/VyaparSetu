@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "ব্যাপারসেতু",
+    "tagline": "ভারতের এআই ব্যবসা ও আর্থিক অংশীদার",
+    "save": "সংরক্ষণ করুন",
+    "cancel": "বাতিল",
+    "delete": "মুছুন",
+    "edit": "সম্পাদনা",
+    "approve": "অনুমোদন করুন",
+    "review": "পর্যালোচনা",
+    "reviewAndEdit": "পর্যালোচনা ও সম্পাদনা",
+    "loading": "লোড হচ্ছে...",
+    "submitting": "জমা দেওয়া হচ্ছে...",
+    "success": "সফল",
+    "error": "ত্রুটি",
+    "retry": "পুনরায় চেষ্টা করুন",
+    "search": "অনুসন্ধান...",
+    "holdToSpeak": "কথা বলতে চেপে ধরে রাখুন",
+    "listening": "শুনছি...",
+    "speaking": "বলছি...",
+    "thinking": "চিন্তা করছি...",
+    "voiceAgent": "ভয়েস এজেন্ট ওএস",
+    "newChat": "নতুন চ্যাট",
+    "clearChat": "চ্যাট মুছুন",
+    "language": "ভাষা",
+    "lightMode": "লাইট মোড",
+    "darkMode": "ডার্ক মোড",
+    "signIn": "সাইন ইন",
+    "signOut": "সাইন আউট"
+  },
+  "sidebar": {
+    "dashboard": "ড্যাশবোর্ড",
+    "swotScanner": "SWOT বাজার স্ক্যানার",
+    "enterpriseProfile": "উদ্যোগ প্রোফাইল",
+    "aiRecommendations": "এআই উপদেষ্টা",
+    "govtSchemes": "সরকারি প্রকল্প",
+    "successStories": "সাফল্যের গল্প",
+    "dailyExpenses": "দৈনিক খরচ",
+    "cashFlowRunway": "ক্যাশ ফ্লো রানওয়ে",
+    "savingsGoals": "সঞ্চয় লক্ষ্য",
+    "budgetPlanning": "বাজেট পরিকল্পনা",
+    "debtNavigator": "ঋণ / ইএমআই নেভিগেটর",
+    "loanSimulator": "ঋণ সিমুলেটর",
+    "businessCredit": "ব্যবসা ক্রেডিট",
+    "masterLedger": "মাস্টার খাতা"
+  },
+  "dashboard": {
+    "healthScore": "আর্থিক স্বাস্থ্য স্কোর",
+    "workingCapital": "চলতি মূলধন বাফার",
+    "monthlyBurn": "মাসিক খরচ",
+    "apmcSpotRates": "লাইভ APMC বাজার দর",
+    "activeAlerts": "জরুরি কাজ",
+    "viewMore": "বিস্তারিত দেখুন"
+  },
+  "chat": {
+    "placeholder": "বাজার দর, মুদ্রা ঋণ বা খাতা সম্পর্কে জিজ্ঞাসা করুন...",
+    "disclaimer": "ব্যাপারসেতু এআই ভুল করতে পারে। গুরুত্বপূর্ণ সিদ্ধান্ত যাচাই করুন।",
+    "stagedDraft": "ড্রাফট প্রস্তুত",
+    "clickToReview": "অনুমোদনের জন্য ক্লিক করুন"
+  },
+  "voice": {
+    "aiSpeaking": "এআই কথা বলছে • মাইক লক",
+    "holdToSpeak": "আপনার ভাষায় কথা বলতে বোতামটি চেপে ধরে রাখুন...",
+    "captions": "ক্যাপশন",
+    "selectLanguage": "ভাষা নির্বাচন করুন"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "வியாபார்சேது",
+    "tagline": "இந்தியாவின் AI வணிக & நிதி பங்குதாரர்",
+    "save": "சேமி",
+    "cancel": "ரத்து செய்",
+    "delete": "நீக்கு",
+    "edit": "திருத்து",
+    "approve": "அங்கீகரி",
+    "review": "மதிப்பாய்வு",
+    "reviewAndEdit": "மதிப்பாய்வு & திருத்து",
+    "loading": "ஏற்றுகிறது...",
+    "submitting": "சமர்ப்பிக்கிறது...",
+    "success": "வெற்றி",
+    "error": "பிழை",
+    "retry": "மீண்டும் முயற்சி செய்",
+    "search": "தேடு...",
+    "holdToSpeak": "பேச அழுத்திப் பிடிக்கவும்",
+    "listening": "கேட்கிறது...",
+    "speaking": "பேசுகிறது...",
+    "thinking": "யோசிக்கிறது...",
+    "voiceAgent": "குரல் முகவர் OS",
+    "newChat": "புதிய அரட்டை",
+    "clearChat": "அரட்டையை அழி",
+    "language": "மொழி",
+    "lightMode": "ஒளி பயன்முறை",
+    "darkMode": "இருண்ட பயன்முறை",
+    "signIn": "உள்நுழைக",
+    "signOut": "வெளியேறு"
+  },
+  "sidebar": {
+    "dashboard": "முகப்புப்பலகை",
+    "swotScanner": "SWOT சந்தை ஸ்கேனர்",
+    "enterpriseProfile": "நிறுவன சுயவிவரம்",
+    "aiRecommendations": "AI ஆலோசகர்",
+    "govtSchemes": "அரசு திட்டங்கள்",
+    "successStories": "வெற்றிக் கதைகள்",
+    "dailyExpenses": "தினசரி செலவுகள்",
+    "cashFlowRunway": "பணப்புழக்க ரன்வே",
+    "savingsGoals": "சேமிப்பு இலக்குகள்",
+    "budgetPlanning": "பட்ஜெட் திட்டமிடல்",
+    "debtNavigator": "கடன் / EMI வழிகாட்டி",
+    "loanSimulator": "கடன் சிமுலேட்டர்",
+    "businessCredit": "வணிக கடன்",
+    "masterLedger": "முதன்மை பேரேடு"
+  },
+  "dashboard": {
+    "healthScore": "நிதி ஆரோக்கிய மதிப்பெண்",
+    "workingCapital": "செயல் மூலதனம்",
+    "monthlyBurn": "மாதாந்திர செலவு",
+    "apmcSpotRates": "நேரடி APMC மண்டி விலைகள்",
+    "activeAlerts": "முக்கிய செயல்கள்",
+    "viewMore": "விவரங்களை காண்க"
+  },
+  "chat": {
+    "placeholder": "மண்டி விலைகள், முத்ரா கடன் பற்றி கேளுங்கள்...",
+    "disclaimer": "AI தவறுகளைச் செய்யலாம். நிதி முடிவுகளைச் சரிபார்க்கவும்.",
+    "stagedDraft": "வரைவு தயார்",
+    "clickToReview": "அங்கீகரிக்க கிளிக் செய்க"
+  },
+  "voice": {
+    "aiSpeaking": "AI பேசுகிறது • மைக் பூட்டப்பட்டது",
+    "holdToSpeak": "உங்கள் மொழியில் பேச பட்டனை அழுத்திப் பிடிக்கவும்...",
+    "captions": "வசனங்கள்",
+    "selectLanguage": "மொழியைத் தேர்ந்தெடுக்கவும்"
+  }
+}

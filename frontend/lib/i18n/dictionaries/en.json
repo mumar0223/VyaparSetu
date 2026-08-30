@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "VyaparSetu",
+    "tagline": "AI Business & Trade Partner for Bharat",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "approve": "Approve",
+    "review": "Review",
+    "reviewAndEdit": "Review & Edit",
+    "loading": "Loading...",
+    "submitting": "Submitting...",
+    "success": "Success",
+    "error": "Error",
+    "retry": "Retry",
+    "search": "Search...",
+    "holdToSpeak": "Hold to Speak",
+    "listening": "Listening...",
+    "speaking": "Speaking...",
+    "thinking": "Thinking...",
+    "voiceAgent": "Voice Agent OS",
+    "newChat": "New Chat",
+    "clearChat": "Clear Chat",
+    "language": "Language",
+    "lightMode": "Light Mode",
+    "darkMode": "Dark Mode",
+    "signIn": "Sign In",
+    "signOut": "Sign Out"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "swotScanner": "SWOT Market Scanner",
+    "enterpriseProfile": "Enterprise Profile",
+    "aiRecommendations": "AI Advisor",
+    "govtSchemes": "Govt Schemes",
+    "successStories": "Success Stories",
+    "dailyExpenses": "Daily Expenses",
+    "cashFlowRunway": "Cash Flow Runway",
+    "savingsGoals": "Savings Goals",
+    "budgetPlanning": "Budget Planning",
+    "debtNavigator": "Debt Navigator",
+    "loanSimulator": "Loan Simulator",
+    "businessCredit": "Business Credit",
+    "masterLedger": "Master Ledger"
+  },
+  "dashboard": {
+    "healthScore": "Financial Health Score",
+    "workingCapital": "Working Capital Buffer",
+    "monthlyBurn": "Monthly Burn Rate",
+    "apmcSpotRates": "Live APMC Spot Rates",
+    "activeAlerts": "Critical Action Items",
+    "viewMore": "View Details"
+  },
+  "chat": {
+    "placeholder": "Ask anything about mandi rates, mudra loans, or ledgers...",
+    "disclaimer": "VyaparSetu AI can make mistakes. Verify important financial & trade decisions.",
+    "stagedDraft": "Interactive Draft Staged",
+    "clickToReview": "Click to review and approve this record"
+  },
+  "voice": {
+    "aiSpeaking": "AI Speaking • Mic Locked",
+    "holdToSpeak": "Hold the button or Spacebar to speak in your language...",
+    "captions": "Captions",
+    "selectLanguage": "Select Language"
+  }
+}
