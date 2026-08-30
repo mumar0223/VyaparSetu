@@ -48,7 +48,7 @@ const nodeConfigs = [
     sublabel: "PM Mudra & SVANidhi",
     angle: -30,
     rType: "far" as const,
-    color: "#6366f1",
+    color: "#10b981",
     Icon: Landmark,
   },
   {
@@ -57,7 +57,7 @@ const nodeConfigs = [
     sublabel: "e-NAM Pricing",
     angle: -60,
     rType: "close" as const,
-    color: "#eab308",
+    color: "#f59e0b",
     Icon: TrendingUp,
   },
   {
@@ -66,7 +66,7 @@ const nodeConfigs = [
     sublabel: "Credit Underwriting",
     angle: -90,
     rType: "medium" as const,
-    color: "#3b82f6",
+    color: "#059669",
     Icon: Building2,
   },
   {
@@ -75,7 +75,7 @@ const nodeConfigs = [
     sublabel: "Bulk Procurement",
     angle: -120,
     rType: "custom" as const,
-    color: "#f97316",
+    color: "#f59e0b",
     Icon: Truck,
   },
   {
@@ -84,24 +84,24 @@ const nodeConfigs = [
     sublabel: "Sales & Turnover",
     angle: -150,
     rType: "close" as const,
-    color: "#38bdf8",
+    color: "#10b981",
     Icon: BookOpen,
   },
   {
     id: "shopify",
     label: "Local Buyers",
     sublabel: "B2B Trade Network",
-    angle: -180,
-    rType: "medium" as const,
-    color: "#ec4899",
+    angle: -170,
+    rType: "close" as const,
+    color: "#f59e0b",
     Icon: Users,
   },
   {
     id: "whatsapp",
     label: "WhatsApp",
     sublabel: "Voice & Chat Input",
-    angle: 150,
-    rType: "far" as const,
+    angle: 135,
+    rType: "medium" as const,
     color: "#22c55e",
     Icon: WhatsAppIcon,
   },
@@ -111,7 +111,7 @@ const nodeConfigs = [
     sublabel: "Regional Dialect",
     angle: 120,
     rType: "close" as const,
-    color: "#06b6d4",
+    color: "#10b981",
     Icon: PhoneCall,
   },
   {
@@ -120,7 +120,7 @@ const nodeConfigs = [
     sublabel: "MSME Certificate",
     angle: 90,
     rType: "medium" as const,
-    color: "#14b8a6",
+    color: "#059669",
     Icon: ShieldCheck,
   },
   {
@@ -129,7 +129,7 @@ const nodeConfigs = [
     sublabel: "NABARD Federation",
     angle: 60,
     rType: "far" as const,
-    color: "#a855f7",
+    color: "#f59e0b",
     Icon: Users,
   },
   {
@@ -162,13 +162,19 @@ const nodes: NodeDef[] = [
     y: 50,
     Icon: Bot,
     big: true,
-    color: "#818cf8",
+    color: "#10b981",
   },
   ...nodeConfigs.map((config) => {
     const rad = (config.angle * Math.PI) / 180;
     const dims = R_LEVELS[config.rType];
-    const px = 500 + dims.rx * Math.cos(rad);
-    const py = 300 + dims.ry * Math.sin(rad);
+    let px = 500 + dims.rx * Math.cos(rad);
+    let py = 300 + dims.ry * Math.sin(rad);
+
+    // Minor visual nudges to clear hero text without breaking diagram composition (1000x600 viewBox)
+    if (config.id === "whatsapp") { px += 30; py += 85; }
+    if (config.id === "slack") { px += 20; py += 15; } // Voice IVR
+    if (config.id === "shopify") { px += 70; py += 25; } // Local Buyers
+
     return {
       id: config.id,
       label: config.label,
@@ -407,7 +413,7 @@ function DiagramNode({
     >
       <div
         className={[
-          "group flex items-center gap-3 rounded-xl border bg-card/80 px-3 py-2.5 backdrop-blur-sm transition-all duration-300 outline-none",
+          "group flex items-center gap-3 rounded-xl border bg-white shadow-sm px-3 py-2.5 transition-all duration-300 outline-none",
           big ? "sm:px-4 sm:py-3.5" : "",
           isCycleActive
             ? cycleType === "chat"
@@ -415,12 +421,12 @@ function DiagramNode({
               : cycleType === "agent"
                 ? "animate-glow-agent"
                 : "animate-glow-destination"
-            : "border-border",
+            : "border-stone-200",
         ].join(" ")}
       >
         <div
           className={[
-            "relative flex shrink-0 items-center justify-center rounded-lg border border-border bg-background/60",
+            "relative flex shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-stone-50",
             big ? "size-11" : "size-9",
           ].join(" ")}
         >

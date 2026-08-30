@@ -274,3 +274,27 @@
     );
   background-size: 44px 44px;
 }
+
+/* 
+  Scoped theme for the rural landing page.
+  This ensures the Dashboard and Auth pages remain unaffected by the rural palette.
+*/
+.landing-theme {
+  --background: oklch(0.98 0.01 85); /* Warm Beige */
+  --foreground: oklch(0.2 0.03 260); /* Deep Navy */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.03 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.03 260);
+  --primary: oklch(0.7 0.16 155); /* Emerald Green */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.94 0.03 85); /* Light Harvest */
+  --secondary-foreground: oklch(0.2 0.03 260);
+  --muted: oklch(0.95 0.02 85);
+  --muted-foreground: oklch(0.4 0.03 260);
+  --accent: oklch(0.78 0.15 75); /* Harvest Orange */
+  --accent-foreground: oklch(1 0 0);
+  --border: oklch(0.9 0.02 85);
+  --input: oklch(0.9 0.02 85);
+  --ring: oklch(0.7 0.16 155);
+}
