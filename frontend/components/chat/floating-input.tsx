@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Plus, ArrowUp, Mic, Brain, AudioLines } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { useTranslation } from "@/lib/i18n";
+
 interface FloatingInputProps {
   onSend: (message: string) => void;
   onStartVoiceMode?: () => void;
@@ -17,11 +19,15 @@ export function FloatingInput({
   onStartVoiceMode,
   isLoading = false,
   isCentered = false,
-  placeholder = "Ask anything about mandi rates, mudra loans, or ledgers...",
+  placeholder,
 }: FloatingInputProps) {
+  const { t } = useTranslation();
   const [input, setInput] = useState("");
   const [isThinkEnabled, setIsThinkEnabled] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const displayPlaceholder =
+    placeholder || t("chat.placeholder", "Ask anything about mandi rates, mudra loans, or ledgers...");
 
   // Auto-grow textarea height
   useEffect(() => {
@@ -66,7 +72,7 @@ export function FloatingInput({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder={displayPlaceholder}
             disabled={isLoading}
             className="w-full resize-none bg-transparent px-3 py-2 text-[14px] sm:text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-hidden disabled:opacity-50 min-h-[44px] max-h-[180px]"
           />
@@ -94,7 +100,7 @@ export function FloatingInput({
                 )}
               >
                 <Brain className="size-3" />
-                <span>Think</span>
+                <span>{t("common.thinking", "Think")}</span>
               </button>
             </div>
 
@@ -106,7 +112,7 @@ export function FloatingInput({
                 onClick={startVoiceAgent}
                 disabled={isLoading}
                 aria-label="Start live voice agent"
-                title="Start Voice Agent OS"
+                title={t("common.voiceAgent", "Voice Agent OS")}
                 className="size-8 rounded-full flex items-center justify-center bg-mint-pale dark:bg-mint/15 hover:bg-mint/25 text-forest dark:text-mint border border-mint/30 hover:border-mint/50 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
               >
                 <AudioLines className="size-4" />
@@ -118,7 +124,7 @@ export function FloatingInput({
                 onClick={startVoiceAgent}
                 disabled={isLoading}
                 aria-label="Start voice agent"
-                title="Start voice agent"
+                title={t("common.holdToSpeak", "Speak")}
                 className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
               >
                 <Mic className="size-4" />
@@ -145,7 +151,7 @@ export function FloatingInput({
 
       {/* Subtle Footer Disclaimer */}
       <p className="mt-2 text-center text-[11px] text-muted-foreground select-none">
-        VyaparSetu AI can make mistakes. Verify important financial &amp; trade decisions.
+        {t("chat.disclaimer", "VyaparSetu AI can make mistakes. Verify important financial & trade decisions.")}
       </p>
     </div>
   );

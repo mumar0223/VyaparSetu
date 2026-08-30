@@ -9,6 +9,7 @@ import {
 } from "@/lib/agent/chat-config";
 import type { VoiceAgentStatus } from "./voice-agent-view";
 import type { ToolCallItem } from "./types";
+import type { ArtifactPayload } from "./artifact-modal";
 
 export interface LiveTurnData {
   userTranscript: string;
@@ -40,6 +41,7 @@ type VertexFunctionCall = {
 
 type VertexFunctionResponse = {
   id?: string;
+  name?: string;
   response: { output: unknown };
 };
 
@@ -112,6 +114,9 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
   const [liveUserTranscript, setLiveUserTranscript] = useState("");
   const [liveAssistantTranscript, setLiveAssistantTranscript] = useState("");
   const [activeToolName, setActiveToolName] = useState<string | null>(null);
+  const [liveArtifact, setLiveArtifact] = useState<ArtifactPayload | null>(
+    null,
+  );
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [isHoldingToSpeak, setIsHoldingToSpeak] = useState(false);
   const [selectedLanguage, setSelectedLanguage] =
@@ -315,11 +320,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
   }, [resumeNativeCaptions]);
 
   const startSpeaking = useCallback(() => {
-    if (
-      mutedRef.current ||
-      !connectedRef.current
-    )
-      return;
+    if (mutedRef.current || !connectedRef.current) return;
 
     // ── Bulletproof turn-boundary cleanup ──
     // 1. Kill any residual audio from the previous AI response immediately.
@@ -527,7 +528,24 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             result,
             status: "completed",
           });
-          functionResponses.push({ id: call.id, response: { output: result } });
+
+          // If tool produced a staged artifact, publish to live state
+          if ((result as any)?.isArtifact && (result as any)?.artifactType) {
+            const art: ArtifactPayload = {
+              artifactType: (result as any).artifactType,
+              title: (result as any).title,
+              summary: (result as any).summary,
+              data: (result as any).data,
+            };
+            setLiveArtifact(art);
+            optionsRef.current.onArtifactAction?.(art);
+          }
+
+          functionResponses.push({
+            id: call.id,
+            name: call.name,
+            response: { output: result },
+          });
         } catch {
           toolCallsRef.current.push({
             toolName: call.name,
@@ -537,6 +555,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
           });
           functionResponses.push({
             id: call.id,
+            name: call.name,
             response: { output: { error: "Execution failed" } },
           });
         }
@@ -737,9 +756,16 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
                 setAssistantSpeaking(false);
               }
             }
-            const calls = (message.toolCall?.functionCalls ||
-              []) as VertexFunctionCall[];
-            if (calls.length) await handleToolCalls(calls, socket);
+            const calls: VertexFunctionCall[] = [
+              ...((message.toolCall?.functionCalls ||
+                []) as VertexFunctionCall[]),
+              ...((serverContent?.modelTurn?.parts || [])
+                .filter((p: any) => p.functionCall)
+                .map((p: any) => p.functionCall) as VertexFunctionCall[]),
+            ];
+            if (calls.length) {
+              await handleToolCalls(calls, socket);
+            }
           } catch (error) {
             console.error("[voice] message processing failed", error);
           }
@@ -826,6 +852,8 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     liveUserTranscript,
     liveAssistantTranscript,
     activeToolName,
+    liveArtifact,
+    setLiveArtifact,
     setStatus,
     reportError,
   };

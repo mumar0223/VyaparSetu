@@ -1,21 +1,20 @@
 /**
  * Dedicated isolated configuration for the Dashboard Chat Advisor.
- * Other agents or tools in the workspace can define their own isolated configs.
+ * Powered by Google Cloud Vertex AI Gemini 3.7 Flash for deep multilingual reasoning.
  */
 export const DASHBOARD_CHAT_CONFIG = {
-  provider: "openai",
-  model: process.env.OPENAI_MODEL || "moonshotai.kimi-k2.5",
+  provider: "vertex",
+  model: process.env.GOOGLE_VERTEX_MODEL || "gemini-3.7-flash",
   temperature: 0.7,
-  maxTokens: 2048,
 };
 
 /**
  * Dedicated AI configuration for Title Generation.
- * Reads the title model name from env (TITLE_AI_MODEL).
+ * Reads the title model name from env (GOOGLE_VERTEX_MODEL).
  */
 export const TITLE_GENERATION_CONFIG = {
-  provider: "openai",
-  model: process.env.TITLE_AI_MODEL || "moonshotai.kimi-k2.5",
+  provider: "vertex",
+  model: process.env.GOOGLE_VERTEX_MODEL || "gemini-3.7-flash",
   temperature: 0.3,
   maxTokens: 30,
 };
@@ -52,4 +51,5 @@ export const SUPPORTED_INDIAN_LANGUAGES = [
   { code: "pa-IN", name: "Punjabi", nativeName: "ਪੰਜਾਬੀ" },
 ] as const;
 
-export type SupportedLanguageCode = (typeof SUPPORTED_INDIAN_LANGUAGES)[number]["code"];
+export type SupportedLanguageCode =
+  (typeof SUPPORTED_INDIAN_LANGUAGES)[number]["code"];

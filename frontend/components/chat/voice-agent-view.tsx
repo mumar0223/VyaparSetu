@@ -12,12 +12,20 @@ import {
   RefreshCw,
   Languages,
   ChevronDown,
+  ArrowUpRight,
+  PieChart,
+  BarChart3,
+  IndianRupee,
+  Layers,
+  Landmark,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   SUPPORTED_INDIAN_LANGUAGES,
   type SupportedLanguageCode,
 } from "@/lib/agent/chat-config";
+import type { ArtifactPayload } from "./artifact-modal";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -49,6 +57,8 @@ interface VoiceAgentViewProps {
   liveTranscript?: string;
   assistantTranscript?: string;
   activeToolName?: string | null;
+  activeArtifact?: ArtifactPayload | null;
+  onOpenArtifact?: (artifact: ArtifactPayload) => void;
 }
 
 export function VoiceAgentView({
@@ -69,6 +79,8 @@ export function VoiceAgentView({
   liveTranscript = "",
   assistantTranscript = "",
   activeToolName = null,
+  activeArtifact = null,
+  onOpenArtifact,
 }: VoiceAgentViewProps) {
   const [showLiveCaptions, setShowLiveCaptions] = useState(true);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
@@ -277,6 +289,41 @@ export function VoiceAgentView({
         </div>
       </div>
 
+      {/* ── Interactive Staged Artifact Pill (Claude Style) ── */}
+      {activeArtifact && (
+        <div
+          onClick={() => onOpenArtifact?.(activeArtifact)}
+          className="w-full max-w-md my-2 p-3 rounded-2xl bg-zinc-900/95 hover:bg-zinc-800 border border-mint/40 hover:border-mint text-zinc-100 flex items-center justify-between gap-3 shadow-2xl backdrop-blur-xl transition-all cursor-pointer group animate-in slide-in-from-top-4 duration-300 select-none z-30"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="size-9 rounded-xl bg-mint/15 border border-mint/30 text-mint flex items-center justify-center shrink-0">
+              {activeArtifact.artifactType === "chart" && <BarChart3 className="size-4" />}
+              {activeArtifact.artifactType === "budget" && <PieChart className="size-4" />}
+              {activeArtifact.artifactType === "expense" && <IndianRupee className="size-4" />}
+              {activeArtifact.artifactType === "transaction" && <Layers className="size-4" />}
+              {activeArtifact.artifactType === "saving_goal" && <Sparkles className="size-4" />}
+              {activeArtifact.artifactType === "debt" && <Landmark className="size-4" />}
+              {activeArtifact.artifactType === "delete_record" && <AlertTriangle className="size-4 text-rose-500" />}
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-[13.5px] font-semibold text-zinc-100 group-hover:text-mint transition-colors truncate">
+                {activeArtifact.title || "Interactive Action Draft"}
+              </h4>
+              <p className="text-[11.5px] text-zinc-400 truncate mt-0.5">
+                {activeArtifact.summary || "Draft prepared • Tap to review & edit"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] font-bold text-mint px-2 py-0.5 rounded-md bg-mint/10 border border-mint/20">
+              Review
+            </span>
+            <ArrowUpRight className="size-4 text-zinc-400 group-hover:text-mint group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+          </div>
+        </div>
+      )}
+
       {/* ── Central Stage: Ambient Glowing Voice Orb ── */}
       <div className="relative flex flex-col items-center justify-center flex-1 w-full max-w-md my-auto z-10">
         {/* Glowing Background Radial Bloom */}
@@ -445,26 +492,42 @@ export function VoiceAgentView({
           </div>
         )}
 
-        {/* ── Live Captions / Subtitle Area ── */}
+        {/* ── Live Captions / Subtitle Area with Responsive Max Height ── */}
         {showLiveCaptions && (
-          <div className="mt-8 w-full min-h-[96px] flex flex-col items-center justify-center gap-3 text-center px-4">
+          <div className="mt-4 md:mt-6 w-full max-w-lg flex flex-col items-center justify-start gap-2.5 text-center px-2 z-20">
             {liveTranscript && (
-              <div className="w-full max-w-lg rounded-2xl border border-emerald-800/40 bg-emerald-950/20 px-4 py-3 transition-all animate-in fade-in-50">
-                <span className="text-[10.5px] font-semibold tracking-wider uppercase text-emerald-400/90">
-                  You {isHoldingToSpeak ? "· speaking" : "· transcript"}
-                </span>
-                <p className="mt-1 text-[15px] md:text-base font-medium text-emerald-200 leading-relaxed">
+              <div className="w-full rounded-2xl border border-emerald-800/40 bg-emerald-950/30 p-3 transition-all shrink-0 text-left shadow-lg">
+                <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-emerald-800/30 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold tracking-wider uppercase text-emerald-300">
+                      You {isHoldingToSpeak ? "· speaking" : "· transcript"}
+                    </span>
+                  </div>
+                </div>
+                <div className="max-h-[70px] overflow-y-auto pr-1 text-xs md:text-sm font-medium text-emerald-200 leading-relaxed">
                   {liveTranscript}
-                </p>
+                </div>
               </div>
             )}
+
             {assistantTranscript && (
-              <div className="w-full max-w-lg rounded-2xl border border-sky-800/40 bg-sky-950/20 px-4 py-3 transition-all animate-in fade-in-50">
-                <span className="text-[10.5px] font-semibold tracking-wider uppercase text-sky-400/90">
-                  VyaparSetu{" "}
-                  {status === "speaking" ? "· speaking" : "· response"}
-                </span>
-                <div className="mt-1 text-[15px] md:text-base font-normal text-zinc-100 leading-relaxed prose prose-invert prose-p:my-0 max-w-none">
+              <div className="w-full rounded-2xl border border-sky-800/40 bg-sky-950/40 p-3 transition-all text-left shadow-xl backdrop-blur-md">
+                {/* Fixed Top Header (Non-scrolling) */}
+                <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-sky-800/40 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <div className="size-2 rounded-full bg-sky-400 animate-pulse" />
+                    <span className="text-[10.5px] font-bold tracking-wider uppercase text-sky-300">
+                      VyaparSetu {status === "speaking" ? "· speaking" : "· response"}
+                    </span>
+                  </div>
+                  <span className="text-[9.5px] font-semibold text-sky-300/80 uppercase px-2 py-0.5 rounded-full bg-sky-900/50 border border-sky-700/40">
+                    Live
+                  </span>
+                </div>
+
+                {/* Clean Scrollable Content Area */}
+                <div className="max-h-[120px] md:max-h-[150px] overflow-y-auto pr-1 text-xs md:text-[13.5px] font-normal text-zinc-100 leading-relaxed prose prose-invert prose-p:my-0.5 max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {assistantTranscript}
                   </ReactMarkdown>
@@ -472,7 +535,7 @@ export function VoiceAgentView({
               </div>
             )}
             {!liveTranscript && !assistantTranscript && (
-              <p className="text-xs md:text-[13px] text-zinc-400 tracking-wide font-normal">
+              <p className="text-xs text-zinc-400 tracking-wide font-normal py-2">
                 {isInitializing
                   ? "Connecting to Voice OS..."
                   : isMuted

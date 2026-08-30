@@ -16,26 +16,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "toolName is required" }, { status: 400 });
     }
 
-    const tools = getAgentTools();
+    const tools: Record<string, any> = getAgentTools({ userId: user.id });
     let result: any = null;
 
-    if (toolName === "getMandiRates" && tools.getMandiRates.execute) {
-      result = await tools.getMandiRates.execute(args || {}, {} as any);
-    } else if (
-      toolName === "evaluateSchemeEligibility" &&
-      tools.evaluateSchemeEligibility.execute
-    ) {
-      result = await tools.evaluateSchemeEligibility.execute(args || {}, {} as any);
+    if (tools[toolName] && typeof tools[toolName].execute === "function") {
+      result = await tools[toolName].execute(args || {}, {} as any);
     } else {
-      result = { error: `Tool ${toolName} not found` };
+      result = { success: false, error: `Tool '${toolName}' is not registered.` };
     }
 
     return NextResponse.json({ result });
   } catch (error: any) {
     console.error("[POST /api/voice/execute-tool error]:", error);
-    return NextResponse.json(
-      { error: error?.message || "Failed to execute tool" },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      result: {
+        success: false,
+        error: error?.message || "Failed to execute tool cleanly.",
+      },
+    });
   }
 }

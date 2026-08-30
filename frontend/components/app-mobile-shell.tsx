@@ -8,6 +8,8 @@ import type { AuthUser } from "@/lib/auth-types";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+
 interface AppMobileShellProps {
   currentUser?: AuthUser | null;
   children: React.ReactNode;
@@ -28,10 +30,10 @@ export function AppMobileShell({ currentUser, children }: AppMobileShellProps) {
             className="fixed inset-0 bg-forest/40 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative z-50 w-72 h-full bg-white shadow-xl flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-sage/30">
-              <span className="font-serif font-bold text-lg text-forest">Menu</span>
-              <button onClick={() => setMobileOpen(false)} className="p-1 text-ink-muted hover:text-forest">
+          <div className="relative z-50 w-72 h-full bg-white dark:bg-card shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-sage/30 dark:border-border">
+              <span className="font-serif font-bold text-lg text-forest dark:text-foreground">Menu</span>
+              <button onClick={() => setMobileOpen(false)} className="p-1 text-ink-muted hover:text-forest dark:hover:text-foreground cursor-pointer">
                 <X className="size-6" />
               </button>
             </div>
@@ -44,24 +46,21 @@ export function AppMobileShell({ currentUser, children }: AppMobileShellProps) {
 
       {/* Content Area */}
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden relative">
-        {/* Mobile Header Bar */}
-        <header className="lg:hidden flex h-14 items-center justify-between border-b border-sage/30 bg-white px-4 shrink-0 z-20">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="size-3 bg-mint rounded-full shadow-[0_0_8px_rgba(74,222,128,0.7)]" />
-            <span className="font-serif font-bold text-lg text-forest">VyaparSetu</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
+        {/* ChatGPT Style Floating Mobile Top Bar (< 1024px) */}
+        <div className="lg:hidden fixed top-3 left-3 z-30 flex items-center pointer-events-auto select-none">
+          <div className="h-10 px-1.5 flex items-center gap-1 bg-white/90 dark:bg-card/90 backdrop-blur-md border border-sage/40 dark:border-border rounded-2xl shadow-xs">
             <button
               onClick={() => setMobileOpen(true)}
-              className="p-1.5 rounded-lg text-forest hover:bg-cream cursor-pointer"
+              aria-label="Open navigation menu"
+              className="size-8 rounded-xl flex items-center justify-center text-forest dark:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
             >
-              <Menu className="size-5" />
+              <Menu className="size-4.5" />
             </button>
+            <LanguageSwitcher variant="brand" className="h-8 shadow-none border-0 bg-transparent px-1.5 hover:bg-cream dark:hover:bg-muted" />
           </div>
-        </header>
+        </div>
 
-        {/* Main Content */}
+        {/* Main Content (Edge to Edge Full Viewport) */}
         <main className="flex-1 h-full overflow-hidden bg-cream">
           {children}
         </main>

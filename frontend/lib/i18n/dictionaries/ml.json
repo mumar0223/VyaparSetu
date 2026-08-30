@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "വ്യാപാരസേതു",
+    "tagline": "ഭാരതത്തിന്റെ AI ബിസിനസ് & സാമ്പത്തിക പങ്കാളി",
+    "save": "സംരക്ഷിക്കുക",
+    "cancel": "റദ്ദാക്കുക",
+    "delete": "മായ്ക്കുക",
+    "edit": "എഡിറ്റ് ചെയ്യുക",
+    "approve": "അംഗീകരിക്കുക",
+    "review": "പരിശോധന",
+    "reviewAndEdit": "പരിശോധിച്ച് എഡിറ്റ് ചെയ്യുക",
+    "loading": "ലോഡ് ചെയ്യുന്നു...",
+    "submitting": "സമർപ്പിക്കുന്നു...",
+    "success": "വിജയം",
+    "error": "പിശക്",
+    "retry": "വീണ്ടും ശ്രമിക്കുക",
+    "search": "തിരയുക...",
+    "holdToSpeak": "സംസാരിക്കാൻ അമർത്തിപ്പിടിക്കുക",
+    "listening": "കേൾക്കുന്നു...",
+    "speaking": "സംസാരിക്കുന്നു...",
+    "thinking": "ചിന്തിക്കുന്നു...",
+    "voiceAgent": "വോയ്‌സ് ഏജന്റ് OS",
+    "newChat": "പുതിയ ചാറ്റ്",
+    "clearChat": "ചാറ്റ് മായ്‌ക്കുക",
+    "language": "ഭാഷ",
+    "lightMode": "ലൈറ്റ് മോഡ്",
+    "darkMode": "ഡാർക്ക് മോഡ്",
+    "signIn": "സൈൻ ഇൻ",
+    "signOut": "സൈൻ ഔട്ട്"
+  },
+  "sidebar": {
+    "dashboard": "ഡാഷ്‌ബോർഡ്",
+    "swotScanner": "SWOT മാർക്കറ്റ് സ്കാനർ",
+    "enterpriseProfile": "സംരംഭ പ്രൊഫൈൽ",
+    "aiRecommendations": "AI ഉപദേശകൻ",
+    "govtSchemes": "സർക്കാർ പദ്ധതികൾ",
+    "successStories": "വിജയഗാഥകൾ",
+    "dailyExpenses": "ദൈനംദിന ചെലവുകൾ",
+    "cashFlowRunway": "ക്യാഷ് ഫ്ലോ റൺവേ",
+    "savingsGoals": "സമ്പാദ്യ ലക്ഷ്യങ്ങൾ",
+    "budgetPlanning": "ബജറ്റ് ആസൂത്രണം",
+    "debtNavigator": "വായ്പ / EMI നാവിഗേറ്റർ",
+    "loanSimulator": "ലോൺ സിമുലേറ്റർ",
+    "businessCredit": "ബിസിനസ് ക്രെഡിറ്റ്",
+    "masterLedger": "മാസ്റ്റർ ലെഡ്ജർ"
+  },
+  "dashboard": {
+    "healthScore": "സാമ്പത്തിക ആരോഗ്യ സ്കോർ",
+    "workingCapital": "പ്രവർത്തന മൂലധനം",
+    "monthlyBurn": "പ്രതിമാസ ചെലവ്",
+    "apmcSpotRates": "തത്സമയ APMC മാർക്കറ്റ് നിരക്കുകൾ",
+    "activeAlerts": "പ്രധാന പ്രവർത്തനങ്ങൾ",
+    "viewMore": "വിശദാംശങ്ങൾ കാണുക"
+  },
+  "chat": {
+    "placeholder": "മാർക്കറ്റ് നിരക്കുകൾ, മുദ്ര വായ്പകൾ എന്നിവയെക്കുറിച്ച് ചോദിക്കുക...",
+    "disclaimer": "AI പിശകുകൾ വരുത്തിയേക്കാം. സാമ്പത്തിക തീരുമാനങ്ങൾ പരിശോധിക്കുക.",
+    "stagedDraft": "ഡ്രാഫ്റ്റ് തയ്യാറാണ്",
+    "clickToReview": "അംഗീകരിക്കാൻ ഇവിടെ ക്ലിക്ക് ചെയ്യുക"
+  },
+  "voice": {
+    "aiSpeaking": "AI സംസാരിക്കുന്നു • മൈക്ക് ലോക്ക് ചെയ്‌തു",
+    "holdToSpeak": "നിങ്ങളുടെ ഭാഷയിൽ സംസാരിക്കാൻ ബട്ടൺ അമർത്തിപ്പിടിക്കുക...",
+    "captions": "ശീർഷകങ്ങൾ",
+    "selectLanguage": "ഭാഷ തിരഞ്ഞെടുക്കുക"
+  }
+}

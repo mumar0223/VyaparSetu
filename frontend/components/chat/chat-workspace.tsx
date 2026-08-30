@@ -25,6 +25,7 @@ import { HistorySidebar } from "./history-sidebar";
 import { ChatMessageList } from "./chat-message-list";
 import { VoiceAgentView, type VoiceAgentStatus } from "./voice-agent-view";
 import { useLiveAgent } from "./use-live-agent";
+import { ArtifactModal, type ArtifactPayload } from "./artifact-modal";
 import type { ChatMessage, ConversationSummary, ToolCallItem } from "./types";
 import type { AuthUser } from "@/lib/auth-types";
 import { cn } from "@/lib/utils";
@@ -46,11 +47,19 @@ export function ChatWorkspace({
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsSidebarOpen(window.innerWidth >= 1024);
+    }
+  }, []);
+
   const [isInitialLoading, setIsInitialLoading] = useState(
     Boolean(initialChatId),
   );
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [activeArtifact, setActiveArtifact] = useState<ArtifactPayload | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const savedScrollPositionRef = useRef<number>(0);
@@ -77,10 +86,44 @@ export function ChatWorkspace({
   const [isEndingVoiceSession, setIsEndingVoiceSession] = useState(false);
   const [isStartingVoiceSession, setIsStartingVoiceSession] = useState(false);
   const voiceStartInFlightRef = useRef(false);
+  const voiceTurnsRef = useRef<Array<{ user: string; assistant?: string }>>([]);
 
   const liveAgent = useLiveAgent({
     activeChatId,
     onTurnComplete: (turn) => {
+      const userText = turn.userTranscript.trim();
+      const asstText = turn.assistantTranscript.trim();
+      if (userText) {
+        voiceTurnsRef.current.push({
+          user: userText,
+          assistant: asstText,
+        });
+        const currentCount = voiceTurnsRef.current.length;
+        const currentChatId = activeChatId;
+
+        // On Turn 1 (instant title) or Turn 3 (refined multi-turn dialogue title)
+        if (currentChatId && (currentCount === 1 || currentCount === 3)) {
+          fetch(`/api/chats/${currentChatId}/title`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              turns: voiceTurnsRef.current.slice(0, 3),
+            }),
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.title) {
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === currentChatId ? { ...c, title: data.title } : c
+                  )
+                );
+              }
+            })
+            .catch((err) => console.warn("Voice title generation error:", err));
+        }
+      }
+
       setMessages((prev) => {
         const next: ChatMessage[] = [...prev, {
           id: `user_${Date.now()}`,
@@ -156,6 +199,7 @@ export function ChatWorkspace({
   const handleStartVoiceSession = useCallback(async () => {
     if (isVoiceMode || voiceStartInFlightRef.current) return;
     voiceStartInFlightRef.current = true;
+    voiceTurnsRef.current = [];
     setIsStartingVoiceSession(true);
     if (scrollViewportRef.current) {
       savedScrollPositionRef.current = scrollViewportRef.current.scrollTop;
@@ -211,6 +255,30 @@ export function ChatWorkspace({
       }
       window.history.replaceState(null, "", "/dashboard");
     } else if (currentChatId) {
+      // Trigger background title generation if title is still default
+      if (voiceTurnsRef.current.length > 0) {
+        const existingConv = conversations.find((c) => c.id === currentChatId);
+        if (existingConv && (existingConv.title === "Live Voice Session" || existingConv.title === "New Conversation")) {
+          fetch(`/api/chats/${currentChatId}/title`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              turns: voiceTurnsRef.current.slice(0, 3),
+            }),
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.title) {
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === currentChatId ? { ...c, title: data.title } : c
+                  )
+                );
+              }
+            })
+            .catch((err) => console.warn("Voice session end title generation error:", err));
+        }
+      }
       window.history.replaceState(null, "", `/dashboard/c/${currentChatId}`);
     } else {
       window.history.replaceState(null, "", "/dashboard");
@@ -607,24 +675,26 @@ export function ChatWorkspace({
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-cream dark:bg-background text-foreground font-sans">
-      {/* ── Floating Controls (Visible ONLY when Sidebar is Closed) ── */}
-      {!isSidebarOpen && (
-        <div className="absolute top-3.5 right-8 z-30 flex items-center gap-2 pointer-events-auto">
-          <button
-            onClick={handleNewChat}
-            title="New chat"
-            className="size-9 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-white dark:hover:bg-card transition-colors cursor-pointer bg-white/80 dark:bg-card/80 backdrop-blur border border-sage/30 dark:border-border shadow-xs"
-          >
-            <Plus className="size-4" />
-          </button>
+      {/* ── Top-Right Floating Controls (ChatGPT Style Mobile & Collapsed Desktop) ── */}
+      {(!isSidebarOpen || (typeof window !== "undefined" && window.innerWidth < 1024)) && (
+        <div className="absolute top-3 right-3 z-30 flex items-center pointer-events-auto select-none">
+          <div className="h-10 px-1.5 flex items-center gap-1 bg-white/90 dark:bg-card/90 backdrop-blur-md border border-sage/40 dark:border-border rounded-2xl shadow-xs">
+            <button
+              onClick={handleNewChat}
+              title="New chat"
+              className="size-8 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
+            >
+              <Plus className="size-4" />
+            </button>
 
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            title="Show chat history"
-            className="size-9 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-white dark:hover:bg-card transition-colors cursor-pointer bg-white/80 dark:bg-card/80 backdrop-blur border border-sage/30 dark:border-border shadow-xs"
-          >
-            <PanelRightOpen className="size-4" />
-          </button>
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              title="Show chat history"
+              className="size-8 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
+            >
+              <PanelRightOpen className="size-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -650,6 +720,8 @@ export function ChatWorkspace({
             liveTranscript={liveAgent.liveUserTranscript}
             assistantTranscript={liveAgent.liveAssistantTranscript}
             activeToolName={liveAgent.activeToolName}
+            activeArtifact={liveAgent.liveArtifact}
+            onOpenArtifact={(art) => setActiveArtifact(art)}
           />
         ) : isNewChatView ? (
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
@@ -741,7 +813,11 @@ export function ChatWorkspace({
 
             {/* Scrollable Message List */}
             <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-6 py-6">
-              <ChatMessageList messages={messages} isLoading={isLoading} />
+              <ChatMessageList
+                messages={messages}
+                isLoading={isLoading}
+                onOpenArtifact={(art) => setActiveArtifact(art)}
+              />
               <div ref={bottomRef} className="h-6" />
             </div>
 
@@ -784,6 +860,18 @@ export function ChatWorkspace({
         onDeleteChat={handleDeleteChat}
         onRenameChat={handleRenameChat}
         onTogglePin={handleTogglePin}
+      />
+
+      {/* ── Interactive Artifact Review & Approval Modal ── */}
+      <ArtifactModal
+        isOpen={Boolean(activeArtifact)}
+        onClose={() => setActiveArtifact(null)}
+        artifact={activeArtifact}
+        isVoiceMode={isVoiceMode}
+        onVoiceHoldStart={liveAgent.startSpeaking}
+        onVoiceHoldEnd={liveAgent.stopSpeaking}
+        isUserSpeaking={liveAgent.isUserSpeaking}
+        isHoldingToSpeak={liveAgent.isHoldingToSpeak}
       />
     </div>
   );

@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "व्यापारसेतु",
+    "tagline": "भारत का AI व्यापार और वित्तीय साझेदार",
+    "save": "सुरक्षित करें",
+    "cancel": "रद्द करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "approve": "स्वीकृत करें",
+    "review": "समीक्षा करें",
+    "reviewAndEdit": "समीक्षा और संपादन",
+    "loading": "लोड हो रहा है...",
+    "submitting": "जमा हो रहा है...",
+    "success": "सफल",
+    "error": "त्रुटि",
+    "retry": "पुनः प्रयास करें",
+    "search": "खोजें...",
+    "holdToSpeak": "बोलने के लिए दबाए रखें",
+    "listening": "सुन रहा हूँ...",
+    "speaking": "बोल रहा हूँ...",
+    "thinking": "विचार कर रहा हूँ...",
+    "voiceAgent": "वॉयस एजेंट ओएस",
+    "newChat": "नई बातचीत",
+    "clearChat": "चैट साफ़ करें",
+    "language": "भाषा",
+    "lightMode": "लाइट मोड",
+    "darkMode": "डार्क मोड",
+    "signIn": "साइन इन करें",
+    "signOut": "साइन आउट"
+  },
+  "sidebar": {
+    "dashboard": "डैशबोर्ड",
+    "swotScanner": "SWOT बाजार स्कैनर",
+    "enterpriseProfile": "उद्यम प्रोफ़ाइल",
+    "aiRecommendations": "AI व्यापार सलाहकार",
+    "govtSchemes": "सरकारी योजनाएं",
+    "successStories": "सफलता की कहानियां",
+    "dailyExpenses": "दैनिक खर्च",
+    "cashFlowRunway": "कैश फ्लो रनवे",
+    "savingsGoals": "बचत लक्ष्य",
+    "budgetPlanning": "बजट योजना",
+    "debtNavigator": "ऋण / ईएमआई नेविगेटर",
+    "loanSimulator": "लोन सिम्युलेटर",
+    "businessCredit": "व्यापार क्रेडिट",
+    "masterLedger": "मास्टर खाता बही"
+  },
+  "dashboard": {
+    "healthScore": "वित्तीय स्वास्थ्य स्कोर",
+    "workingCapital": "कार्यशील पूंजी बफर",
+    "monthlyBurn": "मासिक परिचालन खर्च",
+    "apmcSpotRates": "लाइव APMC मंडी भाव",
+    "activeAlerts": "महत्वपूर्ण कार्य",
+    "viewMore": "विवरण देखें"
+  },
+  "chat": {
+    "placeholder": "मंडी भाव, मुद्रा ऋण या खाता बही के बारे में कुछ भी पूछें...",
+    "disclaimer": "व्यापारसेतु AI से त्रुटियां हो सकती हैं। महत्वपूर्ण वित्तीय निर्णयों की पुष्टि करें।",
+    "stagedDraft": "इंटरएक्टिव ड्राफ्ट तैयार",
+    "clickToReview": "रिकॉर्ड की समीक्षा और अनुमोदन के लिए क्लिक करें"
+  },
+  "voice": {
+    "aiSpeaking": "AI बोल रहा है • माइक लॉक",
+    "holdToSpeak": "अपनी भाषा में बोलने के लिए बटन या स्पेसबार दबाए रखें...",
+    "captions": "उपशीर्षक (कैप्शन)",
+    "selectLanguage": "भाषा चुनें"
+  }
+}

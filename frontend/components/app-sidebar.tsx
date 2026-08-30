@@ -30,6 +30,26 @@ import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/lib/auth-types";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+import { useTranslation } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/language-switcher";
+
+const I18N_NAV_MAP: Record<string, string> = {
+  "/dashboard": "sidebar.dashboard",
+  "/scanner": "sidebar.swotScanner",
+  "/profile/business": "sidebar.enterpriseProfile",
+  "/ai-recommendations": "sidebar.aiRecommendations",
+  "/schemes-for-you": "sidebar.govtSchemes",
+  "/success-stories": "sidebar.successStories",
+  "/expenses": "sidebar.dailyExpenses",
+  "/cashflow": "sidebar.cashFlowRunway",
+  "/savings": "sidebar.savingsGoals",
+  "/budget": "sidebar.budgetPlanning",
+  "/debt": "sidebar.debtNavigator",
+  "/borrowing": "sidebar.loanSimulator",
+  "/credit": "sidebar.businessCredit",
+  "/transactions": "sidebar.masterLedger",
+};
+
 const NAV_SECTIONS = [
   {
     title: "Workspace",
@@ -82,6 +102,7 @@ interface AppSidebarProps {
 export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const isActive = (href: string) =>
     href === "/dashboard"
@@ -119,11 +140,14 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
       )}
     >
       {/* Brand Header */}
-      <div className="flex h-16 items-center px-5 border-b border-sage/30 shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_10px_rgba(74,222,128,0.7)]" />
-          <span className="font-serif font-bold text-xl text-forest tracking-tight">VyaparSetu</span>
+      <div className="flex h-16 items-center justify-between px-4 border-b border-sage/30 shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_10px_rgba(74,222,128,0.7)] shrink-0" />
+          <span className="font-serif font-bold text-lg text-forest tracking-tight truncate">
+            {t("common.appName", "VyaparSetu")}
+          </span>
         </Link>
+        <LanguageSwitcher variant="brand" className="shrink-0" />
       </div>
 
       {/* Navigation Groups */}
@@ -136,6 +160,9 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
             <ul className="flex flex-col gap-0.5">
               {section.items.map((item) => {
                 const active = isActive(item.href);
+                const translatedLabel = I18N_NAV_MAP[item.href]
+                  ? t(I18N_NAV_MAP[item.href], item.label)
+                  : item.label;
                 return (
                   <li key={item.href}>
                     <Link
@@ -154,7 +181,7 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
                           active ? "text-forest" : "text-ink-muted group-hover:text-forest"
                         )}
                       />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate">{translatedLabel}</span>
                     </Link>
                   </li>
                 );

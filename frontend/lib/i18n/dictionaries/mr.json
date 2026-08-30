@@ -1,0 +1,67 @@
+{
+  "common": {
+    "appName": "व्यापारसेतू",
+    "tagline": "भारताचा AI व्यापार आणि आर्थिक भागीदार",
+    "save": "जतन करा",
+    "cancel": "रद्द करा",
+    "delete": "हटवा",
+    "edit": "संपादित करा",
+    "approve": "मंजूर करा",
+    "review": "पुनरावलोकन",
+    "reviewAndEdit": "पुनरावलोकन आणि संपादन",
+    "loading": "लोड होत आहे...",
+    "submitting": "सादर करत आहे...",
+    "success": "यशस्वी",
+    "error": "त्रुटी",
+    "retry": "पुन्हा प्रयत्न करा",
+    "search": "शोधा...",
+    "holdToSpeak": "बोलण्यासाठी दाबून ठेवा",
+    "listening": "ऐकत आहे...",
+    "speaking": "बोलत आहे...",
+    "thinking": "विचार करत आहे...",
+    "voiceAgent": "व्हॉइस एजंट ओएस",
+    "newChat": "नवीन चॅट",
+    "clearChat": "चॅट साफ करा",
+    "language": "भाषा",
+    "lightMode": "लाइट मोड",
+    "darkMode": "डार्क मोड",
+    "signIn": "साइन इन करा",
+    "signOut": "साइन आउट"
+  },
+  "sidebar": {
+    "dashboard": "डॅशबोर्ड",
+    "swotScanner": "SWOT बाजार स्कॅनर",
+    "enterpriseProfile": "उद्यम प्रोफाइल",
+    "aiRecommendations": "AI सल्लागार",
+    "govtSchemes": "सरकारी योजना",
+    "successStories": "यशोगाथा",
+    "dailyExpenses": "दैनिक खर्च",
+    "cashFlowRunway": "कॅश फ्लो रनवे",
+    "savingsGoals": "बचत उद्दिष्टे",
+    "budgetPlanning": "बजेट नियोजन",
+    "debtNavigator": "कर्ज / ईएमआय नेव्हिगेटर",
+    "loanSimulator": "कर्ज सिम्युलेटर",
+    "businessCredit": "व्यवसाय क्रेडिट",
+    "masterLedger": "मास्टर खातेवही"
+  },
+  "dashboard": {
+    "healthScore": "आर्थिक आरोग्य स्कोअर",
+    "workingCapital": "खेळते भांडवल बफर",
+    "monthlyBurn": "मासिक खर्च",
+    "apmcSpotRates": "थेट APMC बाजार भाव",
+    "activeAlerts": "महत्त्वाच्या कृती",
+    "viewMore": "तपशील पहा"
+  },
+  "chat": {
+    "placeholder": "बाजार भाव, मुद्रा कर्ज किंवा खातेवहीबद्दल विचारा...",
+    "disclaimer": "व्यापारसेतू AI कडून त्रुटी होऊ शकतात. आर्थिक निर्णयांची खात्री करा.",
+    "stagedDraft": "मसुदा तयार केला",
+    "clickToReview": "मंजुरीसाठी येथे क्लिक करा"
+  },
+  "voice": {
+    "aiSpeaking": "AI बोलत आहे • माइक लॉक",
+    "holdToSpeak": "आपल्या भाषेत बोलण्यासाठी बटण दाबून ठेवा...",
+    "captions": "मथळे",
+    "selectLanguage": "भाषा निवडा"
+  }
+}

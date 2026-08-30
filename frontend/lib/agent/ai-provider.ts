@@ -36,7 +36,7 @@ export function getLanguageModel(
     case "google-vertex":
     case "gemini-vertex": {
       const project = process.env.GOOGLE_VERTEX_PROJECT;
-      const location = process.env.GOOGLE_VERTEX_LOCATION || "global";
+      const location = process.env.GOOGLE_VERTEX_LOCATION || "us-central1";
       const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
       let privateKey = process.env.GOOGLE_PRIVATE_KEY;
 

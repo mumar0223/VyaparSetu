@@ -168,30 +168,30 @@ export async function POST(req: NextRequest) {
               });
             }
           } else if (isSchemeQuery) {
-            const toolDef = TOOL_DEFINITIONS.evaluateSchemeEligibility;
+            const toolDef = TOOL_DEFINITIONS.getGovtSchemes || { icon: "landmark", formatSummary: () => "Evaluated scheme" };
             const summary = toolDef.formatSummary({ schemeName: "PM_MUDRA" });
             sendEvent("tool_call", {
-              toolName: "evaluateSchemeEligibility",
+              toolName: "getGovtSchemes",
               icon: toolDef.icon,
               args: { schemeName: "PM_MUDRA", annualTurnover: 1200000 },
               summary,
               status: "calling",
             });
-            const schemeTool = tools.evaluateSchemeEligibility;
+            const schemeTool = tools.getGovtSchemes;
             if (schemeTool) {
               const res = await (schemeTool as any).execute({
                 schemeName: "PM_MUDRA",
                 annualTurnover: 1200000,
               });
               sendEvent("tool_result", {
-                toolName: "evaluateSchemeEligibility",
+                toolName: "getGovtSchemes",
                 icon: toolDef.icon,
                 result: res,
                 summary,
                 status: "completed",
               });
               toolInvocations.push({
-                toolName: "evaluateSchemeEligibility",
+                toolName: "getGovtSchemes",
                 icon: toolDef.icon,
                 args: { schemeName: "PM_MUDRA", annualTurnover: 1200000 },
                 result: res,

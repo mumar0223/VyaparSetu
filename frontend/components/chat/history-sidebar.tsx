@@ -81,135 +81,171 @@ export function HistorySidebar({
   const pinnedChats = filtered.filter((c) => c.pinned);
   const recentChats = filtered.filter((c) => !c.pinned);
 
-  return (
-    <aside
-      className={cn(
-        "flex shrink-0 flex-col border-l border-sage/30 dark:border-border bg-white/70 dark:bg-card/90 h-full transition-[width] duration-300 ease-in-out select-none overflow-hidden font-sans",
-        isOpen ? "w-[260px]" : "w-0 border-l-0"
-      )}
-    >
-      {/* Inner Fixed-Width Wrapper */}
-      <div className="w-[260px] h-full flex flex-col shrink-0">
-        {/* Top Header */}
-        <div className="flex h-14 items-center justify-between gap-2 px-3 border-b border-sage/20 dark:border-border">
-          <button
-            onClick={onNewChat}
-            className="flex flex-1 h-9 items-center justify-center gap-2 rounded-xl bg-cream dark:bg-muted hover:bg-mint-pale dark:hover:bg-muted/80 px-3 text-[13px] font-semibold text-forest dark:text-foreground transition-colors cursor-pointer border border-sage/40 dark:border-border shadow-2xs"
-          >
-            <Plus className="size-4 text-forest dark:text-mint" />
-            <span>New chat</span>
-          </button>
+  const renderContent = (isMobileSheet: boolean = false) => (
+    <div className="w-full h-full flex flex-col shrink-0">
+      {/* Top Header */}
+      <div className="flex h-14 items-center justify-between gap-2 px-3 border-b border-sage/20 dark:border-border">
+        <button
+          onClick={() => {
+            onNewChat();
+            if (isMobileSheet) onToggle();
+          }}
+          className="flex flex-1 h-9 items-center justify-center gap-2 rounded-xl bg-cream dark:bg-muted hover:bg-mint-pale dark:hover:bg-muted/80 px-3 text-[13px] font-semibold text-forest dark:text-foreground transition-colors cursor-pointer border border-sage/40 dark:border-border shadow-2xs"
+        >
+          <Plus className="size-4 text-forest dark:text-mint" />
+          <span>New chat</span>
+        </button>
 
-          <button
-            onClick={onToggle}
-            title="Close chat history"
-            className="size-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer border border-transparent hover:border-sage/30"
-          >
-            <PanelRightClose className="size-4" />
-          </button>
-        </div>
+        <button
+          onClick={onToggle}
+          title="Close chat history"
+          className="size-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer border border-transparent hover:border-sage/30"
+        >
+          <PanelRightClose className="size-4" />
+        </button>
+      </div>
 
-        {/* Search Bar */}
-        <div className="px-3 pt-2.5 pb-1">
-          <div className="flex h-9 items-center gap-2 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-background px-2.5 text-[12.5px] text-foreground">
-            <Search className="size-3.5 shrink-0 text-muted-foreground" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search chats..."
-              className="w-full bg-transparent focus:outline-hidden text-[12.5px] text-foreground placeholder:text-muted-foreground"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Gemini Live Voice Session Trigger */}
-        <div className="px-3 pt-1 pb-1">
-          <button
-            onClick={onStartVoiceSession}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-mint-pale dark:bg-mint/10 hover:bg-mint/20 border border-mint/30 dark:border-mint/25 text-forest dark:text-mint transition-all cursor-pointer shadow-2xs group"
-          >
-            <div className="flex items-center gap-2">
-              <AudioLines className="size-4 text-mint group-hover:scale-110 transition-transform animate-pulse" />
-              <span className="text-[12.5px] font-semibold">Voice Agent OS</span>
-            </div>
-            <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-mint/20 text-forest dark:text-mint border border-mint/30">
-              Live
-            </span>
-          </button>
-        </div>
-
-        {/* Scrollable Conversation List */}
-        <div className="flex-1 overflow-y-auto px-2.5 py-1.5 space-y-4">
-          {/* Pinned Section */}
-          {pinnedChats.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                <Pin className="size-3 text-mint" />
-                <span>Pinned</span>
-              </div>
-              <ul className="flex flex-col gap-0.5">
-                {pinnedChats.map((c) => (
-                  <ChatItem
-                    key={c.id}
-                    conversation={c}
-                    isActive={c.id === activeChatId}
-                    isEditing={editingId === c.id}
-                    editTitle={editTitle}
-                    setEditTitle={setEditTitle}
-                    onSelect={() => onSelectChat(c.id)}
-                    onStartRename={(e) => startRename(c, e)}
-                    onSaveRename={(e) => saveRename(c.id, e)}
-                    onCancelRename={cancelRename}
-                    onDelete={() => onDeleteChat(c.id)}
-                    onTogglePin={() => onTogglePin(c.id, !c.pinned)}
-                  />
-                ))}
-              </ul>
-            </div>
+      {/* Search Bar */}
+      <div className="px-3 pt-2.5 pb-1">
+        <div className="flex h-9 items-center gap-2 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-background px-2.5 text-[12.5px] text-foreground">
+          <Search className="size-3.5 shrink-0 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search chats..."
+            className="w-full bg-transparent focus:outline-hidden text-[12.5px] text-foreground placeholder:text-muted-foreground"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="size-3.5" />
+            </button>
           )}
-
-          {/* Recents Section */}
-          <div>
-            <div className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Recents
-            </div>
-            {recentChats.length === 0 && pinnedChats.length === 0 ? (
-              <div className="px-3 py-8 text-center text-[12.5px] text-muted-foreground">
-                No chat history yet
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {recentChats.map((c) => (
-                  <ChatItem
-                    key={c.id}
-                    conversation={c}
-                    isActive={c.id === activeChatId}
-                    isEditing={editingId === c.id}
-                    editTitle={editTitle}
-                    setEditTitle={setEditTitle}
-                    onSelect={() => onSelectChat(c.id)}
-                    onStartRename={(e) => startRename(c, e)}
-                    onSaveRename={(e) => saveRename(c.id, e)}
-                    onCancelRename={cancelRename}
-                    onDelete={() => onDeleteChat(c.id)}
-                    onTogglePin={() => onTogglePin(c.id, !c.pinned)}
-                  />
-                ))}
-              </ul>
-            )}
-          </div>
         </div>
       </div>
-    </aside>
+
+      {/* Gemini Live Voice Session Trigger */}
+      <div className="px-3 pt-1 pb-1">
+        <button
+          onClick={() => {
+            onStartVoiceSession?.();
+            if (isMobileSheet) onToggle();
+          }}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-mint-pale dark:bg-mint/10 hover:bg-mint/20 border border-mint/30 dark:border-mint/25 text-forest dark:text-mint transition-all cursor-pointer shadow-2xs group"
+        >
+          <div className="flex items-center gap-2">
+            <AudioLines className="size-4 text-mint group-hover:scale-110 transition-transform animate-pulse" />
+            <span className="text-[12.5px] font-semibold">Voice Agent OS</span>
+          </div>
+          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-mint/20 text-forest dark:text-mint border border-mint/30">
+            Live
+          </span>
+        </button>
+      </div>
+
+      {/* Scrollable Conversation List */}
+      <div className="flex-1 overflow-y-auto px-2.5 py-1.5 space-y-4">
+        {/* Pinned Section */}
+        {pinnedChats.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <Pin className="size-3 text-mint" />
+              <span>Pinned</span>
+            </div>
+            <ul className="flex flex-col gap-0.5">
+              {pinnedChats.map((c) => (
+                <ChatItem
+                  key={c.id}
+                  conversation={c}
+                  isActive={c.id === activeChatId}
+                  isEditing={editingId === c.id}
+                  editTitle={editTitle}
+                  setEditTitle={setEditTitle}
+                  onSelect={() => {
+                    onSelectChat(c.id);
+                    if (isMobileSheet) onToggle();
+                  }}
+                  onStartRename={(e) => startRename(c, e)}
+                  onSaveRename={(e) => saveRename(c.id, e)}
+                  onCancelRename={cancelRename}
+                  onDelete={() => onDeleteChat(c.id)}
+                  onTogglePin={() => onTogglePin(c.id, !c.pinned)}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Recents Section */}
+        <div>
+          <div className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            Recents
+          </div>
+          {recentChats.length === 0 && pinnedChats.length === 0 ? (
+            <div className="px-3 py-8 text-center text-[12.5px] text-muted-foreground">
+              No chat history yet
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-0.5">
+              {recentChats.map((c) => (
+                <ChatItem
+                  key={c.id}
+                  conversation={c}
+                  isActive={c.id === activeChatId}
+                  isEditing={editingId === c.id}
+                  editTitle={editTitle}
+                  setEditTitle={setEditTitle}
+                  onSelect={() => {
+                    onSelectChat(c.id);
+                    if (isMobileSheet) onToggle();
+                  }}
+                  onStartRename={(e) => startRename(c, e)}
+                  onSaveRename={(e) => saveRename(c.id, e)}
+                  onCancelRename={cancelRename}
+                  onDelete={() => onDeleteChat(c.id)}
+                  onTogglePin={() => onTogglePin(c.id, !c.pinned)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* ── Desktop Inline Collapsible History Sidebar (>= 1024px) ── */}
+      <aside
+        className={cn(
+          "hidden lg:flex shrink-0 flex-col border-l border-sage/30 dark:border-border bg-white/70 dark:bg-card/90 h-full transition-[width] duration-300 ease-in-out select-none overflow-hidden font-sans",
+          isOpen ? "w-[260px]" : "w-0 border-l-0"
+        )}
+      >
+        <div className="w-[260px] h-full flex flex-col shrink-0">
+          {renderContent(false)}
+        </div>
+      </aside>
+
+      {/* ── Mobile & Tablet Slide-Over Sheet (< 1024px) ── */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden font-sans select-none animate-in fade-in-0 duration-200">
+          {/* Frosted Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity cursor-pointer"
+            onClick={onToggle}
+          />
+
+          {/* Sliding Sheet Drawer */}
+          <aside className="absolute inset-y-0 right-0 w-[280px] max-w-[85vw] bg-white dark:bg-card border-l border-sage/30 dark:border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-250 z-10">
+            {renderContent(true)}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
 
