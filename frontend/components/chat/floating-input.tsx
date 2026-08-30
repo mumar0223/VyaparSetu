@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { Plus, ArrowUp, Mic, Brain, AudioLines } from "lucide-react";
+import { Plus, ArrowUp, AudioLines } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useTranslation } from "@/lib/i18n";
@@ -23,7 +23,6 @@ export function FloatingInput({
 }: FloatingInputProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
-  const [isThinkEnabled, setIsThinkEnabled] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const displayPlaceholder =
@@ -79,7 +78,7 @@ export function FloatingInput({
 
           {/* Bottom Action Bar */}
           <div className="flex items-center justify-between pt-1 px-1">
-            {/* Left Actions: Attach & Think */}
+            {/* Left Actions: Attach */}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -87,20 +86,6 @@ export function FloatingInput({
                 className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
               >
                 <Plus className="size-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsThinkEnabled(!isThinkEnabled)}
-                className={cn(
-                  "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer",
-                  isThinkEnabled
-                    ? "bg-mint-pale dark:bg-mint/15 text-forest dark:text-mint border border-mint/30"
-                    : "text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted"
-                )}
-              >
-                <Brain className="size-3" />
-                <span>{t("common.thinking", "Think")}</span>
               </button>
             </div>
 
@@ -116,18 +101,6 @@ export function FloatingInput({
                 className="size-8 rounded-full flex items-center justify-center bg-mint-pale dark:bg-mint/15 hover:bg-mint/25 text-forest dark:text-mint border border-mint/30 hover:border-mint/50 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
               >
                 <AudioLines className="size-4" />
-              </button>
-
-              {/* Dictate / Mic */}
-              <button
-                type="button"
-                onClick={startVoiceAgent}
-                disabled={isLoading}
-                aria-label="Start voice agent"
-                title={t("common.holdToSpeak", "Speak")}
-                className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
-              >
-                <Mic className="size-4" />
               </button>
 
               {/* Send Button */}
