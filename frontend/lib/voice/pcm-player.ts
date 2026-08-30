@@ -15,6 +15,8 @@ export class PCMPlayer {
   private isPlaying = false;
   private sampleRate: number;
   private onPlaybackStateChange?: (isPlaying: boolean) => void;
+  /** Timer to debounce the "stopped playing" signal so we don't flicker between chunks */
+  private pendingEndTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options?: PCMPlayerOptions) {
     this.sampleRate = options?.sampleRate || 24000;
@@ -32,7 +34,8 @@ export class PCMPlayer {
 
   private initAudioContext(): AudioContext {
     if (!this.audioContext || this.audioContext.state === "closed") {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioCtx({
         sampleRate: this.sampleRate,
       });
@@ -44,6 +47,13 @@ export class PCMPlayer {
     return this.audioContext;
   }
 
+  private clearPendingEnd(): void {
+    if (this.pendingEndTimer) {
+      clearTimeout(this.pendingEndTimer);
+      this.pendingEndTimer = null;
+    }
+  }
+
   /**
    * Queue and play incoming base64 PCM chunk
    */
@@ -53,7 +63,14 @@ export class PCMPlayer {
 
     if (float32Array.length === 0) return;
 
-    const audioBuffer = ctx.createBuffer(1, float32Array.length, this.sampleRate);
+    // A new chunk arrived — cancel any pending "stopped" signal
+    this.clearPendingEnd();
+
+    const audioBuffer = ctx.createBuffer(
+      1,
+      float32Array.length,
+      this.sampleRate,
+    );
     audioBuffer.getChannelData(0).set(float32Array);
 
     const source = ctx.createBufferSource();
@@ -79,8 +96,16 @@ export class PCMPlayer {
         this.activeSourceNodes.splice(index, 1);
       }
       if (this.activeSourceNodes.length === 0) {
-        this.isPlaying = false;
-        this.onPlaybackStateChange?.(false);
+        // Don't fire "stopped" immediately — wait a short window for the next
+        // chunk to arrive from Vertex. If no chunk comes, THEN report stopped.
+        this.clearPendingEnd();
+        this.pendingEndTimer = setTimeout(() => {
+          this.pendingEndTimer = null;
+          if (this.activeSourceNodes.length === 0 && this.isPlaying) {
+            this.isPlaying = false;
+            this.onPlaybackStateChange?.(false);
+          }
+        }, 600);
       }
     };
   }
@@ -89,6 +114,7 @@ export class PCMPlayer {
    * Instantly stops audio playback upon barge-in / user interruption
    */
   public interrupt(): void {
+    this.clearPendingEnd();
     for (const node of this.activeSourceNodes) {
       try {
         node.stop();
@@ -105,7 +131,32 @@ export class PCMPlayer {
     }
   }
 
+  /**
+   * Flush all queued/playing audio and reset state WITHOUT closing the
+   * AudioContext.  Use this between conversation turns so the player stays
+   * alive for the next AI response.
+   */
+  public flush(): void {
+    this.clearPendingEnd();
+    for (const node of this.activeSourceNodes) {
+      try {
+        node.stop();
+        node.disconnect();
+      } catch (e) {}
+    }
+    this.activeSourceNodes = [];
+    if (this.audioContext) {
+      this.nextPlayTime = this.audioContext.currentTime;
+    }
+    if (this.isPlaying) {
+      this.isPlaying = false;
+      // Deliberately do NOT fire onPlaybackStateChange here — the caller
+      // (startSpeaking) manages the state transition itself.
+    }
+  }
+
   public stop(): void {
+    this.clearPendingEnd();
     this.interrupt();
     if (this.audioContext && this.audioContext.state !== "closed") {
       this.audioContext.close().catch(() => {});

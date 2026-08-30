@@ -50,6 +50,10 @@ export function FloatingInput({
     }
   };
 
+  const startVoiceAgent = () => {
+    if (!isLoading) onStartVoiceMode?.();
+  };
+
   return (
     <div className="w-full transition-all duration-300 ease-out z-20">
       {/* Elevated Pill Container */}
@@ -99,8 +103,10 @@ export function FloatingInput({
               {/* Gemini Live Voice Agent Trigger */}
               <button
                 type="button"
-                onClick={onStartVoiceMode}
-                title="Start Gemini Live Voice Agent"
+                onClick={startVoiceAgent}
+                disabled={isLoading}
+                aria-label="Start live voice agent"
+                title="Start Vertex AI Voice Agent"
                 className="size-8 rounded-full flex items-center justify-center bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 hover:border-sky-500/40 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
               >
                 <AudioLines className="size-4" />
@@ -109,7 +115,10 @@ export function FloatingInput({
               {/* Dictate / Mic */}
               <button
                 type="button"
-                title="Voice dictation"
+                onClick={startVoiceAgent}
+                disabled={isLoading}
+                aria-label="Start voice agent"
+                title="Start voice agent"
                 className="size-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <Mic className="size-4" />

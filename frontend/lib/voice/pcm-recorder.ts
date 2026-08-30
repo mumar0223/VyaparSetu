@@ -3,9 +3,9 @@
  *
  * Microphone -> AudioWorklet -> 16-bit mono PCM -> onChunk()
  *
- * No custom noise filtering, no noise gate, no gain boost,
- * no custom echo cancellation, no custom noise suppression.
- * Browser audio processing is explicitly disabled for this test.
+ * Capture is deliberately left to the browser's platform audio stack for
+ * echo cancellation, noise suppression, and gain control. This is much more
+ * reliable on desktop devices than a hand-rolled noise gate.
  */
 
 export interface PCMRecorderOptions {
@@ -15,6 +15,7 @@ export interface PCMRecorderOptions {
   gainBoost?: number;           // API compatibility; NOT USED
   onChunk: (base64Chunk: string) => void;
   onVolume?: (volume: number) => void;
+  onAudioLevel?: (rms: number) => void;
   onError?: (err: Error) => void;
 }
 
@@ -41,13 +42,11 @@ export class PCMRecorder {
     if (this.isRecording) return true;
 
     try {
-      // Raw browser capture for this test.
-      // Disable browser-side AEC/NS/AGC so the signal is not intentionally processed.
       const audioConstraints: MediaTrackConstraints = {
         channelCount: { ideal: 1 },
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
+        echoCancellation: { ideal: true },
+        noiseSuppression: { ideal: true },
+        autoGainControl: { ideal: true },
       };
 
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -60,7 +59,7 @@ export class PCMRecorder {
       }
 
       const AudioCtx =
-        window.AudioContext || (window as any).webkitAudioContext;
+        window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
       if (!AudioCtx) {
         throw new Error("Web Audio API is not supported in this browser.");
@@ -104,7 +103,7 @@ export class PCMRecorder {
               const index1 = Math.min(index0 + 1, inputLen - 1);
               const fraction = this.resampleOffset - index0;
 
-              // Direct sample value. No filter, gain, gate, or noise reduction.
+              // The browser has already applied any device-level processing.
               const sample =
                 inputChannel[index0] * (1 - fraction) +
                 inputChannel[index1] * fraction;
@@ -146,7 +145,7 @@ export class PCMRecorder {
         "raw-pcm-processor"
       );
 
-      this.workletNode.port.onmessage = (event: MessageEvent<any>) => {
+      this.workletNode.port.onmessage = (event: MessageEvent<{ type?: string; buffer?: Float32Array }>) => {
         if (!this.isRecording || this.isMuted) return;
 
         const data = event.data;
@@ -168,6 +167,7 @@ export class PCMRecorder {
           }
           const rms = Math.sqrt(sumSquares / float32Data.length);
           this.options.onVolume(Math.min(1, rms * 6));
+          this.options.onAudioLevel?.(rms);
         }
       };
 
@@ -182,7 +182,7 @@ export class PCMRecorder {
 
       this.isRecording = true;
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.stop();
 
       const error =
@@ -200,6 +200,12 @@ export class PCMRecorder {
 
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
+    // Stop the physical track while the assistant is speaking or the user has
+    // muted the call. This prevents both outbound audio and accidental local
+    // capture; unmuting restores the same selected microphone immediately.
+    this.mediaStream?.getAudioTracks().forEach((track) => {
+      track.enabled = !muted;
+    });
   }
 
   public getIsMuted(): boolean {
@@ -208,6 +214,12 @@ export class PCMRecorder {
 
   public getIsRecording(): boolean {
     return this.isRecording;
+  }
+
+  public async resume(): Promise<void> {
+    if (this.audioContext && this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
   }
 
   /** Returns the actual microphone settings reported by the browser. */

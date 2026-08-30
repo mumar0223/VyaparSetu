@@ -75,26 +75,30 @@ export function ChatWorkspace({
   // ── Voice Agent Mode State & Live Agent Orchestrator ──
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isEndingVoiceSession, setIsEndingVoiceSession] = useState(false);
+  const [isStartingVoiceSession, setIsStartingVoiceSession] = useState(false);
+  const voiceStartInFlightRef = useRef(false);
 
   const liveAgent = useLiveAgent({
     activeChatId,
     onTurnComplete: (turn) => {
-      setMessages((prev) => [
-        ...prev,
-        {
+      setMessages((prev) => {
+        const next: ChatMessage[] = [...prev, {
           id: `user_${Date.now()}`,
           role: "user",
           content: turn.userTranscript,
           createdAt: new Date(),
-        },
-        {
-          id: `asst_${Date.now()}`,
-          role: "assistant",
-          content: turn.assistantTranscript,
-          toolCalls: turn.toolCalls,
-          createdAt: new Date(),
-        },
-      ]);
+        }];
+        if (turn.assistantTranscript.trim()) {
+          next.push({
+            id: `asst_${Date.now()}`,
+            role: "assistant",
+            content: turn.assistantTranscript,
+            toolCalls: turn.toolCalls,
+            createdAt: new Date(),
+          });
+        }
+        return next;
+      });
       fetchConversations();
     },
   });
@@ -150,38 +154,44 @@ export function ChatWorkspace({
 
   // ── Start Live Voice Session ──
   const handleStartVoiceSession = useCallback(async () => {
+    if (isVoiceMode || voiceStartInFlightRef.current) return;
+    voiceStartInFlightRef.current = true;
+    setIsStartingVoiceSession(true);
     if (scrollViewportRef.current) {
       savedScrollPositionRef.current = scrollViewportRef.current.scrollTop;
     }
     setIsVoiceMode(true);
+    // This screen is intentionally shown before any model/WebSocket work. It
+    // represents only creation or resolution of the durable chat session.
+    liveAgent.setStatus("initializing");
 
-    let targetId = activeChatId;
-    if (!targetId) {
-      // Show "Setting up Voice OS..." strictly while resolving DB chat ID
-      liveAgent.setStatus("initializing");
-      try {
+    try {
+      let targetId = activeChatId;
+      if (!targetId) {
         const res = await fetch("/api/chats", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: "Live Voice Session" }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          targetId = data.conversation.id;
-          setActiveChatId(targetId);
-          window.history.pushState(null, "", `/dashboard/c/${targetId}?mode=voice`);
-          fetchConversations();
-        }
-      } catch (e) {
-        console.error("Failed to create conversation for voice session:", e);
+        if (!res.ok) throw new Error("Could not create a chat for this voice session.");
+        const data = await res.json();
+        targetId = data?.conversation?.id;
+        if (!targetId) throw new Error("Voice session chat creation returned no chat ID.");
+        setActiveChatId(targetId);
+        fetchConversations();
       }
-    } else {
-      window.history.pushState(null, "", `/dashboard/c/${targetId}?mode=voice`);
-    }
 
-    // Stop setting up and start listening with the resolved chat ID
-    liveAgent.connect(targetId || undefined);
-  }, [activeChatId, liveAgent, fetchConversations]);
+      // The URL update is also complete before any Vertex connection begins.
+      window.history.pushState(null, "", `/dashboard/c/${targetId}?mode=voice`);
+      await liveAgent.connect(targetId);
+    } catch (error) {
+      console.error("Failed to initialize voice session:", error);
+      liveAgent.reportError(error instanceof Error ? error.message : "Unable to start the voice session.");
+    } finally {
+      voiceStartInFlightRef.current = false;
+      setIsStartingVoiceSession(false);
+    }
+  }, [activeChatId, liveAgent, fetchConversations, isVoiceMode]);
 
   // ── End Live Voice Session (Auto-Delete Empty Voice Sessions) ──
   const handleEndVoiceSession = useCallback(async () => {
@@ -626,15 +636,20 @@ export function ChatWorkspace({
             status={liveAgent.status}
             isMuted={liveAgent.isMuted}
             micVolume={liveAgent.micVolume}
+            isUserSpeaking={liveAgent.isUserSpeaking}
+            isHoldingToSpeak={liveAgent.isHoldingToSpeak}
             isEnding={isEndingVoiceSession}
             errorMessage={liveAgent.errorMessage}
+            selectedLanguage={liveAgent.selectedLanguage}
+            onSelectLanguage={liveAgent.setLanguage}
             onToggleMute={liveAgent.toggleMute}
+            onStartSpeaking={liveAgent.startSpeaking}
+            onStopSpeaking={liveAgent.stopSpeaking}
             onEndSession={handleEndVoiceSession}
             onRetry={liveAgent.connect}
             liveTranscript={liveAgent.liveUserTranscript}
             assistantTranscript={liveAgent.liveAssistantTranscript}
             activeToolName={liveAgent.activeToolName}
-            recentMessages={messages}
           />
         ) : isNewChatView ? (
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
