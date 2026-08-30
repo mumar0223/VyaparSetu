@@ -606,14 +606,14 @@ export function ChatWorkspace({
   const activeConversation = conversations.find((c) => c.id === activeChatId);
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-[#131314] text-foreground">
+    <div className="relative flex h-screen w-full overflow-hidden bg-cream dark:bg-background text-foreground font-sans">
       {/* ── Floating Controls (Visible ONLY when Sidebar is Closed) ── */}
       {!isSidebarOpen && (
         <div className="absolute top-3.5 right-8 z-30 flex items-center gap-2 pointer-events-auto">
           <button
             onClick={handleNewChat}
             title="New chat"
-            className="size-9 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/80 backdrop-blur border border-zinc-800"
+            className="size-9 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-white dark:hover:bg-card transition-colors cursor-pointer bg-white/80 dark:bg-card/80 backdrop-blur border border-sage/30 dark:border-border shadow-xs"
           >
             <Plus className="size-4" />
           </button>
@@ -621,7 +621,7 @@ export function ChatWorkspace({
           <button
             onClick={() => setIsSidebarOpen(true)}
             title="Show chat history"
-            className="size-9 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors cursor-pointer bg-zinc-900/80 backdrop-blur border border-zinc-800"
+            className="size-9 rounded-xl flex items-center justify-center text-ink-muted hover:text-forest dark:hover:text-mint hover:bg-white dark:hover:bg-card transition-colors cursor-pointer bg-white/80 dark:bg-card/80 backdrop-blur border border-sage/30 dark:border-border shadow-xs"
           >
             <PanelRightOpen className="size-4" />
           </button>
@@ -655,10 +655,10 @@ export function ChatWorkspace({
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
           <div className="w-full h-full overflow-y-auto flex flex-col justify-center items-center px-4 py-8 -mt-6">
             <div className="w-full max-w-3xl text-center mb-8 animate-in fade-in-50 duration-300">
-              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-zinc-100 mb-2">
+              <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-forest dark:text-foreground mb-2">
                 What&apos;s on the agenda today?
               </h1>
-              <p className="text-sm text-zinc-400">
+              <p className="text-xs sm:text-sm text-ink-muted dark:text-muted-foreground">
                 Hyper-local mandi intelligence, financial structuring, and
                 government credit scheme advisor
               </p>
@@ -709,16 +709,16 @@ export function ChatWorkspace({
                 <button
                   key={i}
                   onClick={() => handleSendMessage(chip.prompt)}
-                  className="p-3 rounded-2xl border border-zinc-800/80 bg-zinc-900/50 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all text-left group flex items-start gap-3 cursor-pointer"
+                  className="p-3.5 rounded-2xl border border-sage/30 dark:border-border bg-white dark:bg-card hover:border-mint transition-all shadow-xs hover:shadow-md text-left group flex items-start gap-3.5 cursor-pointer"
                 >
-                  <div className="size-8 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-300 group-hover:text-white shrink-0">
+                  <div className="size-9 rounded-xl bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint flex items-center justify-center shrink-0 group-hover:bg-mint group-hover:text-black transition-colors">
                     <chip.icon className="size-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-zinc-200 group-hover:text-white truncate">
+                    <p className="text-xs font-serif font-bold text-forest dark:text-foreground group-hover:text-mint transition-colors truncate">
                       {chip.label}
                     </p>
-                    <p className="text-[11px] text-zinc-500 truncate mt-0.5">
+                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                       {chip.desc}
                     </p>
                   </div>
@@ -746,7 +746,7 @@ export function ChatWorkspace({
             </div>
 
             {/* Sticky Bottom Input Bar (Sticks to bottom of scroll viewport with frosted backdrop) */}
-            <div className="sticky bottom-0 w-full max-w-3xl mx-auto px-4 md:px-6 pb-4 pt-2 bg-gradient-to-t from-[#131314] via-[#131314]/95 to-transparent pointer-events-none z-20">
+            <div className="sticky bottom-0 w-full max-w-3xl mx-auto px-4 md:px-6 pb-4 pt-2 bg-gradient-to-t from-cream via-cream/90 to-transparent dark:from-background dark:via-background/90 pointer-events-none z-20">
               <div className="relative pointer-events-auto">
                 {/* Dynamic Scroll to Bottom Button anchored directly above the input */}
                 {showScrollBottom && (
@@ -754,9 +754,9 @@ export function ChatWorkspace({
                     type="button"
                     onClick={scrollToBottom}
                     title="Scroll to bottom"
-                    className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 size-8 rounded-full bg-[#212121]/95 hover:bg-[#2e2e2e] border border-zinc-700/60 shadow-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer backdrop-blur animate-in fade-in-0 zoom-in-90 duration-150 group"
+                    className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 size-8 rounded-full bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted border border-sage/40 dark:border-border shadow-lg flex items-center justify-center text-forest dark:text-mint transition-all cursor-pointer backdrop-blur animate-in fade-in-0 zoom-in-90 duration-150 group"
                   >
-                    <ArrowDown className="size-4 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-y-0.5 duration-150" />
+                    <ArrowDown className="size-4 text-forest dark:text-mint group-hover:translate-y-0.5 transition-transform duration-150" />
                   </button>
                 )}
 

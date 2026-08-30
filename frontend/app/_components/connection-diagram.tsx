@@ -48,7 +48,7 @@ const nodeConfigs = [
     sublabel: "PM Mudra & SVANidhi",
     angle: -30,
     rType: "far" as const,
-    color: "#6366f1",
+    color: "#D98E2A",
     Icon: Landmark,
   },
   {
@@ -66,7 +66,7 @@ const nodeConfigs = [
     sublabel: "Credit Underwriting",
     angle: -90,
     rType: "medium" as const,
-    color: "#3b82f6",
+    color: "#16a34a",
     Icon: Building2,
   },
   {
@@ -75,7 +75,7 @@ const nodeConfigs = [
     sublabel: "Bulk Procurement",
     angle: -120,
     rType: "custom" as const,
-    color: "#f97316",
+    color: "#D98E2A",
     Icon: Truck,
   },
   {
@@ -84,7 +84,7 @@ const nodeConfigs = [
     sublabel: "Sales & Turnover",
     angle: -150,
     rType: "close" as const,
-    color: "#38bdf8",
+    color: "#4ade80",
     Icon: BookOpen,
   },
   {
@@ -93,7 +93,7 @@ const nodeConfigs = [
     sublabel: "B2B Trade Network",
     angle: -180,
     rType: "medium" as const,
-    color: "#ec4899",
+    color: "#10b981",
     Icon: Users,
   },
   {
@@ -111,7 +111,7 @@ const nodeConfigs = [
     sublabel: "Regional Dialect",
     angle: 120,
     rType: "close" as const,
-    color: "#06b6d4",
+    color: "#D98E2A",
     Icon: PhoneCall,
   },
   {
@@ -120,7 +120,7 @@ const nodeConfigs = [
     sublabel: "MSME Certificate",
     angle: 90,
     rType: "medium" as const,
-    color: "#14b8a6",
+    color: "#16a34a",
     Icon: ShieldCheck,
   },
   {
@@ -129,7 +129,7 @@ const nodeConfigs = [
     sublabel: "NABARD Federation",
     angle: 60,
     rType: "far" as const,
-    color: "#a855f7",
+    color: "#eab308",
     Icon: Users,
   },
   {
@@ -138,7 +138,7 @@ const nodeConfigs = [
     sublabel: "P&L Balance Sheet",
     angle: 30,
     rType: "close" as const,
-    color: "#10b981",
+    color: "#4ade80",
     Icon: Coins,
   },
   {
@@ -147,7 +147,7 @@ const nodeConfigs = [
     sublabel: "Cash Flow Ledger",
     angle: 0,
     rType: "medium" as const,
-    color: "#f59e0b",
+    color: "#D98E2A",
     Icon: QrCode,
   },
 ];
@@ -162,7 +162,7 @@ const nodes: NodeDef[] = [
     y: 50,
     Icon: Bot,
     big: true,
-    color: "#818cf8",
+    color: "#4ade80",
   },
   ...nodeConfigs.map((config) => {
     const rad = (config.angle * Math.PI) / 180;
@@ -263,8 +263,8 @@ export function ConnectionDiagram() {
         }
         @keyframes glow-chat {
           0%, 85% {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 14px var(--color-primary);
+            border-color: #4ade80;
+            box-shadow: 0 0 16px rgba(74, 222, 128, 0.45);
           }
           100% {
             border-color: var(--border);
@@ -277,8 +277,8 @@ export function ConnectionDiagram() {
             box-shadow: none;
           }
           35%, 85% {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 20px var(--color-primary);
+            border-color: #4ade80;
+            box-shadow: 0 0 22px rgba(74, 222, 128, 0.55);
           }
           100% {
             border-color: var(--border);
@@ -291,8 +291,8 @@ export function ConnectionDiagram() {
             box-shadow: none;
           }
           70%, 85% {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 14px var(--color-primary);
+            border-color: #4ade80;
+            box-shadow: 0 0 16px rgba(74, 222, 128, 0.45);
           }
           100% {
             border-color: var(--border);
@@ -334,7 +334,8 @@ export function ConnectionDiagram() {
               <path
                 d={d}
                 fill="none"
-                stroke="oklch(1 0 0 / 16%)"
+                stroke="currentColor"
+                strokeOpacity="0.1"
                 strokeWidth={1.25}
                 vectorEffect="non-scaling-stroke"
               />
@@ -346,8 +347,8 @@ export function ConnectionDiagram() {
                 <path
                   d={d}
                   fill="none"
-                  stroke="var(--color-primary)"
-                  strokeWidth={2}
+                  stroke="#4ade80"
+                  strokeWidth={2.5}
                   strokeLinecap="round"
                   pathLength={100}
                   vectorEffect="non-scaling-stroke"
@@ -407,7 +408,7 @@ function DiagramNode({
     >
       <div
         className={[
-          "group flex items-center gap-3 rounded-xl border bg-card/80 px-3 py-2.5 backdrop-blur-sm transition-all duration-300 outline-none",
+          "group flex items-center gap-3 rounded-xl border bg-card/90 dark:bg-card/95 px-3 py-2.5 backdrop-blur-md shadow-xs transition-all duration-300 outline-none whitespace-nowrap shrink-0",
           big ? "sm:px-4 sm:py-3.5" : "",
           isCycleActive
             ? cycleType === "chat"
@@ -420,11 +421,11 @@ function DiagramNode({
       >
         <div
           className={[
-            "relative flex shrink-0 items-center justify-center rounded-lg border border-border bg-background/60",
+            "relative flex shrink-0 items-center justify-center rounded-lg border border-border bg-background/70",
             big ? "size-11" : "size-9",
           ].join(" ")}
         >
-          {/* default (white) icon */}
+          {/* default icon */}
           <Icon
             className={[
               "absolute text-foreground transition-all duration-300",
@@ -432,27 +433,27 @@ function DiagramNode({
               isCycleActive ? "scale-50 opacity-0" : "scale-100 opacity-100",
             ].join(" ")}
           />
-          {/* hover (colored / blue) icon swap */}
+          {/* active/glowing colored icon swap */}
           <Icon
             className={[
               "absolute transition-all duration-300",
               big ? "size-6" : "size-5",
               isCycleActive ? "scale-100 opacity-100" : "scale-150 opacity-0",
             ].join(" ")}
-            style={{ color: color ?? "var(--color-primary)" }}
+            style={{ color: color ?? "#4ade80" }}
           />
         </div>
-        <div className="pr-1">
+        <div className="pr-1 whitespace-nowrap text-left">
           <p
             className={[
-              "font-medium leading-tight text-foreground",
-              big ? "text-sm sm:text-base" : "text-sm",
+              "font-medium leading-tight text-foreground whitespace-nowrap",
+              big ? "text-sm sm:text-base font-bold" : "text-sm",
             ].join(" ")}
           >
             {label}
           </p>
           {sublabel ? (
-            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground whitespace-nowrap">
               {sublabel}
             </p>
           ) : null}

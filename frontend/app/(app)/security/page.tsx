@@ -1,28 +1,27 @@
 import { Shield, Key, Lock, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function SecurityPage() {
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 lg:p-8">
+    <div className="h-full overflow-y-auto p-4 md:p-6 lg:p-8 font-sans text-ink">
       <div className="flex flex-col gap-6 max-w-4xl mx-auto">
-        <div className="p-6 rounded-2xl border border-border bg-card">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Shield className="size-6 text-primary" /> Financial Security & Access Control
+        <div className="p-6 rounded-2xl border border-sage/30 bg-white shadow-xs">
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-forest flex items-center gap-2.5">
+            <Shield className="size-7 text-mint" /> Financial Security &amp; Access Control
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-ink-muted mt-1">
             End-to-end ledger encryption, database session protection, and immutable audit logs
           </p>
         </div>
 
-        <div className="p-6 rounded-2xl border border-border bg-card space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-success/10 text-success flex items-center justify-center">
+        <div className="p-6 rounded-2xl border border-sage/30 bg-white space-y-4 shadow-xs">
+          <div className="flex items-start gap-3.5">
+            <div className="size-10 rounded-xl bg-mint-pale text-forest flex items-center justify-center shrink-0">
               <CheckCircle2 className="size-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">PBKDF2 Cryptographic Security</h3>
-              <p className="text-xs text-muted-foreground">
-                Micro-enterprise credentials and financial records are protected with 100,000 PBKDF2 iterations and constant-time verification.
+              <h3 className="font-serif font-bold text-base text-forest">PBKDF2 Cryptographic Security</h3>
+              <p className="text-xs sm:text-sm text-ink-muted mt-1 leading-relaxed">
+                Micro-enterprise credentials and financial records are protected with 100,000 PBKDF2 iterations, 16-byte random salts, and constant-time verification against timing attacks.
               </p>
             </div>
           </div>
@@ -31,4 +30,3 @@ export default function SecurityPage() {
     </div>
   );
 }
-

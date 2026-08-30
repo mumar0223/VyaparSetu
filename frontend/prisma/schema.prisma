@@ -6,6 +6,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
   id                 String     @id @default(cuid())
   name               String
@@ -20,6 +25,10 @@ model User {
   auditLogs          AuditLog[]     @relation("UserAuditLogs")
   sessions           Session[]      @relation("UserSessions")
   conversations      Conversation[] @relation("UserConversations")
+  businesses         Business[]
+  settings           Settings?
+  privacyConsent     PrivacyConsent?
+  notifications      Notification[]
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
@@ -64,7 +73,6 @@ model Conversation {
   userId    String
   user      User                  @relation("UserConversations", fields: [userId], references: [id], onDelete: Cascade)
   messages  ConversationMessage[]
-  artifacts Artifact[]
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
 
@@ -81,25 +89,201 @@ model ConversationMessage {
   content        String       @db.Text
   thinking       String?      @db.Text
   toolCalls      Json?
-  artifacts      Artifact[]
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
 }
 
-model Artifact {
-  id             String               @id @default(cuid())
-  conversationId String
-  conversation   Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  messageId      String?
-  message        ConversationMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
-  title          String
-  type           String               // "form" | "document" | "table" | "report"
-  content        Json                 // Structured schema / fields data / values
-  status         String               @default("draft") // "draft" | "filled" | "submitted"
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+model Business {
+  id                 String   @id @default(uuid())
+  ownerId            String
+  businessName       String
+  businessType       String?
+  industry           String?
+  category           String?
+  description        String?
+  registrationNumber String?
+  taxNumber          String?
+  address            String?
+  city               String?
+  state              String?
+  country            String?
+  pincode            String?
+  numberOfEmployees  Int?
+  annualRevenue      Float?
+  monthlyRevenue     Float?
+  monthlyExpenses    Float?
+  businessGoals      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  @@index([conversationId])
-  @@index([messageId])
+  owner              User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  transactions       Transaction[]
+  expenses           Expense[]
+  savingGoals        SavingGoal[]
+  budgets            Budget[]
+  debts              Debt[]
+  milestones         BusinessMilestone[]
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  DEBT_PAYMENT
+  SAVING
+  OTHER
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  businessId  String
+  type        TransactionType
+  amount      Float
+  date        DateTime
+  category    String?
+  description String?
+  referenceId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  businessId    String
+  category      String
+  amount        Float
+  date          DateTime
+  vendor        String?
+  description   String?
+  paymentMethod String?
+  recurring     Boolean  @default(false)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model SavingGoal {
+  id           String   @id @default(uuid())
+  businessId   String
+  name         String
+  targetAmount Float
+  savedAmount  Float    @default(0)
+  targetDate   DateTime?
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contributions SavingContribution[]
+}
+
+model SavingContribution {
+  id           String   @id @default(uuid())
+  savingGoalId String
+  amount       Float
+  date         DateTime @default(now())
+  notes        String?
+  
+  savingGoal   SavingGoal @relation(fields: [savingGoalId], references: [id], onDelete: Cascade)
+}
+
+model Budget {
+  id          String   @id @default(uuid())
+  businessId  String
+  name        String
+  period      String
+  startDate   DateTime
+  endDate     DateTime
+  totalAmount Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items       BudgetItem[]
+}
+
+model BudgetItem {
+  id             String   @id @default(uuid())
+  budgetId       String
+  category       String
+  allocatedAmount Float
+
+  budget         Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+}
+
+enum DebtType {
+  TERM_LOAN
+  WORKING_CAPITAL
+  EQUIPMENT_FINANCING
+  CREDIT_CARD
+  OTHER
+}
+
+model Debt {
+  id                String   @id @default(uuid())
+  businessId        String
+  type              DebtType
+  lender            String
+  amountOutStanding Float
+  totalAmount       Float
+  interestRate      Float?
+  nextPaymentDate   DateTime?
+  emiAmount         Float?
+  status            String   @default("ACTIVE")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  business          Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model PrivacyConsent {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  dataSharing     Boolean  @default(false)
+  marketingEmails Boolean  @default(false)
+  termsAccepted   Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Settings {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  currency        String   @default("INR")
+  language        String   @default("en")
+  theme           String   @default("light")
+  emailAlerts     Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BusinessMilestone {
+  id          String   @id @default(uuid())
+  businessId  String
+  title       String
+  description String?
+  isAchieved  Boolean  @default(false)
+  date        DateTime
+  createdAt   DateTime @default(now())
+  
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }

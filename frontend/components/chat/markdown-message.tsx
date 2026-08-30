@@ -22,7 +22,7 @@ export function MarkdownMessage({
   }
 
   return (
-    <div className="prose prose-invert max-w-none text-[15px] leading-relaxed text-zinc-200">
+    <div className="prose max-w-none text-[14.5px] sm:text-[15px] leading-relaxed text-foreground dark:prose-invert font-sans">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -35,12 +35,12 @@ export function MarkdownMessage({
 
             if (!inline && language) {
               return (
-                <div className="relative my-3 rounded-xl border border-zinc-800 bg-[#1e1e1e] overflow-hidden not-prose">
-                  <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-900 border-b border-zinc-800 text-xs text-zinc-400 font-mono">
+                <div className="relative my-3 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-zinc-900 overflow-hidden not-prose shadow-2xs">
+                  <div className="flex items-center justify-between px-3.5 py-1.5 bg-cream dark:bg-zinc-950 border-b border-sage/20 dark:border-border text-xs text-muted-foreground font-mono">
                     <span>{language}</span>
                     <CodeCopyButton code={rawCode} />
                   </div>
-                  <pre className="p-4 overflow-x-auto text-[13.5px] font-mono text-zinc-200 leading-relaxed">
+                  <pre className="p-4 overflow-x-auto text-[13.5px] font-mono text-foreground leading-relaxed">
                     <code>{children}</code>
                   </pre>
                 </div>
@@ -49,7 +49,7 @@ export function MarkdownMessage({
 
             if (!inline) {
               return (
-                <pre className="my-3 p-3.5 rounded-xl border border-zinc-800 bg-[#1e1e1e] overflow-x-auto text-[13.5px] font-mono text-zinc-200 not-prose">
+                <pre className="my-3 p-3.5 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-zinc-900 overflow-x-auto text-[13.5px] font-mono text-foreground not-prose">
                   <code>{children}</code>
                 </pre>
               );
@@ -57,7 +57,7 @@ export function MarkdownMessage({
 
             return (
               <code
-                className="bg-zinc-800/80 text-sky-300 px-1.5 py-0.5 rounded text-xs font-mono border border-zinc-700/40"
+                className="bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint px-1.5 py-0.5 rounded text-xs font-mono border border-mint/20"
                 {...props}
               >
                 {children}
@@ -69,48 +69,92 @@ export function MarkdownMessage({
           table({ children }) {
             return (
               <div className="my-4 w-full overflow-x-auto not-prose">
-                <table className="w-full text-left text-sm border-collapse rounded-xl border border-zinc-800 bg-zinc-950/40">
+                <table className="w-full text-left text-sm border-collapse rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-card shadow-2xs">
                   {children}
                 </table>
               </div>
             );
           },
           thead({ children }) {
-            return <thead className="bg-zinc-900/90 border-b border-zinc-800 font-semibold text-zinc-200">{children}</thead>;
+            return (
+              <thead className="bg-cream dark:bg-muted border-b border-sage/30 dark:border-border font-semibold text-foreground">
+                {children}
+              </thead>
+            );
           },
           tbody({ children }) {
-            return <tbody className="divide-y divide-zinc-800/60">{children}</tbody>;
+            return (
+              <tbody className="divide-y divide-sage/20 dark:divide-border">
+                {children}
+              </tbody>
+            );
           },
           tr({ children }) {
-            return <tr className="hover:bg-zinc-900/40 transition-colors">{children}</tr>;
+            return (
+              <tr className="hover:bg-cream/50 dark:hover:bg-muted/50 transition-colors">
+                {children}
+              </tr>
+            );
           },
           th({ children }) {
-            return <th className="px-3.5 py-2.5 text-xs font-semibold text-zinc-300">{children}</th>;
+            return (
+              <th className="px-3.5 py-2.5 text-xs font-serif font-bold text-forest dark:text-foreground">
+                {children}
+              </th>
+            );
           },
           td({ children }) {
-            return <td className="px-3.5 py-2.5 text-xs text-zinc-300">{children}</td>;
+            return (
+              <td className="px-3.5 py-2.5 text-xs text-foreground/90 leading-normal">
+                {children}
+              </td>
+            );
           },
 
           // Headings
           h1({ children }) {
-            return <h1 className="text-2xl font-bold text-zinc-100 mt-5 mb-2">{children}</h1>;
+            return (
+              <h1 className="text-2xl font-serif font-bold text-forest dark:text-foreground mt-5 mb-2">
+                {children}
+              </h1>
+            );
           },
           h2({ children }) {
-            return <h2 className="text-xl font-bold text-zinc-100 mt-4 mb-2">{children}</h2>;
+            return (
+              <h2 className="text-xl font-serif font-bold text-forest dark:text-foreground mt-4 mb-2">
+                {children}
+              </h2>
+            );
           },
           h3({ children }) {
-            return <h3 className="text-lg font-semibold text-zinc-100 mt-3 mb-1.5">{children}</h3>;
+            return (
+              <h3 className="text-lg font-serif font-bold text-forest dark:text-foreground mt-3 mb-1.5">
+                {children}
+              </h3>
+            );
           },
           h4({ children }) {
-            return <h4 className="text-base font-semibold text-zinc-200 mt-2.5 mb-1">{children}</h4>;
+            return (
+              <h4 className="text-base font-serif font-bold text-forest dark:text-foreground mt-2.5 mb-1">
+                {children}
+              </h4>
+            );
           },
 
           // Lists
           ul({ children }) {
-            return <ul className="list-disc list-outside pl-5 space-y-1.5 my-2.5 text-zinc-300">{children}</ul>;
+            return (
+              <ul className="list-disc list-outside pl-5 space-y-1.5 my-2.5 text-foreground/90">
+                {children}
+              </ul>
+            );
           },
           ol({ children }) {
-            return <ol className="list-decimal list-outside pl-5 space-y-1.5 my-2.5 text-zinc-300">{children}</ol>;
+            return (
+              <ol className="list-decimal list-outside pl-5 space-y-1.5 my-2.5 text-foreground/90">
+                {children}
+              </ol>
+            );
           },
           li({ children }) {
             return <li className="leading-relaxed">{children}</li>;
@@ -118,11 +162,11 @@ export function MarkdownMessage({
 
           // Paragraphs & Blockquotes
           p({ children }) {
-            return <p className="leading-relaxed my-2 text-zinc-200">{children}</p>;
+            return <p className="leading-relaxed my-2 text-foreground">{children}</p>;
           },
           blockquote({ children }) {
             return (
-              <blockquote className="border-l-2 border-primary/60 pl-3.5 italic text-zinc-400 my-3">
+              <blockquote className="border-l-2 border-mint pl-3.5 italic text-muted-foreground my-3">
                 {children}
               </blockquote>
             );
@@ -133,7 +177,7 @@ export function MarkdownMessage({
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                className="text-forest dark:text-mint font-semibold underline underline-offset-2 hover:opacity-80 transition-colors"
               >
                 {children}
               </a>
@@ -164,12 +208,12 @@ function CodeCopyButton({ code }: { code: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
     >
       {copied ? (
         <>
-          <Check className="size-3 text-emerald-400" />
-          <span className="text-emerald-400">Copied</span>
+          <Check className="size-3 text-mint" />
+          <span className="text-mint font-semibold">Copied</span>
         </>
       ) : (
         <>

@@ -17,7 +17,7 @@ export function FloatingInput({
   onStartVoiceMode,
   isLoading = false,
   isCentered = false,
-  placeholder = "Ask anything...",
+  placeholder = "Ask anything about mandi rates, mudra loans, or ledgers...",
 }: FloatingInputProps) {
   const [input, setInput] = useState("");
   const [isThinkEnabled, setIsThinkEnabled] = useState(true);
@@ -55,9 +55,9 @@ export function FloatingInput({
   };
 
   return (
-    <div className="w-full transition-all duration-300 ease-out z-20">
+    <div className="w-full transition-all duration-300 ease-out z-20 font-sans">
       {/* Elevated Pill Container */}
-      <div className="relative rounded-2xl md:rounded-3xl border border-zinc-800 bg-[#1e1e1e]/90 p-2 shadow-2xl backdrop-blur-xl transition-all focus-within:border-zinc-700 focus-within:ring-1 focus-within:ring-zinc-700/50">
+      <div className="relative rounded-2xl md:rounded-3xl border border-sage/40 dark:border-border bg-white/95 dark:bg-card/95 p-2 shadow-xl backdrop-blur-xl transition-all focus-within:border-mint focus-within:ring-1 focus-within:ring-mint/40">
         <div className="flex flex-col">
           {/* Main Input Textarea */}
           <textarea
@@ -68,7 +68,7 @@ export function FloatingInput({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={isLoading}
-            className="w-full resize-none bg-transparent px-3 py-2 text-[15px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 focus:outline-hidden disabled:opacity-50 min-h-[44px] max-h-[180px]"
+            className="w-full resize-none bg-transparent px-3 py-2 text-[14px] sm:text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-hidden disabled:opacity-50 min-h-[44px] max-h-[180px]"
           />
 
           {/* Bottom Action Bar */}
@@ -78,7 +78,7 @@ export function FloatingInput({
               <button
                 type="button"
                 title="Attach files or ledger data"
-                className="size-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
               >
                 <Plus className="size-4" />
               </button>
@@ -89,8 +89,8 @@ export function FloatingInput({
                 className={cn(
                   "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer",
                   isThinkEnabled
-                    ? "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
+                    ? "bg-mint-pale dark:bg-mint/15 text-forest dark:text-mint border border-mint/30"
+                    : "text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted"
                 )}
               >
                 <Brain className="size-3" />
@@ -106,8 +106,8 @@ export function FloatingInput({
                 onClick={startVoiceAgent}
                 disabled={isLoading}
                 aria-label="Start live voice agent"
-                title="Start Vertex AI Voice Agent"
-                className="size-8 rounded-full flex items-center justify-center bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 hover:border-sky-500/40 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
+                title="Start Voice Agent OS"
+                className="size-8 rounded-full flex items-center justify-center bg-mint-pale dark:bg-mint/15 hover:bg-mint/25 text-forest dark:text-mint border border-mint/30 hover:border-mint/50 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
               >
                 <AudioLines className="size-4" />
               </button>
@@ -119,7 +119,7 @@ export function FloatingInput({
                 disabled={isLoading}
                 aria-label="Start voice agent"
                 title="Start voice agent"
-                className="size-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
               >
                 <Mic className="size-4" />
               </button>
@@ -132,8 +132,8 @@ export function FloatingInput({
                 className={cn(
                   "size-8 rounded-full flex items-center justify-center transition-all cursor-pointer",
                   input.trim() && !isLoading
-                    ? "bg-white text-black hover:bg-zinc-200 shadow-md scale-100"
-                    : "bg-zinc-800 text-zinc-600 cursor-not-allowed opacity-60"
+                    ? "bg-forest dark:bg-mint hover:bg-forest-deep dark:hover:bg-mint-light text-white dark:text-black shadow-md scale-100"
+                    : "bg-sage/20 dark:bg-muted text-muted-foreground cursor-not-allowed opacity-60"
                 )}
               >
                 <ArrowUp className="size-4 stroke-[2.5]" />
@@ -144,8 +144,8 @@ export function FloatingInput({
       </div>
 
       {/* Subtle Footer Disclaimer */}
-      <p className="mt-2 text-center text-[11px] text-zinc-500 select-none">
-        VyaparSetu AI can make mistakes. Verify important financial & trade decisions.
+      <p className="mt-2 text-center text-[11px] text-muted-foreground select-none">
+        VyaparSetu AI can make mistakes. Verify important financial &amp; trade decisions.
       </p>
     </div>
   );
