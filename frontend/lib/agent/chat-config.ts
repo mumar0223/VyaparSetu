@@ -1,6 +1,6 @@
 /**
  * Dedicated isolated configuration for the Dashboard Chat Advisor.
- * Powered by Google Cloud Vertex AI Gemini 3.7 Flash for deep multilingual reasoning.
+ * Powered by Google Cloud Vertex AI Gemini 3.7 Flash on global location.
  */
 export const DASHBOARD_CHAT_CONFIG = {
   provider: "vertex",
@@ -24,8 +24,6 @@ export const TITLE_GENERATION_CONFIG = {
  * Uses official Live models with dedicated "google-live" provider.
  */
 export const LIVE_VOICE_AGENT_CONFIG = {
-  // The voice experience is intentionally isolated from the dashboard chat
-  // provider. It always runs through Vertex AI's Live API.
   provider: "vertex",
   model: process.env.LIVE_VOICE_MODEL || "gemini-live-2.5-flash",
   liveModels: [
@@ -33,8 +31,6 @@ export const LIVE_VOICE_AGENT_CONFIG = {
     "gemini-live-2.5-flash-native-audio",
   ] as const,
   voiceName: process.env.LIVE_VOICE_NAME || "Puck",
-  // Vertex Live emits the text needed for captions through its dedicated
-  // transcription events; this model supports one response modality per turn.
   responseModalities: ["AUDIO"],
 };
 
