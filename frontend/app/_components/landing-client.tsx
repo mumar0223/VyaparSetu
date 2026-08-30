@@ -115,7 +115,7 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                     </Link>
                   ) : (
                     <Link
-                      href="/signup"
+                      href="/login"
                       className="px-5 py-3 md:px-6 md:py-3 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-2xl shadow-2xl shadow-[#10b981]/30 transition-all active:scale-95 text-sm inline-flex items-center justify-center"
                     >
                       Get Started Free

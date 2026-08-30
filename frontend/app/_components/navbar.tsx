@@ -103,7 +103,7 @@ export function Navbar({ currentUser }: NavbarProps) {
                 Sign In
               </Link>
               <Link
-                href="/signup"
+                href="/login"
                 className="px-5 py-2.5 bg-[#10b981] text-white text-sm font-bold rounded-xl hover:bg-[#059669] transition-all shadow-lg active:scale-95 inline-flex items-center justify-center"
               >
                 Get Started
