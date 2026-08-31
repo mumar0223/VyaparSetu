@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { AuthUser } from "@/lib/auth-types";
+import { BrandLogo } from "@/components/brand-logo";
 
 interface LandingClientProps {
   currentUser?: AuthUser | null;
@@ -242,10 +243,7 @@ export function LandingClient({ currentUser }: LandingClientProps) {
         {/* Footer */}
         <footer className="border-t border-sage/30 dark:border-border py-10 bg-white dark:bg-zinc-950 text-center text-xs text-muted-foreground">
           <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 font-serif font-bold text-sm text-forest dark:text-mint">
-              <div className="size-2.5 bg-mint rounded-full" />
-              <span>VyaparSetu</span>
-            </div>
+            <BrandLogo iconSize={26} textClassName="text-sm text-forest dark:text-mint" />
             <p>
               © {new Date().getFullYear()} VyaparSetu. DPDP Act 2023 Compliant
               &amp; Encrypted.

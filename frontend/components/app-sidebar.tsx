@@ -32,6 +32,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 import { useTranslation } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { BrandLogo } from "@/components/brand-logo";
 
 const I18N_NAV_MAP: Record<string, string> = {
   "/dashboard": "sidebar.dashboard",
@@ -148,11 +149,12 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
     >
       {/* Brand Header */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-sage/30 dark:border-border shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_10px_rgba(74,222,128,0.7)] shrink-0" />
-          <span className="font-serif font-bold text-lg text-forest dark:text-mint tracking-tight truncate">
-            {t("common.appName", "VyaparSetu")}
-          </span>
+        <Link href="/dashboard" className="flex items-center min-w-0">
+          <BrandLogo
+            iconSize={28}
+            text={t("common.appName", "VyaparSetu")}
+            textClassName="text-lg text-forest dark:text-mint truncate"
+          />
         </Link>
         <LanguageSwitcher variant="brand" className="shrink-0" />
       </div>

@@ -15,6 +15,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,9 +58,8 @@ export default function LoginPage() {
       {/* Left panel - Branding & Value Prop */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-forest via-[#0a2318] to-[#04120a] p-6 sm:p-8 lg:p-10 xl:p-12 flex-col justify-between relative overflow-hidden">
         <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-4 h-4 sm:w-5 sm:h-5 bg-mint rounded-full shadow-[0_0_12px_rgba(33,184,124,0.6)]" />
-            <span className="font-serif font-bold text-xl sm:text-2xl text-white tracking-tight">VyaparSetu</span>
+          <Link href="/" className="inline-flex items-center">
+            <BrandLogo iconSize={36} textClassName="text-xl sm:text-2xl text-white" />
           </Link>
 
           <div className="mt-6 sm:mt-8 lg:mt-10 max-w-md">

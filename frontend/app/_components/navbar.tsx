@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/lib/auth-types";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+import { BrandLogo } from "@/components/brand-logo";
+
 interface NavbarProps {
   currentUser?: AuthUser | null;
 }
@@ -41,11 +43,8 @@ export function Navbar({ currentUser }: NavbarProps) {
         )}
       >
         <div className="flex items-center select-none">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="size-3.5 bg-mint rounded-full shadow-[0_0_12px_rgba(74,222,128,0.8)]" />
-            <span className="font-serif font-bold text-xl text-forest dark:text-mint tracking-tight">
-              VyaparSetu
-            </span>
+          <Link href="/" className="flex items-center">
+            <BrandLogo iconSize={32} textClassName="text-xl text-forest dark:text-mint" />
           </Link>
         </div>
 
