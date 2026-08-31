@@ -21,6 +21,7 @@ import {
   WifiOff,
   ShieldAlert,
   Target,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -394,6 +395,7 @@ export function VoiceAgentView({
               {activeArtifact.artifactType === "transaction" && <Layers className="size-4" />}
               {activeArtifact.artifactType === "saving_goal" && <Target className="size-4" />}
               {activeArtifact.artifactType === "debt" && <Landmark className="size-4" />}
+              {activeArtifact.artifactType === "form" && <ClipboardList className="size-4" />}
               {activeArtifact.artifactType === "delete_record" && <AlertTriangle className="size-4 text-rose-500" />}
             </div>
             <div className="min-w-0">

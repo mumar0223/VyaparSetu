@@ -485,6 +485,26 @@ export function ChatWorkspace({
     const previousMessages = [...messages];
     setMessages((prev) => [...prev, newUserMessage, newAssistantMessage]);
     setIsLoading(true);
+    setShowScrollBottom(false);
+
+    // Scroll the page to bottom on send
+    requestAnimationFrame(() => {
+      if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTop =
+          scrollViewportRef.current.scrollHeight;
+      }
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }
+    });
+    setTimeout(() => {
+      if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTop =
+          scrollViewportRef.current.scrollHeight;
+      }
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 100);
 
     try {
       const response = await fetch("/api/chat/stream", {

@@ -213,6 +213,31 @@ const StageDebtSchema = z.object({
   emiAmount: z.number().optional().describe("Monthly EMI installment in INR"),
 });
 
+const StageFormFieldSchema = z.object({
+  id: z.string().describe("Unique field key/id (e.g. 'fullName', 'loanAmount', 'businessType', 'purpose')"),
+  label: z.string().describe("Field display label (e.g. 'Applicant Full Name (आवेदक का पूरा नाम)')"),
+  type: z.enum(["text", "number", "select", "date", "textarea", "checkbox"]).default("text").describe("Input field type"),
+  defaultValue: z.any().optional().describe("Default or suggested pre-filled value"),
+  placeholder: z.string().optional().describe("Helpful placeholder text"),
+  options: z.array(z.string()).optional().describe("List of options for 'select' dropdown type"),
+  required: z.boolean().optional().default(false).describe("Whether the field is mandatory"),
+  helpText: z.string().optional().describe("Optional brief description or note under the input"),
+});
+
+const StageFormSectionSchema = z.object({
+  title: z.string().optional().describe("Section heading (e.g. '1. Personal / Applicant Details', '2. Loan Request')"),
+  description: z.string().optional().describe("Brief subtitle or description for this section"),
+  fields: z.array(StageFormFieldSchema).min(1).describe("List of fields in this section"),
+});
+
+const StageFormSchema = z.object({
+  title: z.string().describe("Form title, e.g. 'MSME Business Loan Application Form' or 'Supplier Vendor Onboarding'"),
+  description: z.string().optional().describe("Subtitle, summary or instructions for the form"),
+  submitLabel: z.string().optional().default("Approve & Submit").describe("Label on the primary action button"),
+  formType: z.string().optional().describe("Form category or domain, e.g. 'loan_application', 'subsidy_registration', 'vendor_kyc', 'custom'"),
+  sections: z.array(StageFormSectionSchema).min(1).describe("Array of form sections containing dynamic interactive fields"),
+});
+
 const StageDeleteRecordSchema = z.object({
   entityType: z
     .enum(["budget", "expense", "transaction", "savingGoal", "debt"])
@@ -986,6 +1011,38 @@ export function getAgentTools(ctx?: ToolContext) {
       },
     }),
 
+    stageForm: tool({
+      description:
+        "Generates a dynamic, interactive multi-field form artifact (e.g. Loan Applications, MSME Subsidies, Vendor KYC, Trade Inquiries, Checklists, Feedback) for the user to review, edit, fill, and approve.",
+      inputSchema: StageFormSchema,
+      execute: async ({ title, description, submitLabel, formType, sections }) => {
+        try {
+          const totalFields = sections.reduce(
+            (sum, sec) => sum + sec.fields.length,
+            0,
+          );
+          return {
+            success: true,
+            isArtifact: true,
+            artifactType: "form",
+            title,
+            summary:
+              description ||
+              `${sections.length} sections • ${totalFields} interactive fields`,
+            data: {
+              title,
+              description: description || "",
+              submitLabel: submitLabel || "Approve & Submit",
+              formType: formType || "general",
+              sections,
+            },
+          };
+        } catch (error: any) {
+          return { success: false, error: "Failed to stage dynamic form." };
+        }
+      },
+    }),
+
     stageDeleteRecord: tool({
       description:
         "Prepares a safe confirmation card to delete/trash an expense, budget, goal, or debt.",
@@ -1108,6 +1165,12 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
     icon: "landmark",
     formatSummary: (args) =>
       `Generated loan liability draft with ${args?.lender || "lender"}`,
+  },
+  stageForm: {
+    name: "stageForm",
+    icon: "landmark",
+    formatSummary: (args) =>
+      `Generated interactive form: "${args?.title || "Dynamic Form"}"`,
   },
   stageDeleteRecord: {
     name: "stageDeleteRecord",

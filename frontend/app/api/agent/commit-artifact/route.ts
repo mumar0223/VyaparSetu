@@ -133,6 +133,48 @@ export async function POST(req: NextRequest) {
         });
       }
       createdRecord = { deleted: true, entityType, entityId };
+    } else if (artifactType === "form") {
+      const { title, formType, values, sections } = data;
+      // If the dynamic form has loan/debt data, record it to debt table as well
+      const flattened: Record<string, any> = { ...(values || {}) };
+      if (sections && Array.isArray(sections)) {
+        for (const sec of sections) {
+          for (const f of sec.fields || []) {
+            if (f.id && flattened[f.id] === undefined && f.defaultValue !== undefined) {
+              flattened[f.id] = f.defaultValue;
+            }
+          }
+        }
+      }
+
+      if (formType === "loan_application" || formType === "debt" || flattened.loanAmount || flattened.totalAmount) {
+        const totalAmt = Number(flattened.loanAmount || flattened.totalAmount || flattened.amount || 0);
+        if (totalAmt > 0) {
+          try {
+            await prisma.debt.create({
+              data: {
+                businessId: business.id,
+                type: (flattened.loanType as any) || "WORKING_CAPITAL",
+                lender: flattened.lender || flattened.bankName || flattened.primaryBank || "Sanctioned Lender",
+                totalAmount: totalAmt,
+                amountOutStanding: totalAmt,
+                interestRate: flattened.interestRate ? Number(flattened.interestRate) : null,
+                emiAmount: flattened.emiAmount || flattened.monthlyEmi ? Number(flattened.emiAmount || flattened.monthlyEmi) : null,
+                status: "ACTIVE",
+              },
+            });
+          } catch (e) {
+            console.warn("[commit-artifact form debt linkage warning]:", e);
+          }
+        }
+      }
+
+      createdRecord = {
+        title: title || "Submitted Form",
+        formType: formType || "general",
+        submittedData: flattened,
+        submittedAt: new Date(),
+      };
     } else {
       return NextResponse.json(
         { error: `Unknown artifactType: ${artifactType}` },

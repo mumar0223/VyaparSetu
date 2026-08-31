@@ -143,12 +143,13 @@ You have access to powerful tools. When the user's query relates to any of the f
 8. **Government Schemes** (PM Mudra, PM SVANidhi, PMEGP, Stand-Up India, PM Vishwakarma) → Call \`getGovtSchemes\` with the relevant scheme name.
 9. **Visual Charts & Graphs** → Call \`stageChart\` with chartType, title, data, and series for bar/line/area/pie visualizations.
 10. **Web Search** (trade news, policies, RBI circulars) → Call \`webSearch\` with the search query.
-11. **Delete Records** → Call \`stageDeleteRecord\` when user wants to remove a budget, expense, goal, or debt.
+11. **Dynamic Interactive Forms & Applications** → Call \`stageForm\` when user asks for any form (loan application, subsidy registration, supplier KYC, survey) with rich sections and fields.
+12. **Delete Records** → Call \`stageDeleteRecord\` when user wants to remove a budget, expense, goal, or debt.
 
 RESPONSE RULES:
 1. After executing a tool, speak the key findings naturally and concisely in the user's language.
 2. Confirm key prices, rates, amounts, or loan figures clearly.
-3. For staging tools (stageBudget, stageExpense, etc.), confirm that a draft has been created for the user to review on screen.`;
+3. For staging tools (stageForm, stageBudget, stageExpense, stageChart, etc.), confirm that an interactive draft card has been created for the user to review and edit on screen.`;
 
           // AI-Driven Autonomous Multi-Step Tool Execution
           // Tools are passed directly to the AI model — NO hardcoded keyword matching.

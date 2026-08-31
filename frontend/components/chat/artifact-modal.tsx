@@ -28,7 +28,15 @@ import {
   LineChart as LineIcon,
   Activity,
   Download,
+  ClipboardList,
+  ChevronDown,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import {
   ResponsiveContainer,
   BarChart,
@@ -50,7 +58,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export interface ArtifactPayload {
-  artifactType: "budget" | "expense" | "transaction" | "saving_goal" | "debt" | "delete_record" | "chart";
+  artifactType:
+    | "budget"
+    | "expense"
+    | "transaction"
+    | "saving_goal"
+    | "debt"
+    | "delete_record"
+    | "chart"
+    | "form";
   title?: string;
   summary?: string;
   data: any;
@@ -85,7 +101,20 @@ export function ArtifactModal({
 
   useEffect(() => {
     if (artifact?.data) {
-      setFormData(JSON.parse(JSON.stringify(artifact.data)));
+      const cloned = JSON.parse(JSON.stringify(artifact.data));
+      if (artifact.artifactType === "form" && cloned.sections) {
+        const initialVals: Record<string, any> = cloned.values || {};
+        for (const sec of cloned.sections) {
+          for (const f of sec.fields || []) {
+            if (f.id && initialVals[f.id] === undefined) {
+              initialVals[f.id] =
+                f.defaultValue !== undefined ? f.defaultValue : "";
+            }
+          }
+        }
+        cloned.values = initialVals;
+      }
+      setFormData(cloned);
       if (artifact.artifactType === "chart" && artifact.data.chartType) {
         setActiveChartType(artifact.data.chartType);
       }
@@ -96,6 +125,16 @@ export function ArtifactModal({
 
   const handleFieldChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDynamicFieldChange = (fieldId: string, value: any) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      values: {
+        ...(prev.values || {}),
+        [fieldId]: value,
+      },
+    }));
   };
 
   const handleItemChange = (index: number, field: string, value: any) => {
@@ -173,6 +212,7 @@ export function ArtifactModal({
               {artifact.artifactType === "transaction" && <Layers className="size-5" />}
               {artifact.artifactType === "saving_goal" && <Target className="size-5" />}
               {artifact.artifactType === "debt" && <Landmark className="size-5" />}
+              {artifact.artifactType === "form" && <ClipboardList className="size-5" />}
               {artifact.artifactType === "delete_record" && <AlertTriangle className="size-5 text-rose-500" />}
             </span>
             <div className="min-w-0 flex-1">
@@ -207,16 +247,26 @@ export function ArtifactModal({
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">
                     Period Frequency
                   </label>
-                  <select
-                    value={formData.period || "Monthly"}
-                    onChange={(e) => handleFieldChange("period", e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-sm text-foreground focus:outline-hidden focus:border-mint"
-                  >
-                    <option value="Monthly">Monthly</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="Annual">Annual</option>
-                    <option value="Weekly">Weekly</option>
-                  </select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="w-full h-9.5 px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground flex items-center justify-between focus:outline-hidden focus:border-mint transition-colors cursor-pointer">
+                      <span className="truncate">{formData.period || "Monthly"}</span>
+                      <ChevronDown className="size-4 text-muted-foreground shrink-0 opacity-70" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
+                    >
+                      {["Monthly", "Quarterly", "Annual", "Weekly"].map((opt) => (
+                        <DropdownMenuItem
+                          key={opt}
+                          onClick={() => handleFieldChange("period", opt)}
+                          className="cursor-pointer text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
+                        >
+                          {opt}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -345,16 +395,33 @@ export function ArtifactModal({
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">
                     Payment Method
                   </label>
-                  <select
-                    value={formData.paymentMethod || "UPI"}
-                    onChange={(e) => handleFieldChange("paymentMethod", e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-sm text-foreground focus:outline-hidden"
-                  >
-                    <option value="UPI">UPI</option>
-                    <option value="CASH">Cash</option>
-                    <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
-                    <option value="CHEQUE">Cheque</option>
-                  </select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="w-full h-9.5 px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground flex items-center justify-between focus:outline-hidden transition-colors cursor-pointer">
+                      <span className="truncate">{formData.paymentMethod || "UPI"}</span>
+                      <ChevronDown className="size-4 text-muted-foreground shrink-0 opacity-70" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
+                    >
+                      {[
+                        { label: "UPI", value: "UPI" },
+                        { label: "Cash", value: "CASH" },
+                        { label: "Bank Transfer / NEFT", value: "BANK_TRANSFER" },
+                        { label: "Cheque", value: "CHEQUE" },
+                        { label: "Credit Card", value: "CREDIT_CARD" },
+                        { label: "Other", value: "OTHER" },
+                      ].map((item) => (
+                        <DropdownMenuItem
+                          key={item.value}
+                          onClick={() => handleFieldChange("paymentMethod", item.value)}
+                          className="cursor-pointer text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
+                        >
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -381,16 +448,42 @@ export function ArtifactModal({
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">
                     Transaction Type
                   </label>
-                  <select
-                    value={formData.type || "EXPENSE"}
-                    onChange={(e) => handleFieldChange("type", e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-sm text-foreground focus:outline-hidden"
-                  >
-                    <option value="INCOME">Income / Revenue</option>
-                    <option value="EXPENSE">Expense</option>
-                    <option value="TRANSFER">Transfer</option>
-                    <option value="DEBT_PAYMENT">Debt Payment</option>
-                  </select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="w-full h-9.5 px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground flex items-center justify-between focus:outline-hidden transition-colors cursor-pointer">
+                      <span className="truncate">
+                        {formData.type === "INCOME"
+                          ? "Income / Revenue"
+                          : formData.type === "TRANSFER"
+                          ? "Transfer"
+                          : formData.type === "DEBT_PAYMENT"
+                          ? "Debt Payment"
+                          : formData.type === "OTHER"
+                          ? "Other"
+                          : "Expense"}
+                      </span>
+                      <ChevronDown className="size-4 text-muted-foreground shrink-0 opacity-70" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
+                    >
+                      {[
+                        { label: "Income / Revenue", value: "INCOME" },
+                        { label: "Expense", value: "EXPENSE" },
+                        { label: "Transfer", value: "TRANSFER" },
+                        { label: "Debt Payment", value: "DEBT_PAYMENT" },
+                        { label: "Other", value: "OTHER" },
+                      ].map((item) => (
+                        <DropdownMenuItem
+                          key={item.value}
+                          onClick={() => handleFieldChange("type", item.value)}
+                          className="cursor-pointer text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
+                        >
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">
@@ -481,16 +574,42 @@ export function ArtifactModal({
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">
                     Loan Type
                   </label>
-                  <select
-                    value={formData.type || "WORKING_CAPITAL"}
-                    onChange={(e) => handleFieldChange("type", e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-sm text-foreground focus:outline-hidden"
-                  >
-                    <option value="WORKING_CAPITAL">Working Capital</option>
-                    <option value="TERM_LOAN">Term Loan</option>
-                    <option value="EQUIPMENT_FINANCING">Equipment Financing</option>
-                    <option value="CREDIT_CARD">Credit Card</option>
-                  </select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="w-full h-9.5 px-3 py-2 rounded-xl bg-cream/60 dark:bg-muted/40 border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground flex items-center justify-between focus:outline-hidden transition-colors cursor-pointer">
+                      <span className="truncate">
+                        {formData.type === "TERM_LOAN"
+                          ? "Term Loan"
+                          : formData.type === "EQUIPMENT_FINANCING"
+                          ? "Equipment Financing"
+                          : formData.type === "CREDIT_CARD"
+                          ? "Credit Card"
+                          : formData.type === "OTHER"
+                          ? "Other"
+                          : "Working Capital"}
+                      </span>
+                      <ChevronDown className="size-4 text-muted-foreground shrink-0 opacity-70" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
+                    >
+                      {[
+                        { label: "Working Capital", value: "WORKING_CAPITAL" },
+                        { label: "Term Loan", value: "TERM_LOAN" },
+                        { label: "Equipment Financing", value: "EQUIPMENT_FINANCING" },
+                        { label: "Credit Card", value: "CREDIT_CARD" },
+                        { label: "Other", value: "OTHER" },
+                      ].map((item) => (
+                        <DropdownMenuItem
+                          key={item.value}
+                          onClick={() => handleFieldChange("type", item.value)}
+                          className="cursor-pointer text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
+                        >
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -529,6 +648,158 @@ export function ArtifactModal({
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 6. DYNAMIC MULTI-SECTION MULTI-FIELD FORM ARTIFACT */}
+          {artifact.artifactType === "form" && (
+            <div className="space-y-5">
+              {formData.description && (
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed -mt-1">
+                  {formData.description}
+                </p>
+              )}
+
+              {(formData.sections || []).map((section: any, sIdx: number) => (
+                <div
+                  key={sIdx}
+                  className="p-4 sm:p-5 rounded-2xl bg-cream/35 dark:bg-muted/15 border border-sage/30 dark:border-border/60 space-y-3.5 shadow-2xs"
+                >
+                  {section.title && (
+                    <div className="border-b border-sage/20 dark:border-border/40 pb-2">
+                      <h3 className="font-serif font-bold text-sm sm:text-base text-forest dark:text-mint">
+                        {section.title}
+                      </h3>
+                      {section.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {section.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {(section.fields || []).map((field: any) => {
+                      const fieldVal =
+                        formData.values?.[field.id] !== undefined
+                          ? formData.values[field.id]
+                          : (field.defaultValue !== undefined ? field.defaultValue : "");
+                      const isFullWidth =
+                        field.type === "textarea" ||
+                        field.id?.toLowerCase().includes("address") ||
+                        field.id?.toLowerCase().includes("notes") ||
+                        field.id?.toLowerCase().includes("purpose") ||
+                        field.id?.toLowerCase().includes("description");
+
+                      return (
+                        <div
+                          key={field.id}
+                          className={cn(
+                            "space-y-1.5",
+                            isFullWidth ? "sm:col-span-2" : "col-span-1"
+                          )}
+                        >
+                          <label className="text-xs font-semibold text-foreground/90 block">
+                            {field.label || field.id}
+                            {field.required && (
+                              <span className="text-rose-500 ml-1 font-bold">*</span>
+                            )}
+                          </label>
+
+                          {field.type === "select" ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger className="w-full h-9.5 px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground flex items-center justify-between focus:outline-hidden focus:border-mint transition-colors cursor-pointer">
+                                <span className="truncate">
+                                  {fieldVal || field.placeholder || "Select option"}
+                                </span>
+                                <ChevronDown className="size-4 text-muted-foreground shrink-0 opacity-70" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="start"
+                                className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
+                              >
+                                {(field.options || []).map((opt: string) => (
+                                  <DropdownMenuItem
+                                    key={opt}
+                                    onClick={() =>
+                                      handleDynamicFieldChange(field.id, opt)
+                                    }
+                                    className="cursor-pointer text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
+                                  >
+                                    {opt}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : field.type === "textarea" ? (
+                            <textarea
+                              rows={3}
+                              value={fieldVal || ""}
+                              onChange={(e) =>
+                                handleDynamicFieldChange(field.id, e.target.value)
+                              }
+                              placeholder={field.placeholder || ""}
+                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint resize-y"
+                            />
+                          ) : field.type === "checkbox" ? (
+                            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(fieldVal)}
+                                onChange={(e) =>
+                                  handleDynamicFieldChange(field.id, e.target.checked)
+                                }
+                                className="size-4 rounded-md accent-forest dark:accent-mint cursor-pointer"
+                              />
+                              <span className="text-xs sm:text-sm text-foreground">
+                                {field.placeholder || field.label}
+                              </span>
+                            </label>
+                          ) : field.type === "date" ? (
+                            <input
+                              type="date"
+                              value={fieldVal || ""}
+                              onChange={(e) =>
+                                handleDynamicFieldChange(field.id, e.target.value)
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint"
+                            />
+                          ) : field.type === "number" ? (
+                            <input
+                              type="number"
+                              value={fieldVal}
+                              onChange={(e) =>
+                                handleDynamicFieldChange(
+                                  field.id,
+                                  e.target.value === "" ? "" : Number(e.target.value)
+                                )
+                              }
+                              placeholder={field.placeholder || "0"}
+                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm font-semibold text-foreground focus:outline-hidden focus:border-mint"
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={fieldVal || ""}
+                              onChange={(e) =>
+                                handleDynamicFieldChange(field.id, e.target.value)
+                              }
+                              placeholder={field.placeholder || ""}
+                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint"
+                            />
+                          )}
+
+                          {field.helpText && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {field.helpText}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -770,7 +1041,7 @@ export function ArtifactModal({
                 ? "Done"
                 : isSubmitting
                   ? "Saving..."
-                  : "Approve & Save"}
+                  : formData.submitLabel || "Approve & Save"}
             </span>
           </button>
         </DialogFooter>

@@ -97,12 +97,13 @@ You have access to powerful tools. When the user's query relates to any of the f
 8. **Government Schemes** (PM Mudra, PM SVANidhi, PMEGP, Stand-Up India, PM Vishwakarma) → Call getGovtSchemes with the relevant scheme name.
 9. **Visual Charts & Graphs** → Call stageChart with chartType (bar, line, area, pie), title, data array, and series for visualizations.
 10. **Web Search** (trade news, policies, RBI circulars, market updates) → Call webSearch with the search query.
-11. **Delete Records** → Call stageDeleteRecord when the user wants to remove a budget, expense, goal, or debt.
+11. **Dynamic Interactive Forms & Applications** → Call stageForm when user asks for any form (loan application, subsidy registration, supplier KYC, survey, registration) with rich sections and fields.
+12. **Delete Records** → Call stageDeleteRecord when the user wants to remove a budget, expense, goal, or debt.
 
 RESPONSE RULES:
 1. After executing a tool, speak the key findings naturally and concisely in the user's language.
 2. Confirm key prices, rates, amounts, or loan figures clearly.
-3. For staging tools (stageBudget, stageExpense, etc.), confirm that a draft has been created for the user to review on screen.`;
+3. For staging tools (stageForm, stageBudget, stageExpense, stageChart, etc.), confirm that an interactive draft card has been created for the user to review and edit on screen.`;
 
 
     if (conversationId) {
@@ -405,6 +406,68 @@ RESPONSE RULES:
                 },
               },
               required: ["chartType", "title", "data"],
+            },
+          },
+          {
+            name: "stageForm",
+            description:
+              "Generates a dynamic interactive multi-field form artifact (loan applications, subsidy forms, vendor KYC, registration) for the user to review, edit, and approve.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                title: {
+                  type: "STRING",
+                  description: "Title of the form",
+                },
+                description: {
+                  type: "STRING",
+                  description: "Subtitle or instructions",
+                },
+                submitLabel: {
+                  type: "STRING",
+                  description: "Label for the submit button",
+                },
+                formType: {
+                  type: "STRING",
+                  description: "Form category e.g. loan_application",
+                },
+                sections: {
+                  type: "ARRAY",
+                  description: "List of form sections containing fields",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      title: { type: "STRING" },
+                      description: { type: "STRING" },
+                      fields: {
+                        type: "ARRAY",
+                        items: {
+                          type: "OBJECT",
+                          properties: {
+                            id: { type: "STRING" },
+                            label: { type: "STRING" },
+                            type: {
+                              type: "STRING",
+                              description: "text, number, select, date, textarea, checkbox",
+                            },
+                            defaultValue: { type: "STRING" },
+                            placeholder: { type: "STRING" },
+                            options: {
+                              type: "ARRAY",
+                              items: { type: "STRING" },
+                            },
+                            required: { type: "BOOLEAN" },
+                            helpText: { type: "STRING" },
+                          },
+                          required: ["id", "label"],
+                        },
+                      },
+                    },
+                    required: ["fields"],
+                  },
+                },
+              },
+              required: ["title", "sections"],
             },
           },
           {
