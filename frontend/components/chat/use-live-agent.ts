@@ -167,12 +167,34 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
 
   const persistCurrentTurn = useCallback(async () => {
     if (flushingRef.current) return;
-    // Prefer Vertex AI's Gemini-powered transcription (userTranscriptRef) over
-    // the browser's Web Speech API (nativeCaptionFinalRef) for database accuracy.
+    // Pick the longer (more complete) transcript between Vertex AI's
+    // inputTranscription and the browser's Web Speech API.  Vertex often
+    // returns garbled romanised fragments for Hindi/regional speech, while
+    // the browser's recognition is more accurate for Indic scripts.
+    const vertexUser = userTranscriptRef.current.trim();
+    const browserUser = nativeCaptionFinalRef.current.trim();
     const userTranscript =
-      userTranscriptRef.current.trim() || nativeCaptionFinalRef.current.trim();
-    const assistantTranscript = assistantTranscriptRef.current.trim();
+      vertexUser.length >= browserUser.length ? vertexUser : browserUser;
+    let assistantTranscript = assistantTranscriptRef.current.trim();
     const toolCalls = [...toolCallsRef.current];
+
+    // If tools were called but the assistant transcript is empty or very
+    // short (outputTranscription may not have arrived yet), build a
+    // human-readable summary so the text chat view isn't blank.
+    if (toolCalls.length > 0 && assistantTranscript.length < 20) {
+      const summaries = toolCalls
+        .filter((tc) => tc.status === "completed")
+        .map((tc) => {
+          const r = tc.result as any;
+          if (r?.isArtifact) return `[${r.title || tc.toolName}]`;
+          return `[${tc.toolName}]`;
+        });
+      if (summaries.length > 0) {
+        assistantTranscript = assistantTranscript
+          ? `${assistantTranscript}\n\n${summaries.join(", ")}`
+          : summaries.join(", ");
+      }
+    }
 
     // Do not invent placeholder data. A turn is useful only when we have
     // an actual user transcript.
@@ -215,14 +237,13 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
 
   const schedulePersistence = useCallback(() => {
     clearFlushTimer();
-    // Output transcription can arrive immediately after turnComplete; wait one
-    // short event-loop window without delaying the next conversation turn.
-    // Wait long enough for Vertex's inputTranscription and outputTranscription
-    // to arrive after turnComplete, so we save the accurate Gemini transcripts.
+    // Output transcription can arrive well after turnComplete; Vertex sends
+    // outputTranscription fragments over several seconds as the audio plays.
+    // Wait long enough for ALL fragments to arrive before persisting to DB.
     flushTimerRef.current = setTimeout(() => {
       flushTimerRef.current = null;
       void persistCurrentTurn();
-    }, 800);
+    }, 2500);
   }, [clearFlushTimer, persistCurrentTurn]);
 
   const resumeNativeCaptions = useCallback(() => {
