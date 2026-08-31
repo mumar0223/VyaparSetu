@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  Sparkles,
+  Bot,
   CheckCircle2,
   Clock,
   ArrowRight,
@@ -104,7 +104,7 @@ export function RecommendationsClient({ profile }: { profile: RecProfile | null 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-forest dark:text-mint flex items-center gap-2.5">
-            <Sparkles className="size-7 text-mint" /> Strategic AI Recommendations
+            <Bot className="size-7 text-mint" /> Strategic AI Recommendations
           </h1>
           <p className="text-xs sm:text-sm text-ink-muted dark:text-muted-foreground mt-1">
             Data-backed action playbooks prioritized by profit impact and execution velocity

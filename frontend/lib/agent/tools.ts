@@ -44,6 +44,10 @@ const WebSearchSchema = z.object({
 });
 
 const StageChartSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID or index (e.g. 'art_1' or '1') of an existing chart to update in-place"),
   chartType: z
     .enum(["bar", "line", "area", "pie"])
     .default("bar")
@@ -110,6 +114,10 @@ const SchemeEligibilitySchema = z.object({
 });
 
 const StageBudgetSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID or index of an existing budget to update in-place"),
   name: z
     .string()
     .describe(
@@ -139,6 +147,10 @@ const StageBudgetSchema = z.object({
 });
 
 const StageExpenseSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID or index of an existing expense to update in-place"),
   category: z
     .string()
     .describe(
@@ -158,6 +170,10 @@ const StageExpenseSchema = z.object({
 });
 
 const StageTransactionSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID or index of an existing transaction to update in-place"),
   type: z
     .enum(["INCOME", "EXPENSE", "TRANSFER", "DEBT_PAYMENT", "SAVING", "OTHER"])
     .describe("Transaction type"),
@@ -170,6 +186,10 @@ const StageTransactionSchema = z.object({
 });
 
 const StageSavingsGoalSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID or index of an existing savings goal to update in-place"),
   name: z
     .string()
     .describe(
@@ -183,6 +203,10 @@ const StageSavingsGoalSchema = z.object({
 });
 
 const StageDebtSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID or index of an existing debt to update in-place"),
   type: z
     .enum([
       "TERM_LOAN",
@@ -213,6 +237,57 @@ const StageDebtSchema = z.object({
   emiAmount: z.number().optional().describe("Monthly EMI installment in INR"),
 });
 
+const StageFormFieldSchema = z.object({
+  id: z.string().describe("Unique field key/id (e.g. 'fullName', 'loanAmount', 'businessType', 'purpose')"),
+  label: z.string().describe("Field display label (e.g. 'Applicant Full Name (आवेदक का पूरा नाम)')"),
+  type: z.enum(["text", "number", "select", "date", "textarea", "checkbox"]).default("text").describe("Input field type"),
+  defaultValue: z.any().optional().describe("Default or suggested pre-filled value"),
+  placeholder: z.string().optional().describe("Helpful placeholder text"),
+  options: z.array(z.string()).optional().describe("List of options for 'select' dropdown type"),
+  required: z.boolean().optional().default(false).describe("Whether the field is mandatory"),
+  helpText: z.string().optional().describe("Optional brief description or note under the input"),
+});
+
+const StageFormSectionSchema = z.object({
+  title: z.string().optional().describe("Section heading (e.g. '1. Personal / Applicant Details', '2. Loan Request')"),
+  description: z.string().optional().describe("Brief subtitle or description for this section"),
+  fields: z.array(StageFormFieldSchema).min(1).describe("List of fields in this section"),
+});
+
+const StageFormSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID or index (e.g. 'art_1' or '1') of an existing form to update in-place instead of creating a new duplicate"),
+  title: z.string().describe("Form title, e.g. 'MSME Business Loan Application Form' or 'Supplier Vendor Onboarding'"),
+  description: z.string().optional().describe("Subtitle, summary or instructions for the form"),
+  submitLabel: z.string().optional().default("Approve & Submit").describe("Label on the primary action button"),
+  formType: z.string().optional().describe("Form category or domain, e.g. 'loan_application', 'subsidy_registration', 'vendor_kyc', 'custom'"),
+  sections: z.array(StageFormSectionSchema).min(1).describe("Array of form sections containing dynamic interactive fields"),
+});
+
+const GetArtifactsSchema = z.object({
+  artifactType: z
+    .enum([
+      "all",
+      "form",
+      "chart",
+      "budget",
+      "expense",
+      "transaction",
+      "saving_goal",
+      "debt",
+    ])
+    .optional()
+    .default("all")
+    .describe("Filter by artifact type ('form', 'chart', 'budget', 'expense', 'transaction', 'saving_goal', 'debt', or 'all')"),
+  limit: z
+    .number()
+    .optional()
+    .default(10)
+    .describe("Max number of recent artifacts to retrieve (defaults to 10)"),
+});
+
 const StageDeleteRecordSchema = z.object({
   entityType: z
     .enum(["budget", "expense", "transaction", "savingGoal", "debt"])
@@ -229,8 +304,97 @@ const StageDeleteRecordSchema = z.object({
  */
 export function getAgentTools(ctx?: ToolContext) {
   const userId = ctx?.userId;
+  const conversationId = ctx?.conversationId;
 
   return {
+    // ─────────────────────────────────────────────────────────────
+    // 0. ARTIFACT RETRIEVAL & INSPECTION (For In-Place Editing)
+    // ─────────────────────────────────────────────────────────────
+    getArtifacts: tool({
+      description:
+        "Retrieves previously staged artifacts (forms, charts, budgets, expenses, transactions, savings goals, debts) from the current conversation in stack order (latest to oldest, with simple index #1, #2...). Use this tool before editing or updating any existing form or chart on user demand.",
+      inputSchema: GetArtifactsSchema,
+      execute: async ({ artifactType = "all", limit = 10 }) => {
+        if (!conversationId) {
+          return {
+            success: true,
+            totalCount: 0,
+            artifacts: [],
+            message: "No active conversation context.",
+          };
+        }
+
+        try {
+          const messages = await prisma.conversationMessage.findMany({
+            where: { conversationId },
+            orderBy: { createdAt: "desc" },
+            take: 30,
+            select: { id: true, role: true, toolCalls: true, createdAt: true },
+          });
+
+          const extractedArtifacts: Array<{
+            artifactId: string;
+            index: number;
+            messageId: string;
+            artifactType: string;
+            title: string;
+            summary?: string;
+            createdAt: string;
+            data: any;
+          }> = [];
+
+          let globalIndex = 1;
+
+          for (const msg of messages) {
+            if (!msg.toolCalls || !Array.isArray(msg.toolCalls)) continue;
+            for (let i = msg.toolCalls.length - 1; i >= 0; i--) {
+              const tc: any = msg.toolCalls[i];
+              const res = tc.result as any;
+              const art = res?.artifact || res?.data || (res?.isArtifact ? res : null);
+              const artType = res?.artifactType || art?.artifactType;
+
+              if (art && artType) {
+                const normalizedType = artType === "savinggoal" ? "saving_goal" : artType;
+
+                if (artifactType !== "all" && normalizedType !== artifactType) {
+                  continue;
+                }
+
+                const artId = art.artifactId || res.artifactId || tc.args?.targetArtifactId || `art_${globalIndex}`;
+
+                extractedArtifacts.push({
+                  artifactId: artId,
+                  index: globalIndex,
+                  messageId: msg.id,
+                  artifactType: normalizedType,
+                  title: res.title || art.title || tc.args?.title || `${normalizedType} Draft`,
+                  summary: res.summary || art.summary,
+                  createdAt: msg.createdAt.toISOString(),
+                  data: art.sections || art.data || art,
+                });
+
+                globalIndex++;
+                if (extractedArtifacts.length >= limit) break;
+              }
+            }
+            if (extractedArtifacts.length >= limit) break;
+          }
+
+          return {
+            success: true,
+            totalCount: extractedArtifacts.length,
+            artifacts: extractedArtifacts,
+            hint: "To edit any artifact, call the corresponding staging tool (e.g. stageForm) passing targetArtifactId: '<artifactId>' to update it in place.",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error?.message || "Failed to retrieve artifacts.",
+          };
+        }
+      },
+    }),
+
     // ─────────────────────────────────────────────────────────────
     // 1. LIVE APMC MANDI RATES (Official data.gov.in Real API)
     // ─────────────────────────────────────────────────────────────
@@ -772,13 +936,14 @@ export function getAgentTools(ctx?: ToolContext) {
     }),
 
     // ─────────────────────────────────────────────────────────────
-    // 4. STAGING / ACTION TOOLS (Draft Artifact Creation)
+    // 4. STAGING / ACTION TOOLS (Draft Artifact Creation & In-Place Editing)
     // ─────────────────────────────────────────────────────────────
     stageChart: tool({
       description:
-        "Generates an interactive visual chart or graph (Bar, Line, Area, Pie) as an artifact for comparing financial metrics, mandi trends, budgets, or revenue.",
+        "Generates or updates an interactive visual chart (Bar, Line, Area, Pie) as an artifact for comparing financial metrics, mandi trends, budgets, or revenue. Pass 'targetArtifactId' to edit an existing chart.",
       inputSchema: StageChartSchema,
       execute: async ({
+        targetArtifactId,
         chartType,
         title,
         description,
@@ -801,13 +966,21 @@ export function getAgentTools(ctx?: ToolContext) {
             color: s.color || defaultColors[idx % defaultColors.length],
           }));
 
+          const artId = targetArtifactId || `art_chart_${Date.now()}`;
+
           return {
             success: true,
             isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
             artifactType: "chart",
             title: `Visual Graph: ${title}`,
             summary: `${chartType.toUpperCase()} Chart • ${data.length} Data Points • ${series.map((s) => s.name || s.dataKey).join(", ")}`,
             data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
               chartType,
               title,
               description: description || "",
@@ -827,9 +1000,9 @@ export function getAgentTools(ctx?: ToolContext) {
 
     stageBudget: tool({
       description:
-        "Prepares an interactive draft budget plan with category allocations for the user to review, edit, and approve before saving to the database.",
+        "Prepares or updates an interactive draft budget plan with category allocations for user review. Pass 'targetArtifactId' to edit an existing budget.",
       inputSchema: StageBudgetSchema,
-      execute: async ({ name, period, totalAmount, items }) => {
+      execute: async ({ targetArtifactId, name, period, totalAmount, items }) => {
         try {
           const now = new Date();
           const startDate = now.toISOString().split("T")[0];
@@ -841,13 +1014,21 @@ export function getAgentTools(ctx?: ToolContext) {
           else endDateObj.setMonth(now.getMonth() + 1);
           const endDate = endDateObj.toISOString().split("T")[0];
 
+          const artId = targetArtifactId || `art_budget_${Date.now()}`;
+
           return {
             success: true,
             isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
             artifactType: "budget",
             title: `Draft Budget: ${name}`,
             summary: `${period} budget of ₹${totalAmount.toLocaleString("en-IN")} across ${items.length} categories`,
             data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
               name,
               period,
               totalAmount,
@@ -864,9 +1045,10 @@ export function getAgentTools(ctx?: ToolContext) {
 
     stageExpense: tool({
       description:
-        "Prepares an interactive draft expense entry for the user to review, edit, and approve before saving to the database.",
+        "Prepares or updates an interactive draft expense entry for user review. Pass 'targetArtifactId' to edit an existing expense.",
       inputSchema: StageExpenseSchema,
       execute: async ({
+        targetArtifactId,
         category,
         amount,
         vendor,
@@ -876,13 +1058,21 @@ export function getAgentTools(ctx?: ToolContext) {
       }) => {
         try {
           const date = new Date().toISOString().split("T")[0];
+          const artId = targetArtifactId || `art_expense_${Date.now()}`;
+
           return {
             success: true,
             isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
             artifactType: "expense",
             title: `Draft Expense: ₹${amount.toLocaleString("en-IN")} (${category})`,
             summary: `Log ₹${amount.toLocaleString("en-IN")} for ${category} paid via ${paymentMethod}`,
             data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
               category,
               amount,
               date,
@@ -900,18 +1090,26 @@ export function getAgentTools(ctx?: ToolContext) {
 
     stageTransaction: tool({
       description:
-        "Prepares an interactive draft master ledger transaction for the user to review, edit, and approve.",
+        "Prepares or updates an interactive draft master ledger transaction. Pass 'targetArtifactId' to edit an existing transaction.",
       inputSchema: StageTransactionSchema,
-      execute: async ({ type, amount, category, description }) => {
+      execute: async ({ targetArtifactId, type, amount, category, description }) => {
         try {
           const date = new Date().toISOString().split("T")[0];
+          const artId = targetArtifactId || `art_tx_${Date.now()}`;
+
           return {
             success: true,
             isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
             artifactType: "transaction",
             title: `Draft Transaction: ${type} ₹${amount.toLocaleString("en-IN")}`,
             summary: `${type} of ₹${amount.toLocaleString("en-IN")} in ${category || "General"}`,
             data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
               type,
               amount,
               date,
@@ -930,17 +1128,25 @@ export function getAgentTools(ctx?: ToolContext) {
 
     stageSavingsGoal: tool({
       description:
-        "Prepares an interactive draft savings goal for the user to review, edit, and approve.",
+        "Prepares or updates an interactive draft savings goal. Pass 'targetArtifactId' to edit an existing savings goal.",
       inputSchema: StageSavingsGoalSchema,
-      execute: async ({ name, targetAmount, targetDate }) => {
+      execute: async ({ targetArtifactId, name, targetAmount, targetDate }) => {
         try {
+          const artId = targetArtifactId || `art_goal_${Date.now()}`;
+
           return {
             success: true,
             isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
             artifactType: "saving_goal",
             title: `Draft Savings Goal: ${name}`,
             summary: `Target of ₹${targetAmount.toLocaleString("en-IN")}${targetDate ? ` by ${targetDate}` : ""}`,
             data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
               name,
               targetAmount,
               targetDate: targetDate || "",
@@ -954,9 +1160,10 @@ export function getAgentTools(ctx?: ToolContext) {
 
     stageDebt: tool({
       description:
-        "Prepares an interactive draft loan / debt liability for the user to review, edit, and approve.",
+        "Prepares or updates an interactive draft loan / debt liability. Pass 'targetArtifactId' to edit an existing debt.",
       inputSchema: StageDebtSchema,
       execute: async ({
+        targetArtifactId,
         type,
         lender,
         totalAmount,
@@ -965,13 +1172,21 @@ export function getAgentTools(ctx?: ToolContext) {
         emiAmount,
       }) => {
         try {
+          const artId = targetArtifactId || `art_debt_${Date.now()}`;
+
           return {
             success: true,
             isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
             artifactType: "debt",
             title: `Draft Debt: ${lender} (₹${amountOutStanding.toLocaleString("en-IN")})`,
             summary: `${type} with ${lender} • Total: ₹${totalAmount.toLocaleString("en-IN")} • Outstanding: ₹${amountOutStanding.toLocaleString("en-IN")}`,
             data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
               type,
               lender,
               totalAmount,
@@ -982,6 +1197,46 @@ export function getAgentTools(ctx?: ToolContext) {
           };
         } catch (error: any) {
           return { success: false, error: "Failed to stage debt liability." };
+        }
+      },
+    }),
+
+    stageForm: tool({
+      description:
+        "Generates or updates a dynamic, interactive multi-field form artifact (e.g. Loan Applications, MSME Subsidies, Vendor KYC, Trade Inquiries, Checklists, Feedback) for the user to review, edit, fill, and approve. When editing an existing form on user demand, pass 'targetArtifactId' so the original form updates in place.",
+      inputSchema: StageFormSchema,
+      execute: async ({ targetArtifactId, title, description, submitLabel, formType, sections }) => {
+        try {
+          const totalFields = sections.reduce(
+            (sum, sec) => sum + sec.fields.length,
+            0,
+          );
+          const artId = targetArtifactId || `art_form_${Date.now()}`;
+
+          return {
+            success: true,
+            isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
+            artifactType: "form",
+            title,
+            summary:
+              description ||
+              `${sections.length} sections • ${totalFields} interactive fields`,
+            data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
+              title,
+              description: description || "",
+              submitLabel: submitLabel || "Approve & Submit",
+              formType: formType || "general",
+              sections,
+            },
+          };
+        } catch (error: any) {
+          return { success: false, error: "Failed to stage dynamic form." };
         }
       },
     }),
@@ -1022,6 +1277,20 @@ export interface ToolMeta {
 }
 
 export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
+  getArtifacts: {
+    name: "getArtifacts",
+    icon: "search",
+    formatSummary: (args, res) =>
+      `Inspected conversation artifacts (${res?.totalCount ?? 0} found)`,
+  },
+  stageForm: {
+    name: "stageForm",
+    icon: "landmark",
+    formatSummary: (args) =>
+      args?.targetArtifactId
+        ? `Updated dynamic form "${args?.title || "Form"}"`
+        : `Prepared dynamic form "${args?.title || "Form"}"`,
+  },
   getMandiRates: {
     name: "getMandiRates",
     icon: "sprout",
@@ -1038,7 +1307,9 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
     name: "stageChart",
     icon: "landmark",
     formatSummary: (args) =>
-      `Generated ${args?.chartType || "visual"} chart for "${args?.title || "metrics"}"`,
+      args?.targetArtifactId
+        ? `Updated visual chart "${args?.title || "metrics"}"`
+        : `Generated ${args?.chartType || "visual"} chart for "${args?.title || "metrics"}"`,
   },
   getBudgets: {
     name: "getBudgets",
@@ -1107,7 +1378,9 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
     name: "stageDebt",
     icon: "landmark",
     formatSummary: (args) =>
-      `Generated loan liability draft with ${args?.lender || "lender"}`,
+      args?.targetArtifactId
+        ? `Updated loan liability draft with ${args?.lender || "lender"}`
+        : `Generated loan liability draft with ${args?.lender || "lender"}`,
   },
   stageDeleteRecord: {
     name: "stageDeleteRecord",

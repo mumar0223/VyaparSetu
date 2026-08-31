@@ -19,7 +19,7 @@ export function AppMobileShell({ currentUser, children }: AppMobileShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-cream font-sans antialiased text-ink">
+    <div className="flex h-screen overflow-hidden bg-cream dark:bg-background font-sans antialiased text-foreground">
       {/* Desktop Sidebar */}
       <AppSidebar currentUser={currentUser} className="hidden lg:flex" />
 
@@ -27,13 +27,13 @@ export function AppMobileShell({ currentUser, children }: AppMobileShellProps) {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
-            className="fixed inset-0 bg-forest/40 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative z-50 w-72 h-full bg-white dark:bg-card shadow-2xl flex flex-col">
+          <div className="relative z-50 w-72 h-full bg-white dark:bg-card shadow-2xl flex flex-col border-r border-sage/30 dark:border-border">
             <div className="flex items-center justify-between p-4 border-b border-sage/30 dark:border-border">
               <span className="font-serif font-bold text-lg text-forest dark:text-foreground">Menu</span>
-              <button onClick={() => setMobileOpen(false)} className="p-1 text-ink-muted hover:text-forest dark:hover:text-foreground cursor-pointer">
+              <button onClick={() => setMobileOpen(false)} className="p-1 text-ink-muted dark:text-muted-foreground hover:text-forest dark:hover:text-foreground cursor-pointer">
                 <X className="size-6" />
               </button>
             </div>
@@ -61,7 +61,7 @@ export function AppMobileShell({ currentUser, children }: AppMobileShellProps) {
         </div>
 
         {/* Main Content (Edge to Edge Full Viewport) */}
-        <main className="flex-1 h-full overflow-hidden bg-cream">
+        <main className="flex-1 h-full overflow-hidden bg-cream dark:bg-background text-foreground">
           {children}
         </main>
       </div>

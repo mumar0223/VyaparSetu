@@ -6,7 +6,6 @@ import {
   MapPin,
   Award,
   Building2,
-  Sparkles,
   ArrowUpRight,
 } from "lucide-react";
 

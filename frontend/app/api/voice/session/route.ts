@@ -81,11 +81,31 @@ MALE PERSONA & GRAMMAR RULES:
 MULTILINGUAL SUPPORT (10 Indian Languages):
 1. You natively understand and speak: Hindi (हिन्दी), English (India), Bengali (বাংলা), Marathi (मराठी), Telugu (తెలుగు), Tamil (தமிழ்), Gujarati (ગુજરાતી), Kannada (ಕನ್ನಡ), Malayalam (മലയാളം), and Punjabi (ਪੰਜਾਬੀ), including Hinglish and colloquial regional business terminology.
 2. Always respond directly in the language spoken by the user (or the language the user asks for).
-3. Keep spoken replies concise, clear, natural, and respectful. Never read out hidden reasoning.
-4. When the user asks for APMC commodity mandi prices, market trends, loan credit schemes (PM Mudra, PM SVANidhi, PMEGP), budgets, expenses, or debt records, execute the relevant tool immediately (e.g. getMandiRates, getBudgets, getExpenses, getGovtSchemes) and speak the key findings naturally.
-5. When creating a budget, logging an expense, adding a transaction, or creating a goal, ALWAYS call the corresponding stage tool (stageBudget, stageExpense, stageTransaction, stageSavingsGoal, stageDebt) so an interactive draft artifact is generated for the user on screen.
-6. When the user asks for a visual graph, chart, plot, or trend visualization, ALWAYS call stageChart with chartType ('bar', 'line', 'area', 'pie'), title, xAxisKey, data array of points, and series.
-7. When the user asks for market news, trade circulars, or web search, execute the webSearch tool.`;
+3. Keep spoken replies concise, clear, natural, and respectful — 1 to 3 short spoken sentences.
+4. Never read out hidden reasoning or tool schema details.
+
+CAPABILITIES & TOOL USAGE (CRITICAL — YOU MUST USE TOOLS WHEN RELEVANT):
+You have access to powerful tools. When the user's query relates to any of the following, you MUST call the appropriate tool immediately — do NOT say "I can't do that" or "I don't have access":
+
+0. **Inspect & In-Place Edit Forms & Artifacts** → Call getArtifacts to inspect previously staged forms/charts (#1, #2...). When the user asks to modify or change an existing form/chart, retrieve it via getArtifacts, modify the requested fields, and pass targetArtifactId to stageForm or other staging tools to update it in place.
+1. **APMC Mandi Commodity Prices** → Call getMandiRates with the commodity name (Onion, Wheat, Cotton, Tomato, Soyabean, Mustard, Potato, Gram, etc.) and optional state/district/market filters.
+2. **Budgets** (view, create) → Call getBudgets to retrieve active budgets, or stageBudget to create/update a budget plan.
+3. **Expenses** (view, log) → Call getExpenses to retrieve logged expenses, or stageExpense to log/update an expense entry.
+4. **Transactions** (view, add) → Call getTransactions to retrieve ledger transactions, or stageTransaction to add/update a ledger entry.
+5. **Savings Goals** (view, create) → Call getSavingsGoals to retrieve goals, or stageSavingsGoal to create/update a savings target.
+6. **Debts & Loans** (view, add) → Call getDebts to retrieve loan liabilities, or stageDebt to record/update a loan/liability.
+7. **Business Profile** → Call getBusinessProfile to retrieve enterprise details, category, location, and turnover.
+8. **Government Schemes** (PM Mudra, PM SVANidhi, PMEGP, Stand-Up India, PM Vishwakarma) → Call getGovtSchemes with the relevant scheme name.
+9. **Visual Charts & Graphs** → Call stageChart with chartType (bar, line, area, pie), title, data array, and series for visualizations.
+10. **Web Search** (trade news, policies, RBI circulars, market updates) → Call webSearch with the search query.
+11. **Dynamic Interactive Forms & Applications** → Call stageForm when user asks for any form (loan application, subsidy registration, supplier KYC, survey, registration) with rich sections and fields.
+12. **Delete Records** → Call stageDeleteRecord when the user wants to remove a budget, expense, goal, or debt.
+
+RESPONSE RULES:
+1. After executing a tool, speak the key findings naturally and concisely in the user's language.
+2. Confirm key prices, rates, amounts, or loan figures clearly.
+3. For staging tools (stageForm, stageBudget, stageExpense, stageChart, etc.), confirm that an interactive draft card has been created or updated for the user to review and edit on screen.`;
+
 
     if (conversationId) {
       const history = await prisma.conversationMessage.findMany({
@@ -344,12 +364,34 @@ MULTILINGUAL SUPPORT (10 Indian Languages):
             },
           },
           {
-            name: "stageChart",
+            name: "getArtifacts",
             description:
-              "Generates an interactive visual chart or graph (bar, line, area, pie) as an artifact for financial metrics, mandi trends, or revenue.",
+              "Retrieves previously staged artifacts (forms, charts, budgets, expenses) from the current conversation in stack order (#1, #2...). Use before editing or updating any existing form or chart on user demand.",
             parameters: {
               type: "OBJECT",
               properties: {
+                artifactType: {
+                  type: "STRING",
+                  description: "form, chart, budget, expense, transaction, saving_goal, debt, or all",
+                },
+                limit: {
+                  type: "NUMBER",
+                  description: "Max number of artifacts to retrieve (defaults to 10)",
+                },
+              },
+            },
+          },
+          {
+            name: "stageChart",
+            description:
+              "Generates or updates an interactive visual chart (bar, line, area, pie) as an artifact. Pass 'targetArtifactId' to edit an existing chart in place.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                targetArtifactId: {
+                  type: "STRING",
+                  description: "Optional ID or index (e.g. 'art_1' or '1') of an existing chart to update in place",
+                },
                 chartType: {
                   type: "STRING",
                   description: "bar, line, area, or pie",
@@ -387,6 +429,72 @@ MULTILINGUAL SUPPORT (10 Indian Languages):
                 },
               },
               required: ["chartType", "title", "data"],
+            },
+          },
+          {
+            name: "stageForm",
+            description:
+              "Generates or updates a dynamic interactive multi-field form artifact (loan applications, subsidy forms, vendor KYC, registration). Pass 'targetArtifactId' to edit an existing form in place.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                targetArtifactId: {
+                  type: "STRING",
+                  description: "Optional ID or index (e.g. 'art_1' or '1') of an existing form to update in place",
+                },
+                title: {
+                  type: "STRING",
+                  description: "Title of the form",
+                },
+                description: {
+                  type: "STRING",
+                  description: "Subtitle or instructions",
+                },
+                submitLabel: {
+                  type: "STRING",
+                  description: "Label for the submit button",
+                },
+                formType: {
+                  type: "STRING",
+                  description: "Form category e.g. loan_application",
+                },
+                sections: {
+                  type: "ARRAY",
+                  description: "List of form sections containing fields",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      title: { type: "STRING" },
+                      description: { type: "STRING" },
+                      fields: {
+                        type: "ARRAY",
+                        items: {
+                          type: "OBJECT",
+                          properties: {
+                            id: { type: "STRING" },
+                            label: { type: "STRING" },
+                            type: {
+                              type: "STRING",
+                              description: "text, number, select, date, textarea, checkbox",
+                            },
+                            defaultValue: { type: "STRING" },
+                            placeholder: { type: "STRING" },
+                            options: {
+                              type: "ARRAY",
+                              items: { type: "STRING" },
+                            },
+                            required: { type: "BOOLEAN" },
+                            helpText: { type: "STRING" },
+                          },
+                          required: ["id", "label"],
+                        },
+                      },
+                    },
+                    required: ["fields"],
+                  },
+                },
+              },
+              required: ["title", "sections"],
             },
           },
           {

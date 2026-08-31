@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Volume2, VolumeX, AudioLines, FileCheck, ArrowUpRight, PieChart, BarChart3, IndianRupee, Layers, Sparkles, Landmark, AlertTriangle } from "lucide-react";
+import { Copy, Check, Volume2, VolumeX, AudioLines, FileCheck, ArrowUpRight, PieChart, BarChart3, IndianRupee, Layers, Target, Landmark, AlertTriangle, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThinkingAccordion } from "./thinking-accordion";
 import { MarkdownMessage } from "./markdown-message";
@@ -89,6 +89,9 @@ export function ChatMessageList({
           const res = tc.result as any;
           if (res?.isArtifact && res?.artifactType && res?.data) {
             artifacts.push({
+              artifactId: res.artifactId || res.data?.artifactId,
+              targetArtifactId: res.targetArtifactId,
+              isUpdated: res.isUpdated,
               artifactType: res.artifactType,
               title: res.title,
               summary: res.summary,
@@ -135,16 +138,24 @@ export function ChatMessageList({
                             {art.artifactType === "budget" && <PieChart className="size-4" />}
                             {art.artifactType === "expense" && <IndianRupee className="size-4" />}
                             {art.artifactType === "transaction" && <Layers className="size-4" />}
-                            {art.artifactType === "saving_goal" && <Sparkles className="size-4" />}
+                            {art.artifactType === "saving_goal" && <Target className="size-4" />}
                             {art.artifactType === "debt" && <Landmark className="size-4" />}
+                            {art.artifactType === "form" && <ClipboardList className="size-4" />}
                             {art.artifactType === "delete_record" && <AlertTriangle className="size-4 text-rose-500" />}
                           </div>
                           <div className="min-w-0">
-                            <h4 className="text-[13.5px] font-semibold text-forest dark:text-zinc-100 group-hover:text-mint transition-colors truncate">
-                              {art.title || t("chat.stagedDraft", "Interactive Action Draft")}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-[13.5px] font-semibold text-forest dark:text-zinc-100 group-hover:text-mint transition-colors truncate">
+                                {art.title || t("chat.stagedDraft", "Interactive Action Draft")}
+                              </h4>
+                              {art.isUpdated && (
+                                <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-mint/20 text-forest dark:text-mint border border-mint/30 shrink-0">
+                                  Updated
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11.5px] text-muted-foreground truncate mt-0.5">
-                              {art.summary || t("chat.clickToReview", "Draft prepared • Click to review & edit")}
+                              {art.summary || (art.isUpdated ? "Draft updated • Click to review changes" : t("chat.clickToReview", "Draft prepared • Click to review & edit"))}
                             </p>
                           </div>
                         </div>

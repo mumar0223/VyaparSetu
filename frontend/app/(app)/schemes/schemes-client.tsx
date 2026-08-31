@@ -10,9 +10,10 @@ import {
   Building,
   Landmark,
   ArrowRight,
-  Sparkles,
+  BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n";
 
 export interface SchemesBusinessProfile {
   businessName: string;
@@ -70,6 +71,7 @@ const SCHEMES = [
 ];
 
 export function SchemesClient({ profile }: { profile: SchemesBusinessProfile | null }) {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredSchemes = SCHEMES.filter(
@@ -85,10 +87,10 @@ export function SchemesClient({ profile }: { profile: SchemesBusinessProfile | n
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-forest dark:text-mint flex items-center gap-2.5">
-            <Award className="size-7 text-mint" /> Government Schemes &amp; Capital Subsidies
+            <Award className="size-7 text-mint" /> {t("schemes.title", "Government Schemes & Capital Subsidies")}
           </h1>
           <p className="text-xs sm:text-sm text-ink-muted dark:text-muted-foreground mt-1">
-            Verified central and state government credit-linked subsidies and collateral-free loan programs
+            {t("schemes.subtitle", "Verified central and state government credit-linked subsidies and collateral-free loan programs")}
           </p>
         </div>
       </div>
@@ -97,19 +99,19 @@ export function SchemesClient({ profile }: { profile: SchemesBusinessProfile | n
       <div className="bg-mint-pale dark:bg-mint/10 border border-mint/30 dark:border-mint/20 rounded-2xl p-5 shadow-xs mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-mint/20 dark:bg-mint/30 rounded-xl shrink-0">
-            <Sparkles className="size-6 text-forest dark:text-mint" />
+            <BadgeCheck className="size-6 text-forest dark:text-mint" />
           </div>
           <div>
             <h3 className="font-bold text-forest dark:text-foreground text-sm sm:text-base">
-              Pre-Matched for: {profile?.businessName || "Your Enterprise"} ({profile?.city || "Maharashtra"})
+              {t("schemes.preMatchedFor", "Pre-Matched for:")} {profile?.businessName || "Your Enterprise"} ({profile?.city || "Maharashtra"})
             </h3>
             <p className="text-xs text-forest/80 dark:text-muted-foreground">
-              Based on your enterprise profile, you qualify for up to 35% capital subsidy and 5% subvented interest.
+              {t("schemes.preMatchedDesc", "Based on your enterprise profile, you qualify for up to 35% capital subsidy and 5% subvented interest.")}
             </p>
           </div>
         </div>
         <span className="text-xs font-bold bg-white dark:bg-card text-forest dark:text-mint px-3.5 py-2 rounded-xl border border-mint/30 shadow-xs whitespace-nowrap shrink-0">
-          ✓ 4 Verified Schemes Available
+          {t("schemes.verifiedCount", "✓ 4 Verified Schemes Available")}
         </span>
       </div>
 
@@ -119,7 +121,7 @@ export function SchemesClient({ profile }: { profile: SchemesBusinessProfile | n
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search schemes, ministry, subsidy type..."
+          placeholder={t("schemes.searchPlaceholder", "Search schemes, ministry, subsidy type...")}
           className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-card border border-sage/40 dark:border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-mint"
         />
         <Search className="size-4 text-sage dark:text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />

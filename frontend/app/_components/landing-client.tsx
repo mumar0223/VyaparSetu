@@ -11,7 +11,6 @@ import {
   Code2,
   Network,
   ShieldCheck,
-  Sparkles,
   ArrowRight,
   IndianRupee,
   Bot,
@@ -65,11 +64,11 @@ export function LandingClient({ currentUser }: LandingClientProps) {
   ];
 
   return (
-    <main className="bg-cream dark:bg-background text-foreground selection:bg-mint-pale selection:text-forest min-h-screen font-sans">
+    <main className="bg-cream dark:bg-background text-foreground selection:bg-mint-pale selection:text-forest min-h-screen font-sans overflow-x-clip max-w-full">
       <Navbar currentUser={currentUser} />
 
       {/* Hero Section */}
-      <div ref={heroRef} className="min-h-[110vh] lg:h-[125vh] relative">
+      <div ref={heroRef} className="min-h-[110vh] lg:h-[125vh] relative overflow-x-clip max-w-full">
         <div className="sticky top-0 h-svh w-full overflow-hidden flex flex-col items-center pt-20 md:pt-28 pb-4">
           <motion.section
             style={{ y, opacity, scale }}
@@ -107,12 +106,6 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                 transition={{ duration: 0.7, ease: "easeOut" }}
                 className="flex flex-col gap-4 sm:gap-6 max-w-xl lg:max-w-2xl z-10 pointer-events-auto"
               >
-                {/* Grassroots Badge */}
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-mint-pale dark:bg-mint/10 border border-mint/30 dark:border-mint/20 text-forest dark:text-mint text-xs font-bold shadow-xs w-fit">
-                  <Sparkles className="size-3.5 text-mint" />
-                  <span>AI Business Advisory for Bharat</span>
-                </div>
-
                 <h1 className="text-3xl sm:text-5xl md:text-5xl lg:text-6xl font-serif font-bold tracking-tight leading-[1.12] text-forest dark:text-foreground">
                   Grow your local business.{" "}
                   <span className="text-forest dark:text-mint block mt-1">

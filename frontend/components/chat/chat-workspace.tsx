@@ -13,7 +13,6 @@ import {
   PanelRightOpen,
   PanelRightClose,
   Plus,
-  Sparkles,
   TrendingUp,
   Landmark,
   FileSpreadsheet,
@@ -29,6 +28,7 @@ import { ArtifactModal, type ArtifactPayload } from "./artifact-modal";
 import type { ChatMessage, ConversationSummary, ToolCallItem } from "./types";
 import type { AuthUser } from "@/lib/auth-types";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 interface ChatWorkspaceProps {
   currentUser?: AuthUser | null;
@@ -40,6 +40,7 @@ export function ChatWorkspace({
   initialChatId,
 }: ChatWorkspaceProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [activeChatId, setActiveChatId] = useState<string | null>(
     initialChatId || null,
@@ -471,7 +472,10 @@ export function ChatWorkspace({
       id: assistantMessageId,
       role: "assistant",
       content: "",
-      thinking: "Synthesizing market context & evaluating trade queries...",
+      thinking: t(
+        "chat.thinkingDefault",
+        "Synthesizing market context & evaluating trade queries...",
+      ),
       toolCalls: [],
       createdAt: new Date(),
       isStreaming: true,
@@ -481,6 +485,26 @@ export function ChatWorkspace({
     const previousMessages = [...messages];
     setMessages((prev) => [...prev, newUserMessage, newAssistantMessage]);
     setIsLoading(true);
+    setShowScrollBottom(false);
+
+    // Scroll the page to bottom on send
+    requestAnimationFrame(() => {
+      if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTop =
+          scrollViewportRef.current.scrollHeight;
+      }
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }
+    });
+    setTimeout(() => {
+      if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTop =
+          scrollViewportRef.current.scrollHeight;
+      }
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 100);
 
     try {
       const response = await fetch("/api/chat/stream", {
@@ -596,8 +620,41 @@ export function ChatWorkspace({
               }),
             );
           } else if (eventType === "tool_result") {
-            setMessages((prev) =>
-              prev.map((m) => {
+            const targetId = data.result?.targetArtifactId || data.result?.artifactId;
+            const isUpdated = data.result?.isUpdated;
+
+            setMessages((prev) => {
+              // 1. If in-place update, first update the target artifact in previous messages
+              let updatedPrev = prev;
+              if (isUpdated && targetId) {
+                updatedPrev = prev.map((m) => {
+                  if (!m.toolCalls || m.id === assistantMessageId) return m;
+                  const updatedToolCalls = m.toolCalls.map((tc) => {
+                    const res = tc.result as any;
+                    const match =
+                      res?.artifactId === targetId ||
+                      res?.data?.artifactId === targetId ||
+                      (targetId === "1" && res?.isArtifact) ||
+                      (targetId === "art_1" && res?.isArtifact);
+                    if (match) {
+                      return {
+                        ...tc,
+                        result: {
+                          ...res,
+                          title: data.result.title || res.title,
+                          summary: data.result.summary || res.summary,
+                          data: data.result.data || data.result,
+                        },
+                      };
+                    }
+                    return tc;
+                  });
+                  return { ...m, toolCalls: updatedToolCalls };
+                });
+              }
+
+              // 2. Update current assistant message's toolCalls
+              return updatedPrev.map((m) => {
                 if (m.id !== assistantMessageId) return m;
                 const tools = (m.toolCalls || []).map((t) =>
                   t.toolName === data.toolName
@@ -611,8 +668,21 @@ export function ChatWorkspace({
                     : t,
                 );
                 return { ...m, toolCalls: tools };
-              }),
-            );
+              });
+            });
+
+            // If the artifact modal is currently open on screen, live-sync the changes!
+            if (isUpdated && data.result?.data) {
+              setActiveArtifact((curr) => {
+                if (!curr) return null;
+                return {
+                  ...curr,
+                  title: data.result.title || curr.title,
+                  summary: data.result.summary || curr.summary,
+                  data: data.result.data,
+                };
+              });
+            }
           } else if (eventType === "chunk") {
             setMessages((prev) =>
               prev.map((m) =>
@@ -728,11 +798,13 @@ export function ChatWorkspace({
           <div className="w-full h-full overflow-y-auto flex flex-col justify-center items-center px-4 py-8 -mt-6">
             <div className="w-full max-w-3xl text-center mb-8 animate-in fade-in-50 duration-300">
               <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-forest dark:text-foreground mb-2">
-                What&apos;s on the agenda today?
+                {t("chat.agendaTitle", "What's on the agenda today?")}
               </h1>
               <p className="text-xs sm:text-sm text-ink-muted dark:text-muted-foreground">
-                Hyper-local mandi intelligence, financial structuring, and
-                government credit scheme advisor
+                {t(
+                  "chat.agendaSubtitle",
+                  "Hyper-local mandi intelligence, financial structuring, and government credit scheme advisor",
+                )}
               </p>
             </div>
 
@@ -750,32 +822,55 @@ export function ChatWorkspace({
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-3xl px-4 md:px-6">
               {[
                 {
-                  label: "Live APMC Mandi Rates",
-                  desc: "Current onion, wheat & commodity price arrivals",
+                  label: t("chat.prompt1Title", "Live APMC Mandi Rates"),
+                  desc: t(
+                    "chat.prompt1Desc",
+                    "Current onion, wheat & commodity price arrivals",
+                  ),
                   icon: TrendingUp,
-                  prompt:
+                  prompt: t(
+                    "chat.prompt1Prompt",
                     "Show me the latest regional mandi rates and APMC trends for Onion and Wheat.",
+                  ),
                 },
                 {
-                  label: "PM Mudra & SVANidhi Loan",
-                  desc: "Check zero-collateral credit eligibility",
+                  label: t("chat.prompt2Title", "PM Mudra & SVANidhi Loan"),
+                  desc: t(
+                    "chat.prompt2Desc",
+                    "Check zero-collateral credit eligibility",
+                  ),
                   icon: Landmark,
-                  prompt:
+                  prompt: t(
+                    "chat.prompt2Prompt",
                     "Evaluate my eligibility for PM Mudra Kishore and PM SVANidhi loans.",
+                  ),
                 },
                 {
-                  label: "Working Capital Optimization",
-                  desc: "Analyze 14-day cash flow & stock buffer",
+                  label: t(
+                    "chat.prompt3Title",
+                    "Working Capital Optimization",
+                  ),
+                  desc: t(
+                    "chat.prompt3Desc",
+                    "Analyze 14-day cash flow & stock buffer",
+                  ),
                   icon: Coins,
-                  prompt:
+                  prompt: t(
+                    "chat.prompt3Prompt",
                     "Give me advice on optimizing my micro-enterprise working capital and inventory buffer.",
+                  ),
                 },
                 {
-                  label: "GST & Trade Compliance",
-                  desc: "Udyam Aadhar & balance sheet checklist",
+                  label: t("chat.prompt4Title", "GST & Trade Compliance"),
+                  desc: t(
+                    "chat.prompt4Desc",
+                    "Udyam Aadhar & balance sheet checklist",
+                  ),
                   icon: FileSpreadsheet,
-                  prompt:
+                  prompt: t(
+                    "chat.prompt4Prompt",
                     "What is the compliance checklist for Udyam Aadhar and micro-enterprise ledger audit?",
+                  ),
                 },
               ].map((chip, i) => (
                 <button

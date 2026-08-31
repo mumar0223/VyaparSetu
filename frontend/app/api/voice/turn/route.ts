@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAgentTools, TOOL_DEFINITIONS } from "@/lib/agent/tools";
 import { getLanguageModel } from "@/lib/agent/ai-provider";
 import { LIVE_VOICE_AGENT_CONFIG } from "@/lib/agent/chat-config";
-import { streamText } from "ai";
+import { streamText, isStepCount } from "ai";
 
 export const dynamic = "force-dynamic";
 
@@ -79,11 +79,15 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         const sendEvent = (event: string, data: any) => {
-          controller.enqueue(
-            encoder.encode(
-              `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-            )
-          );
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+              )
+            );
+          } catch (e) {
+            // controller closed
+          }
         };
 
         sendEvent("conversation_init", {
@@ -92,7 +96,7 @@ export async function POST(req: NextRequest) {
         });
 
         let accumulatedText = "";
-        let toolInvocations: any[] = [];
+        const toolInvocations: any[] = [];
 
         try {
           const model = getLanguageModel(
@@ -113,118 +117,117 @@ export async function POST(req: NextRequest) {
           const formattedHistory = rawFilteredHistory.slice(-20);
           formattedHistory.push({ role: "user", content: userText });
 
-          // Check if message requires tools
-          const lowerMsg = userText.toLowerCase();
-          const isMandiQuery =
-            lowerMsg.includes("mandi") ||
-            lowerMsg.includes("rate") ||
-            lowerMsg.includes("price") ||
-            lowerMsg.includes("onion") ||
-            lowerMsg.includes("pyaaz") ||
-            lowerMsg.includes("wheat") ||
-            lowerMsg.includes("gehu") ||
-            lowerMsg.includes("bhav");
+          // System instruction with full tool awareness and multilingual support
+          const systemInstruction = `You are VyaparSetu Voice OS (व्यापारसेतु), a male AI business advisor and trade partner for Indian micro-enterprises, shopkeepers, traders, and farmers.
 
-          const isSchemeQuery =
-            lowerMsg.includes("loan") ||
-            lowerMsg.includes("scheme") ||
-            lowerMsg.includes("mudra") ||
-            lowerMsg.includes("credit") ||
-            lowerMsg.includes("svanidhi");
+MALE PERSONA & GRAMMAR RULES:
+1. You are strictly a male persona. In all Indian languages (Hindi, Marathi, Bengali, Punjabi, Gujarati, etc.), always use masculine self-referential verb inflections, pronouns, and adjectives (e.g. in Hindi: "मैं करूँगा", "बता सकता हूँ", "मैं समझता हूँ", never use feminine forms like "करूँगी" or "सकती हूँ").
+2. In English, maintain a warm, confident, professional male advisor tone.
 
-          if (isMandiQuery) {
-            const commodityName = lowerMsg.includes("wheat") || lowerMsg.includes("gehu")
-              ? "Wheat"
-              : "Onion";
-            const toolDef = TOOL_DEFINITIONS.getMandiRates;
-            const summary = toolDef.formatSummary({ commodity: commodityName });
-            sendEvent("tool_call", {
-              toolName: "getMandiRates",
-              icon: toolDef.icon,
-              args: { commodity: commodityName, state: "Regional APMC" },
-              summary,
-              status: "calling",
-            });
-            const mandiTool = tools.getMandiRates;
-            if (mandiTool) {
-              const res = await (mandiTool as any).execute({
-                commodity: commodityName,
-                state: "Regional APMC",
-              });
-              sendEvent("tool_result", {
-                toolName: "getMandiRates",
-                icon: toolDef.icon,
-                result: res,
+MULTILINGUAL SUPPORT:
+1. You natively understand and speak: Hindi, English, Bengali, Marathi, Telugu, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Hinglish, and colloquial regional business terminology.
+2. Always respond directly in the language spoken by the user (or the language the user asks for).
+3. Keep spoken replies concise, clear, natural, and respectful — 1 to 3 short spoken sentences.
+4. Never read out hidden reasoning or tool schema details.
+
+CAPABILITIES & TOOL USAGE (CRITICAL — YOU MUST USE TOOLS):
+You have access to powerful tools. When the user's query relates to any of the following, you MUST autonomously call the appropriate tool — do NOT say "I can't do that" or "I don't have access":
+
+0. **Inspect & In-Place Edit Forms & Artifacts** → Call \`getArtifacts\` to inspect previously staged forms/charts (#1, #2...). When the user asks to modify or change an existing form/chart, retrieve it via \`getArtifacts\`, modify the requested fields, and pass \`targetArtifactId\` to \`stageForm\` or other staging tools to update it in place.
+1. **APMC Mandi Commodity Prices** → Call \`getMandiRates\` with the commodity name (Onion, Wheat, Cotton, Tomato, Soyabean, etc.) and optional state/district/market filters.
+2. **Budgets** (view, create) → Call \`getBudgets\` to retrieve, or \`stageBudget\` to create/update a budget plan.
+3. **Expenses** (view, log) → Call \`getExpenses\` to retrieve, or \`stageExpense\` to log/update an expense.
+4. **Transactions** (view, add) → Call \`getTransactions\` to retrieve, or \`stageTransaction\` to add/update a ledger entry.
+5. **Savings Goals** (view, create) → Call \`getSavingsGoals\` to retrieve, or \`stageSavingsGoal\` to create/update a goal.
+6. **Debts & Loans** (view, add) → Call \`getDebts\` to retrieve, or \`stageDebt\` to record/update a loan/liability.
+7. **Business Profile** → Call \`getBusinessProfile\` to retrieve enterprise details.
+8. **Government Schemes** (PM Mudra, PM SVANidhi, PMEGP, Stand-Up India, PM Vishwakarma) → Call \`getGovtSchemes\` with the relevant scheme name.
+9. **Visual Charts & Graphs** → Call \`stageChart\` with chartType, title, data, and series for bar/line/area/pie visualizations.
+10. **Web Search** (trade news, policies, RBI circulars) → Call \`webSearch\` with the search query.
+11. **Dynamic Interactive Forms & Applications** → Call \`stageForm\` when user asks for any form (loan application, subsidy registration, supplier KYC, survey) with rich sections and fields.
+12. **Delete Records** → Call \`stageDeleteRecord\` when user wants to remove a budget, expense, goal, or debt.
+
+RESPONSE RULES:
+1. After executing a tool, speak the key findings naturally and concisely in the user's language.
+2. Confirm key prices, rates, amounts, or loan figures clearly.
+3. For staging tools (stageForm, stageBudget, stageExpense, stageChart, etc.), confirm that an interactive draft card has been created or updated for the user to review and edit on screen.`;
+
+          // AI-Driven Autonomous Multi-Step Tool Execution
+          // Tools are passed directly to the AI model — NO hardcoded keyword matching.
+          // The AI autonomously decides which tools to call based on the user's query.
+          const aiStream = streamText({
+            model,
+            system: systemInstruction,
+            messages: formattedHistory,
+            tools: tools as any,
+            stopWhen: isStepCount(5),
+          });
+
+          for await (const rawPart of (aiStream as any).fullStream) {
+            const part = rawPart as any;
+            if (part.type === "text-delta" || part.type === "text") {
+              const textChunk = part.textDelta ?? part.text ?? "";
+              if (textChunk) {
+                accumulatedText += textChunk;
+                sendEvent("chunk", { text: textChunk });
+              }
+            } else if (part.type === "tool-call") {
+              const toolArgs = part.args ?? part.input ?? {};
+              const def = (TOOL_DEFINITIONS as any)[part.toolName] || {
+                icon: "terminal",
+                formatSummary: (args: any) => `Executing ${part.toolName}...`,
+              };
+              const summary =
+                typeof def.formatSummary === "function"
+                  ? def.formatSummary(toolArgs)
+                  : `Executing ${part.toolName}...`;
+
+              sendEvent("tool_call", {
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                icon: def.icon || "terminal",
+                args: toolArgs,
                 summary,
-                status: "completed",
+                status: "calling",
               });
+            } else if (part.type === "tool-result") {
+              const toolArgs = part.args ?? part.input ?? {};
+              const toolResult = part.result ?? part.output ?? {};
+              const def = (TOOL_DEFINITIONS as any)[part.toolName] || {
+                icon: "terminal",
+                formatSummary: () => "Action completed",
+              };
+              const summary =
+                typeof def.formatSummary === "function"
+                  ? def.formatSummary(toolArgs)
+                  : "Action completed";
+
               toolInvocations.push({
-                toolName: "getMandiRates",
-                icon: toolDef.icon,
-                args: { commodity: commodityName },
-                result: res,
+                toolName: part.toolName,
+                icon: def.icon || "terminal",
+                args: toolArgs,
+                result: toolResult,
                 summary,
                 status: "completed",
               });
-            }
-          } else if (isSchemeQuery) {
-            const toolDef = TOOL_DEFINITIONS.getGovtSchemes || { icon: "landmark", formatSummary: () => "Evaluated scheme" };
-            const summary = toolDef.formatSummary({ schemeName: "PM_MUDRA" });
-            sendEvent("tool_call", {
-              toolName: "getGovtSchemes",
-              icon: toolDef.icon,
-              args: { schemeName: "PM_MUDRA", annualTurnover: 1200000 },
-              summary,
-              status: "calling",
-            });
-            const schemeTool = tools.getGovtSchemes;
-            if (schemeTool) {
-              const res = await (schemeTool as any).execute({
-                schemeName: "PM_MUDRA",
-                annualTurnover: 1200000,
-              });
+
               sendEvent("tool_result", {
-                toolName: "getGovtSchemes",
-                icon: toolDef.icon,
-                result: res,
-                summary,
-                status: "completed",
-              });
-              toolInvocations.push({
-                toolName: "getGovtSchemes",
-                icon: toolDef.icon,
-                args: { schemeName: "PM_MUDRA", annualTurnover: 1200000 },
-                result: res,
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                icon: def.icon || "terminal",
+                result: toolResult,
                 summary,
                 status: "completed",
               });
             }
-          }
-
-          const systemInstruction = `You are VyaparSetu Voice OS, an AI voice partner for Indian micro-enterprises, rural businesses, and farmers.
-RULES:
-1. Speak ONLY in natural, energetic conversational Hindi and Hinglish.
-2. Never speak in English.
-3. Keep all responses to 1 to 2 short spoken sentences.
-4. Confirm key prices, rates, or loan figures clearly.`;
-
-          try {
-            const aiStream = streamText({
-              model,
-              system: systemInstruction,
-              messages: formattedHistory,
-            });
-
-            for await (const chunk of aiStream.textStream) {
-              accumulatedText += chunk;
-              sendEvent("chunk", { text: chunk });
-            }
-          } catch (llmError: any) {
-            const fallbackResponse = "Nashik APMC mandi mein aaj Onion ka modal rate ₹2,100 se ₹2,450 prati quintal chal raha hai.";
-            accumulatedText = fallbackResponse;
-            sendEvent("chunk", { text: fallbackResponse });
           }
         } catch (err: any) {
+          console.error("[Voice Turn Stream Error]:", err);
+          const errorMsg = `⚠️ ${err?.message || "Execution error"}`;
+          if (!accumulatedText.trim()) {
+            accumulatedText = "Maaf kijiye, abhi kuch technical dikkat aa rahi hai. Kripya dobara try karein.";
+            sendEvent("chunk", { text: accumulatedText });
+          }
           sendEvent("error", { message: err?.message || "Execution error" });
         } finally {
           // 4. Persist Assistant Response to Database
@@ -269,3 +272,4 @@ RULES:
     );
   }
 }
+
