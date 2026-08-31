@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Volume2, VolumeX, AudioLines, FileCheck, ArrowUpRight, PieChart, BarChart3, IndianRupee, Layers, Sparkles, Landmark, AlertTriangle } from "lucide-react";
+import { Copy, Check, Volume2, VolumeX, AudioLines, FileCheck, ArrowUpRight, PieChart, BarChart3, IndianRupee, Layers, Target, Landmark, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThinkingAccordion } from "./thinking-accordion";
 import { MarkdownMessage } from "./markdown-message";
@@ -135,7 +135,7 @@ export function ChatMessageList({
                             {art.artifactType === "budget" && <PieChart className="size-4" />}
                             {art.artifactType === "expense" && <IndianRupee className="size-4" />}
                             {art.artifactType === "transaction" && <Layers className="size-4" />}
-                            {art.artifactType === "saving_goal" && <Sparkles className="size-4" />}
+                            {art.artifactType === "saving_goal" && <Target className="size-4" />}
                             {art.artifactType === "debt" && <Landmark className="size-4" />}
                             {art.artifactType === "delete_record" && <AlertTriangle className="size-4 text-rose-500" />}
                           </div>

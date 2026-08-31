@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Bell,
   Clock,
-  Sparkles,
   Award,
   AlertCircle,
 } from "lucide-react";
@@ -106,7 +105,7 @@ export function NotificationsClient({ initialNotifications }: { initialNotificat
                 ) : n.type === "SCHEME" ? (
                   <Award className="size-5" />
                 ) : (
-                  <Sparkles className="size-5" />
+                  <Bell className="size-5" />
                 )}
               </div>
 

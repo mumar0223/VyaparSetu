@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import {
   ArrowRight,
   Landmark,
-  Sparkles,
+  Bot,
   HandCoins,
   Loader2,
   AlertCircle,
@@ -99,7 +99,7 @@ export default function SignupPage() {
 
           <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-3 sm:p-3.5 flex gap-3.5 items-center group hover:bg-white/10 transition-colors">
             <div className="p-2 sm:p-2.5 bg-mint/10 rounded-lg shrink-0 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 text-mint" />
+              <Bot className="w-5 h-5 text-mint" />
             </div>
             <div>
               <div className="text-white font-semibold text-xs sm:text-sm">AI Financial Advisor</div>

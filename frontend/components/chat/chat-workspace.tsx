@@ -13,7 +13,6 @@ import {
   PanelRightOpen,
   PanelRightClose,
   Plus,
-  Sparkles,
   TrendingUp,
   Landmark,
   FileSpreadsheet,

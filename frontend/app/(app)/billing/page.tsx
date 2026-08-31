@@ -1,4 +1,4 @@
-import { CreditCard, Check, Sparkles } from "lucide-react";
+import { CreditCard, Check } from "lucide-react";
 
 export default function BillingPage() {
   return (

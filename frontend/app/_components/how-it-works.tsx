@@ -18,7 +18,6 @@ import {
   Globe,
   BookOpen,
   TrendingUp,
-  Sparkles,
   Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Check, Sparkles } from "lucide-react";
+import { Check, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { AuthUser } from "@/lib/auth-types";
 
@@ -75,7 +75,7 @@ export function Pricing({ currentUser }: { currentUser?: AuthUser | null }) {
           className="text-center max-w-3xl mx-auto mb-16"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mint-pale dark:bg-mint/10 border border-mint/30 dark:border-mint/20 text-forest dark:text-mint text-xs font-bold mb-3 shadow-xs">
-            <Sparkles className="size-3.5" /> Transparent Enterprise Plans
+            <ShieldCheck className="size-3.5" /> Transparent Enterprise Plans
           </div>
           <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight mb-4 text-forest dark:text-foreground">
             Accessible for Every Micro-Enterprise

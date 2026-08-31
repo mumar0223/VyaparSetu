@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import {
-  Sparkles,
   Landmark,
   TrendingUp,
   Building2,

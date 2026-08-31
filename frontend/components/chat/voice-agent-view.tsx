@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Mic,
   MicOff,
   PhoneOff,
-  Sparkles,
   MessageSquareText,
   Radio,
   Loader2,
@@ -19,6 +18,9 @@ import {
   Layers,
   Landmark,
   AlertTriangle,
+  WifiOff,
+  ShieldAlert,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -84,6 +86,95 @@ export function VoiceAgentView({
 }: VoiceAgentViewProps) {
   const [showLiveCaptions, setShowLiveCaptions] = useState(true);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+
+  // ── Classify error type from the errorMessage string ──
+  const errorType = useMemo(() => {
+    if (!errorMessage) return "mic" as const;
+    const msg = errorMessage.toLowerCase();
+    // Microphone-specific errors
+    if (
+      msg.includes("microphone") ||
+      msg.includes("mic") ||
+      msg.includes("notallowederror") ||
+      msg.includes("permission") ||
+      msg.includes("not allowed") ||
+      msg.includes("blocked") ||
+      msg.includes("notfounderror") ||
+      msg.includes("no microphone") ||
+      msg.includes("notreadableerror") ||
+      msg.includes("busy in another")
+    ) {
+      return "mic" as const;
+    }
+    // Connection / network errors
+    if (
+      msg.includes("connection") ||
+      msg.includes("vertex") ||
+      msg.includes("websocket") ||
+      msg.includes("ended unexpectedly") ||
+      msg.includes("could not be established") ||
+      msg.includes("reconnect") ||
+      msg.includes("session") ||
+      msg.includes("network") ||
+      msg.includes("timeout") ||
+      msg.includes("token") ||
+      msg.includes("unauthorized") ||
+      msg.includes("401") ||
+      msg.includes("500")
+    ) {
+      return "connection" as const;
+    }
+    // General / unknown errors
+    return "general" as const;
+  }, [errorMessage]);
+
+  const errorConfig = useMemo(() => {
+    switch (errorType) {
+      case "mic":
+        return {
+          statusPillText: "Microphone Permission Required",
+          orbLabel: "Mic Blocked",
+          dialogTitle: "Microphone Permission Blocked",
+          dialogDescription:
+            errorMessage ||
+            "VyaparSetu Voice requires microphone access to start the conversation.",
+          dialogIcon: MicOff,
+          dialogIconColor: "text-rose-400",
+          dialogIconBg: "bg-rose-500/20 border-rose-500/30",
+          retryLabel: "Retry Microphone",
+          showMicSteps: true,
+        };
+      case "connection":
+        return {
+          statusPillText: "Connection Lost",
+          orbLabel: "Disconnected",
+          dialogTitle: "Voice Connection Failed",
+          dialogDescription:
+            errorMessage ||
+            "The secure voice connection to VyaparSetu could not be established.",
+          dialogIcon: WifiOff,
+          dialogIconColor: "text-amber-400",
+          dialogIconBg: "bg-amber-500/20 border-amber-500/30",
+          retryLabel: "Reconnect",
+          showMicSteps: false,
+        };
+      case "general":
+      default:
+        return {
+          statusPillText: "Something Went Wrong",
+          orbLabel: "Error",
+          dialogTitle: "Something Went Wrong",
+          dialogDescription:
+            errorMessage ||
+            "An unexpected error occurred. Please try again.",
+          dialogIcon: ShieldAlert,
+          dialogIconColor: "text-orange-400",
+          dialogIconBg: "bg-orange-500/20 border-orange-500/30",
+          retryLabel: "Try Again",
+          showMicSteps: false,
+        };
+    }
+  }, [errorType, errorMessage]);
 
   // Keyboard shortcut: Spacebar hold-to-speak on PC
   useEffect(() => {
@@ -203,7 +294,7 @@ export function VoiceAgentView({
 
           <span className="text-[12.5px] font-medium text-zinc-200 capitalize tracking-wide">
             {isError
-              ? "Microphone Permission Required"
+              ? errorConfig.statusPillText
               : isInitializing
                 ? "Setting up Voice OS..."
                 : isMuted
@@ -301,7 +392,7 @@ export function VoiceAgentView({
               {activeArtifact.artifactType === "budget" && <PieChart className="size-4" />}
               {activeArtifact.artifactType === "expense" && <IndianRupee className="size-4" />}
               {activeArtifact.artifactType === "transaction" && <Layers className="size-4" />}
-              {activeArtifact.artifactType === "saving_goal" && <Sparkles className="size-4" />}
+              {activeArtifact.artifactType === "saving_goal" && <Target className="size-4" />}
               {activeArtifact.artifactType === "debt" && <Landmark className="size-4" />}
               {activeArtifact.artifactType === "delete_record" && <AlertTriangle className="size-4 text-rose-500" />}
             </div>
@@ -397,9 +488,15 @@ export function VoiceAgentView({
 
             {isError ? (
               <div className="flex flex-col items-center gap-2 text-white/90">
-                <MicOff className="size-8 text-rose-200" />
+                {errorType === "mic" ? (
+                  <MicOff className="size-8 text-rose-200" />
+                ) : errorType === "connection" ? (
+                  <WifiOff className="size-8 text-amber-200" />
+                ) : (
+                  <ShieldAlert className="size-8 text-orange-200" />
+                )}
                 <span className="text-[11px] font-semibold tracking-wider uppercase text-rose-100">
-                  Mic Blocked
+                  {errorConfig.orbLabel}
                 </span>
               </div>
             ) : isInitializing ? (
@@ -460,7 +557,6 @@ export function VoiceAgentView({
         {/* Active Tool Badge */}
         {activeToolName && (
           <div className="mt-6 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-950/60 border border-sky-500/30 text-sky-300 text-xs font-medium animate-in fade-in zoom-in-95">
-            <Sparkles className="size-3.5 text-sky-400 animate-spin" />
             <span>Executing {activeToolName}...</span>
           </div>
         )}
@@ -696,75 +792,127 @@ export function VoiceAgentView({
         </p>
       </div>
 
-      {/* ── LOCKING BACKGROUND DIALOG POPUP (Microphone Permission Blocked) ── */}
+      {/* ── LOCKING BACKGROUND DIALOG POPUP (Error-Type Aware) ── */}
       {isError && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in-0 duration-200">
-          <div className="relative w-full max-w-md p-6 rounded-3xl bg-[#18191c] border border-rose-500/30 shadow-2xl shadow-rose-950/50 text-center animate-in zoom-in-95 duration-200">
-            {/* Top Amber/Rose Bloom */}
-            <div className="mx-auto mb-4 size-14 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
-              <MicOff className="size-7" />
+          <div className={cn(
+            "relative w-full max-w-md p-6 rounded-3xl bg-[#18191c] shadow-2xl text-center animate-in zoom-in-95 duration-200 border",
+            errorType === "mic" ? "border-rose-500/30 shadow-rose-950/50" :
+            errorType === "connection" ? "border-amber-500/30 shadow-amber-950/50" :
+            "border-orange-500/30 shadow-orange-950/50"
+          )}>
+            {/* Top Icon */}
+            <div className={cn(
+              "mx-auto mb-4 size-14 rounded-2xl border flex items-center justify-center",
+              errorConfig.dialogIconBg, errorConfig.dialogIconColor
+            )}>
+              <errorConfig.dialogIcon className="size-7" />
             </div>
 
             <h3 className="text-lg font-semibold text-white mb-2">
-              Microphone Permission Blocked
+              {errorConfig.dialogTitle}
             </h3>
 
             <p className="text-xs md:text-[13px] text-zinc-400 mb-5 leading-relaxed">
-              {errorMessage ||
-                "VyaparSetu Voice requires microphone access and a secure Vertex connection to start the conversation."}
+              {errorConfig.dialogDescription}
             </p>
 
-            {/* Step-by-step Quick Guide */}
-            <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-left mb-6 space-y-2.5">
-              <div className="flex items-start gap-2.5">
-                <span className="flex size-5 shrink-0 rounded-full bg-rose-500/20 border border-rose-500/40 text-[11px] font-bold text-rose-300 items-center justify-center mt-0.5">
-                  1
-                </span>
-                <p className="text-xs text-zinc-300">
-                  Click the{" "}
-                  <strong className="text-white">
-                    lock 🔒 or tune 🎛️ icon
-                  </strong>{" "}
-                  in your browser address bar (top left of the URL).
-                </p>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <span className="flex size-5 shrink-0 rounded-full bg-rose-500/20 border border-rose-500/40 text-[11px] font-bold text-rose-300 items-center justify-center mt-0.5">
-                  2
-                </span>
-                <p className="text-xs text-zinc-300">
-                  Toggle <strong className="text-white">Microphone</strong> to{" "}
-                  <span className="text-emerald-400 font-semibold">
-                    &ldquo;Allow&rdquo;
+            {/* Step-by-step Quick Guide — only for microphone errors */}
+            {errorConfig.showMicSteps && (
+              <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-left mb-6 space-y-2.5">
+                <div className="flex items-start gap-2.5">
+                  <span className="flex size-5 shrink-0 rounded-full bg-rose-500/20 border border-rose-500/40 text-[11px] font-bold text-rose-300 items-center justify-center mt-0.5">
+                    1
                   </span>
-                  .
-                </p>
-              </div>
+                  <p className="text-xs text-zinc-300">
+                    Click the{" "}
+                    <strong className="text-white">
+                      lock 🔒 or tune 🎛️ icon
+                    </strong>{" "}
+                    in your browser address bar (top left of the URL).
+                  </p>
+                </div>
 
-              <div className="flex items-start gap-2.5">
-                <span className="flex size-5 shrink-0 rounded-full bg-rose-500/20 border border-rose-500/40 text-[11px] font-bold text-rose-300 items-center justify-center mt-0.5">
-                  3
-                </span>
-                <p className="text-xs text-zinc-300">
-                  Click{" "}
-                  <strong className="text-white">
-                    &ldquo;Retry Microphone&rdquo;
-                  </strong>{" "}
-                  below.
-                </p>
+                <div className="flex items-start gap-2.5">
+                  <span className="flex size-5 shrink-0 rounded-full bg-rose-500/20 border border-rose-500/40 text-[11px] font-bold text-rose-300 items-center justify-center mt-0.5">
+                    2
+                  </span>
+                  <p className="text-xs text-zinc-300">
+                    Toggle <strong className="text-white">Microphone</strong> to{" "}
+                    <span className="text-emerald-400 font-semibold">
+                      &ldquo;Allow&rdquo;
+                    </span>
+                    .
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2.5">
+                  <span className="flex size-5 shrink-0 rounded-full bg-rose-500/20 border border-rose-500/40 text-[11px] font-bold text-rose-300 items-center justify-center mt-0.5">
+                    3
+                  </span>
+                  <p className="text-xs text-zinc-300">
+                    Click{" "}
+                    <strong className="text-white">
+                      &ldquo;{errorConfig.retryLabel}&rdquo;
+                    </strong>{" "}
+                    below.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Connection error help tips */}
+            {errorType === "connection" && (
+              <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-left mb-6 space-y-2.5">
+                <div className="flex items-start gap-2.5">
+                  <span className="flex size-5 shrink-0 rounded-full bg-amber-500/20 border border-amber-500/40 text-[11px] font-bold text-amber-300 items-center justify-center mt-0.5">
+                    1
+                  </span>
+                  <p className="text-xs text-zinc-300">
+                    Check your <strong className="text-white">internet connection</strong> is stable.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2.5">
+                  <span className="flex size-5 shrink-0 rounded-full bg-amber-500/20 border border-amber-500/40 text-[11px] font-bold text-amber-300 items-center justify-center mt-0.5">
+                    2
+                  </span>
+                  <p className="text-xs text-zinc-300">
+                    The voice server may be temporarily busy. <strong className="text-white">Wait a moment</strong> and try again.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2.5">
+                  <span className="flex size-5 shrink-0 rounded-full bg-amber-500/20 border border-amber-500/40 text-[11px] font-bold text-amber-300 items-center justify-center mt-0.5">
+                    3
+                  </span>
+                  <p className="text-xs text-zinc-300">
+                    Click{" "}
+                    <strong className="text-white">
+                      &ldquo;{errorConfig.retryLabel}&rdquo;
+                    </strong>{" "}
+                    below to reconnect.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
               {onRetry && (
                 <button
                   onClick={onRetry}
-                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-medium text-sm transition-all shadow-lg shadow-rose-950/40 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                  className={cn(
+                    "w-full py-2.5 px-4 rounded-xl text-white font-medium text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]",
+                    errorType === "mic"
+                      ? "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 shadow-rose-950/40"
+                      : errorType === "connection"
+                        ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-amber-950/40"
+                        : "bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 shadow-indigo-950/40"
+                  )}
                 >
                   <RefreshCw className="size-4" />
-                  <span>Retry Microphone</span>
+                  <span>{errorConfig.retryLabel}</span>
                 </button>
               )}
 

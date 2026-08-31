@@ -5,7 +5,6 @@ import {
   IndianRupee,
   Plus,
   Trash2,
-  Sparkles,
   ChevronDown,
   X,
 } from "lucide-react";

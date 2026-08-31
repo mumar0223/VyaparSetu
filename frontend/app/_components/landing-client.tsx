@@ -11,7 +11,6 @@ import {
   Code2,
   Network,
   ShieldCheck,
-  Sparkles,
   ArrowRight,
   IndianRupee,
   Bot,

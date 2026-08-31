@@ -8,7 +8,7 @@ import {
   Lightbulb,
   Building2,
   MapPin,
-  Sparkles,
+  ScanSearch,
   CheckCircle2,
   ArrowRight,
   ShieldCheck,
@@ -226,7 +226,7 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
               disabled={isScanning}
               className="bg-orange hover:bg-orange-hover text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
             >
-              <Sparkles className="size-4" />
+              <ScanSearch className="size-4" />
               <span>{isScanning ? t("scanner.scanningLocalDemo", "Scanning Local Demographics...") : t("scanner.runDeepMarketScan", "Run Deep Market Scan")}</span>
             </button>
           </div>

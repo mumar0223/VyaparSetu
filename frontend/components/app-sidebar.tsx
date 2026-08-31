@@ -8,7 +8,7 @@ import {
   Activity,
   TrendingUp,
   Building2,
-  Sparkles,
+  Bot,
   Award,
   Star,
   IndianRupee,
@@ -62,7 +62,7 @@ const NAV_SECTIONS = [
     items: [
       { href: "/scanner", label: "SWOT Market Scanner", icon: TrendingUp },
       { href: "/profile/business", label: "Enterprise Profile", icon: Building2 },
-      { href: "/ai-recommendations", label: "AI Recommendations", icon: Sparkles },
+      { href: "/ai-recommendations", label: "AI Recommendations", icon: Bot },
       { href: "/schemes-for-you", label: "Govt. Schemes", icon: Award },
       { href: "/success-stories", label: "Success Stories", icon: Star },
     ],

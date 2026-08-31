@@ -16,7 +16,7 @@ import {
   Trash2,
   Mic,
   AudioLines,
-  Sparkles,
+  Target,
   PieChart as PieIcon,
   IndianRupee,
   Calendar,
@@ -171,7 +171,7 @@ export function ArtifactModal({
               {artifact.artifactType === "chart" && <BarChart3 className="size-5" />}
               {artifact.artifactType === "expense" && <IndianRupee className="size-5" />}
               {artifact.artifactType === "transaction" && <Layers className="size-5" />}
-              {artifact.artifactType === "saving_goal" && <Sparkles className="size-5" />}
+              {artifact.artifactType === "saving_goal" && <Target className="size-5" />}
               {artifact.artifactType === "debt" && <Landmark className="size-5" />}
               {artifact.artifactType === "delete_record" && <AlertTriangle className="size-5 text-rose-500" />}
             </span>

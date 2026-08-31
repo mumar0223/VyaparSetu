@@ -7,7 +7,6 @@ import {
   Bot,
   Award,
   FileText,
-  Sparkles,
   ScanEye,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";

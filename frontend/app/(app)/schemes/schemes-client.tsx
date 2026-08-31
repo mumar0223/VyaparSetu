@@ -10,7 +10,7 @@ import {
   Building,
   Landmark,
   ArrowRight,
-  Sparkles,
+  BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n";
@@ -99,7 +99,7 @@ export function SchemesClient({ profile }: { profile: SchemesBusinessProfile | n
       <div className="bg-mint-pale dark:bg-mint/10 border border-mint/30 dark:border-mint/20 rounded-2xl p-5 shadow-xs mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-mint/20 dark:bg-mint/30 rounded-xl shrink-0">
-            <Sparkles className="size-6 text-forest dark:text-mint" />
+            <BadgeCheck className="size-6 text-forest dark:text-mint" />
           </div>
           <div>
             <h3 className="font-bold text-forest dark:text-foreground text-sm sm:text-base">

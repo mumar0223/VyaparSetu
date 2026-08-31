@@ -166,7 +166,7 @@ PRESENTATION & SYNTHESIS RULES:
             } else if (part.type === "tool-call") {
               const toolArgs = part.args ?? part.input ?? {};
               const def = (TOOL_DEFINITIONS as any)[part.toolName] || {
-                icon: "sparkles",
+                icon: "bot",
                 formatSummary: (args: any) => `Executing ${part.toolName}...`,
               };
               const summary =
@@ -177,7 +177,7 @@ PRESENTATION & SYNTHESIS RULES:
               sendEvent("tool_call", {
                 toolName: part.toolName,
                 toolCallId: part.toolCallId,
-                icon: def.icon || "sparkles",
+                icon: def.icon || "bot",
                 args: toolArgs,
                 summary,
                 status: "calling",
@@ -186,7 +186,7 @@ PRESENTATION & SYNTHESIS RULES:
               const toolArgs = part.args ?? part.input ?? {};
               const toolResult = part.result ?? part.output ?? {};
               const def = (TOOL_DEFINITIONS as any)[part.toolName] || {
-                icon: "sparkles",
+                icon: "bot",
                 formatSummary: () => "Action completed",
               };
               const summary =
@@ -196,7 +196,7 @@ PRESENTATION & SYNTHESIS RULES:
 
               toolInvocations.push({
                 toolName: part.toolName,
-                icon: def.icon || "sparkles",
+                icon: def.icon || "bot",
                 args: toolArgs,
                 result: toolResult,
                 summary,
@@ -206,7 +206,7 @@ PRESENTATION & SYNTHESIS RULES:
               sendEvent("tool_result", {
                 toolName: part.toolName,
                 toolCallId: part.toolCallId,
-                icon: def.icon || "sparkles",
+                icon: def.icon || "bot",
                 result: toolResult,
                 summary,
                 status: "completed",
