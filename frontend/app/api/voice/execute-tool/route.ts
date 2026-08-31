@@ -11,12 +11,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { toolName, args } = await req.json();
+    const { toolName, args, conversationId } = await req.json();
     if (!toolName) {
       return NextResponse.json({ error: "toolName is required" }, { status: 400 });
     }
 
-    const tools: Record<string, any> = getAgentTools({ userId: user.id });
+    const tools: Record<string, any> = getAgentTools({
+      userId: user.id,
+      conversationId,
+    });
     let result: any = null;
 
     if (tools[toolName] && typeof tools[toolName].execute === "function") {

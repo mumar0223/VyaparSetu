@@ -88,7 +88,14 @@ export function ChatMessageList({
         (msg.toolCalls || []).forEach((tc) => {
           const res = tc.result as any;
           if (res?.isArtifact && res?.artifactType && res?.data) {
+            // Skip creating duplicate pill in follow-up edit messages (in-place update)
+            if (res.isUpdated || res.targetArtifactId) {
+              return;
+            }
             artifacts.push({
+              artifactId: res.artifactId || res.data?.artifactId,
+              targetArtifactId: res.targetArtifactId,
+              isUpdated: res.isUpdated,
               artifactType: res.artifactType,
               title: res.title,
               summary: res.summary,

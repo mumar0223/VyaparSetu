@@ -620,8 +620,41 @@ export function ChatWorkspace({
               }),
             );
           } else if (eventType === "tool_result") {
-            setMessages((prev) =>
-              prev.map((m) => {
+            const targetId = data.result?.targetArtifactId || data.result?.artifactId;
+            const isUpdated = data.result?.isUpdated;
+
+            setMessages((prev) => {
+              // 1. If in-place update, first update the target artifact in previous messages
+              let updatedPrev = prev;
+              if (isUpdated && targetId) {
+                updatedPrev = prev.map((m) => {
+                  if (!m.toolCalls || m.id === assistantMessageId) return m;
+                  const updatedToolCalls = m.toolCalls.map((tc) => {
+                    const res = tc.result as any;
+                    const match =
+                      res?.artifactId === targetId ||
+                      res?.data?.artifactId === targetId ||
+                      (targetId === "1" && res?.isArtifact) ||
+                      (targetId === "art_1" && res?.isArtifact);
+                    if (match) {
+                      return {
+                        ...tc,
+                        result: {
+                          ...res,
+                          title: data.result.title || res.title,
+                          summary: data.result.summary || res.summary,
+                          data: data.result.data || data.result,
+                        },
+                      };
+                    }
+                    return tc;
+                  });
+                  return { ...m, toolCalls: updatedToolCalls };
+                });
+              }
+
+              // 2. Update current assistant message's toolCalls
+              return updatedPrev.map((m) => {
                 if (m.id !== assistantMessageId) return m;
                 const tools = (m.toolCalls || []).map((t) =>
                   t.toolName === data.toolName
@@ -635,8 +668,21 @@ export function ChatWorkspace({
                     : t,
                 );
                 return { ...m, toolCalls: tools };
-              }),
-            );
+              });
+            });
+
+            // If the artifact modal is currently open on screen, live-sync the changes!
+            if (isUpdated && data.result?.data) {
+              setActiveArtifact((curr) => {
+                if (!curr) return null;
+                return {
+                  ...curr,
+                  title: data.result.title || curr.title,
+                  summary: data.result.summary || curr.summary,
+                  data: data.result.data,
+                };
+              });
+            }
           } else if (eventType === "chunk") {
             setMessages((prev) =>
               prev.map((m) =>

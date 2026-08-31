@@ -87,12 +87,13 @@ MULTILINGUAL SUPPORT (10 Indian Languages):
 CAPABILITIES & TOOL USAGE (CRITICAL — YOU MUST USE TOOLS WHEN RELEVANT):
 You have access to powerful tools. When the user's query relates to any of the following, you MUST call the appropriate tool immediately — do NOT say "I can't do that" or "I don't have access":
 
+0. **Inspect & In-Place Edit Forms & Artifacts** → Call getArtifacts to inspect previously staged forms/charts (#1, #2...). When the user asks to modify or change an existing form/chart, retrieve it via getArtifacts, modify the requested fields, and pass targetArtifactId to stageForm or other staging tools to update it in place.
 1. **APMC Mandi Commodity Prices** → Call getMandiRates with the commodity name (Onion, Wheat, Cotton, Tomato, Soyabean, Mustard, Potato, Gram, etc.) and optional state/district/market filters.
-2. **Budgets** (view, create) → Call getBudgets to retrieve active budgets, or stageBudget to create a new budget plan.
-3. **Expenses** (view, log) → Call getExpenses to retrieve logged expenses, or stageExpense to log a new expense entry.
-4. **Transactions** (view, add) → Call getTransactions to retrieve ledger transactions, or stageTransaction to add a new ledger entry.
-5. **Savings Goals** (view, create) → Call getSavingsGoals to retrieve goals, or stageSavingsGoal to create a new savings target.
-6. **Debts & Loans** (view, add) → Call getDebts to retrieve loan liabilities, or stageDebt to record a new loan/liability.
+2. **Budgets** (view, create) → Call getBudgets to retrieve active budgets, or stageBudget to create/update a budget plan.
+3. **Expenses** (view, log) → Call getExpenses to retrieve logged expenses, or stageExpense to log/update an expense entry.
+4. **Transactions** (view, add) → Call getTransactions to retrieve ledger transactions, or stageTransaction to add/update a ledger entry.
+5. **Savings Goals** (view, create) → Call getSavingsGoals to retrieve goals, or stageSavingsGoal to create/update a savings target.
+6. **Debts & Loans** (view, add) → Call getDebts to retrieve loan liabilities, or stageDebt to record/update a loan/liability.
 7. **Business Profile** → Call getBusinessProfile to retrieve enterprise details, category, location, and turnover.
 8. **Government Schemes** (PM Mudra, PM SVANidhi, PMEGP, Stand-Up India, PM Vishwakarma) → Call getGovtSchemes with the relevant scheme name.
 9. **Visual Charts & Graphs** → Call stageChart with chartType (bar, line, area, pie), title, data array, and series for visualizations.
@@ -103,7 +104,7 @@ You have access to powerful tools. When the user's query relates to any of the f
 RESPONSE RULES:
 1. After executing a tool, speak the key findings naturally and concisely in the user's language.
 2. Confirm key prices, rates, amounts, or loan figures clearly.
-3. For staging tools (stageForm, stageBudget, stageExpense, stageChart, etc.), confirm that an interactive draft card has been created for the user to review and edit on screen.`;
+3. For staging tools (stageForm, stageBudget, stageExpense, stageChart, etc.), confirm that an interactive draft card has been created or updated for the user to review and edit on screen.`;
 
 
     if (conversationId) {
@@ -363,12 +364,34 @@ RESPONSE RULES:
             },
           },
           {
-            name: "stageChart",
+            name: "getArtifacts",
             description:
-              "Generates an interactive visual chart or graph (bar, line, area, pie) as an artifact for financial metrics, mandi trends, or revenue.",
+              "Retrieves previously staged artifacts (forms, charts, budgets, expenses) from the current conversation in stack order (#1, #2...). Use before editing or updating any existing form or chart on user demand.",
             parameters: {
               type: "OBJECT",
               properties: {
+                artifactType: {
+                  type: "STRING",
+                  description: "form, chart, budget, expense, transaction, saving_goal, debt, or all",
+                },
+                limit: {
+                  type: "NUMBER",
+                  description: "Max number of artifacts to retrieve (defaults to 10)",
+                },
+              },
+            },
+          },
+          {
+            name: "stageChart",
+            description:
+              "Generates or updates an interactive visual chart (bar, line, area, pie) as an artifact. Pass 'targetArtifactId' to edit an existing chart in place.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                targetArtifactId: {
+                  type: "STRING",
+                  description: "Optional ID or index (e.g. 'art_1' or '1') of an existing chart to update in place",
+                },
                 chartType: {
                   type: "STRING",
                   description: "bar, line, area, or pie",
@@ -411,10 +434,14 @@ RESPONSE RULES:
           {
             name: "stageForm",
             description:
-              "Generates a dynamic interactive multi-field form artifact (loan applications, subsidy forms, vendor KYC, registration) for the user to review, edit, and approve.",
+              "Generates or updates a dynamic interactive multi-field form artifact (loan applications, subsidy forms, vendor KYC, registration). Pass 'targetArtifactId' to edit an existing form in place.",
             parameters: {
               type: "OBJECT",
               properties: {
+                targetArtifactId: {
+                  type: "STRING",
+                  description: "Optional ID or index (e.g. 'art_1' or '1') of an existing form to update in place",
+                },
                 title: {
                   type: "STRING",
                   description: "Title of the form",
