@@ -17,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { useTranslation } from "@/lib/i18n";
 
 export interface ExpenseItem {
   id: string;
@@ -49,6 +50,7 @@ const PAYMENT_METHODS = [
 ];
 
 export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseItem[] }) {
+  const { t } = useTranslation();
   const [expenses, setExpenses] = useState<ExpenseItem[]>(initialExpenses);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -134,10 +136,10 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-forest dark:text-mint flex items-center gap-2.5">
-            <IndianRupee className="size-7 text-mint" /> Daily Expense Tracker
+            <IndianRupee className="size-7 text-mint" /> {t("expenses.title", "Daily Expense Tracker")}
           </h1>
           <p className="text-xs sm:text-sm text-ink-muted dark:text-muted-foreground mt-1">
-            Track business cash outflows, monitor supplier payments, and identify margin leaks
+            {t("expenses.subtitle", "Track business cash outflows, monitor supplier payments, and identify margin leaks")}
           </p>
         </div>
 
@@ -145,7 +147,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
           onClick={() => setShowAddModal(true)}
           className="bg-orange hover:bg-orange-hover text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
-          <Plus className="size-4" /> Add Expense
+          <Plus className="size-4" /> {t("expenses.addExpense", "Add Expense")}
         </button>
       </div>
 
@@ -153,7 +155,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-sage/30 dark:border-border shadow-xs">
           <span className="text-[11px] font-bold text-ink-muted dark:text-muted-foreground uppercase tracking-wider block mb-1">
-            Total Outflow
+            {t("expenses.totalSpent", "Total Outflow")}
           </span>
           <span className="text-xl sm:text-2xl font-bold text-forest dark:text-foreground">
             ₹{totalSpent.toLocaleString("en-IN")}
@@ -162,7 +164,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
 
         <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-sage/30 dark:border-border shadow-xs">
           <span className="text-[11px] font-bold text-ink-muted dark:text-muted-foreground uppercase tracking-wider block mb-1">
-            Highest Category
+            {t("expenses.highestCategory", "Highest Category")}
           </span>
           <span className="text-base sm:text-lg font-bold text-forest dark:text-foreground truncate block">
             {highestCategory}
@@ -171,7 +173,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
 
         <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-sage/30 dark:border-border shadow-xs">
           <span className="text-[11px] font-bold text-ink-muted dark:text-muted-foreground uppercase tracking-wider block mb-1">
-            Recorded Bills
+            {t("expenses.activeExpenses", "Recorded Bills")}
           </span>
           <span className="text-xl sm:text-2xl font-bold text-forest dark:text-foreground">
             {expenses.length}

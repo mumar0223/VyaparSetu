@@ -101,10 +101,10 @@ export function HowItWorks() {
       },
     });
 
-    // 1. Expand the card first
+    // 1. Expand the card first (use 100% instead of 100vw to prevent scrollbar overflow)
     tl.to(card, {
-      width: "100vw",
-      maxWidth: "100vw",
+      width: "100%",
+      maxWidth: "100%",
       height: "100vh",
       borderRadius: "0px",
       borderColor: "transparent",
@@ -138,11 +138,11 @@ export function HowItWorks() {
     <section
       ref={containerRef}
       id="how-it-works"
-      className="relative h-[300vh] bg-background"
+      className="relative h-[300vh] bg-background overflow-x-clip max-w-full"
     >
       <div
         ref={stickyRef}
-        className="w-full h-screen flex flex-col items-center justify-center overflow-hidden"
+        className="w-full h-screen flex flex-col items-center justify-center overflow-hidden max-w-full"
       >
         {/* Main Card Container */}
         <div

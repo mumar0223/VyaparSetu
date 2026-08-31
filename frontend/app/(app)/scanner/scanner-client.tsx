@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
 
 export interface ScannerBusinessProfile {
   id: string;
@@ -32,6 +33,7 @@ export interface ScannerBusinessProfile {
 }
 
 export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | null }) {
+  const { t } = useTranslation();
   const [radiusKm, setRadiusKm] = useState(10);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{
@@ -143,10 +145,10 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-forest dark:text-mint flex items-center gap-2.5">
-            <ScanEye className="size-7 text-mint" /> SWOT &amp; Market Feasibility Scanner
+            <ScanEye className="size-7 text-mint" /> {t("scanner.title", "SWOT & Market Feasibility Scanner")}
           </h1>
           <p className="text-xs sm:text-sm text-ink-muted dark:text-muted-foreground mt-1">
-            Demographic intelligence, competitor heuristics, margin expansion opportunities, and risk mitigation
+            {t("scanner.subtitle", "Demographic intelligence, competitor heuristics, margin expansion opportunities, and risk mitigation")}
           </p>
         </div>
 
@@ -155,7 +157,7 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
           className="px-4 py-2.5 bg-forest dark:bg-mint hover:bg-forest-deep dark:hover:bg-mint-light text-white dark:text-black font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
         >
           <Award className="size-4" />
-          <span>Matched Govt Subsidies</span>
+          <span>{t("scanner.matchedGovtSubsidies", "Matched Govt Subsidies")}</span>
         </Link>
       </div>
 
@@ -185,7 +187,7 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                  Market Feasibility Score
+                  {t("scanner.marketFeasibilityScore", "Market Feasibility Score")}
                 </span>
                 <span className="font-serif font-bold text-xl sm:text-2xl text-forest dark:text-mint">
                   {scanResult.score} / 100
@@ -201,7 +203,7 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
           <div className="pt-5 flex flex-col lg:flex-row lg:items-center gap-6">
             <div className="flex-1">
               <div className="flex justify-between text-xs font-bold text-forest dark:text-foreground mb-2">
-                <span>Geographic Scan Radius:</span>
+                <span>{t("scanner.geoScanRadius", "Geographic Scan Radius:")}</span>
                 <span className="text-mint font-bold text-sm">{radiusKm} Kilometers</span>
               </div>
               <input
@@ -213,9 +215,9 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
                 className="w-full accent-forest dark:accent-mint cursor-pointer"
               />
               <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5">
-                <span>1 km (Village Center)</span>
-                <span>10 km (Tehsil Cluster)</span>
-                <span>25 km (Regional APMC Mandi)</span>
+                <span>1 km</span>
+                <span>10 km</span>
+                <span>25 km</span>
               </div>
             </div>
 
@@ -225,7 +227,7 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
               className="bg-orange hover:bg-orange-hover text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
             >
               <Sparkles className="size-4" />
-              <span>{isScanning ? "Scanning Local Demographics..." : "Run Deep Market Scan"}</span>
+              <span>{isScanning ? t("scanner.scanningLocalDemo", "Scanning Local Demographics...") : t("scanner.runDeepMarketScan", "Run Deep Market Scan")}</span>
             </button>
           </div>
         </div>
@@ -251,7 +253,7 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
                 {scanResult.dataSource}
               </span>
               <span className="text-xs font-bold text-forest dark:text-mint bg-mint-pale dark:bg-mint/20 px-3 py-1 rounded-full border border-mint/20">
-                Active Heuristics Report
+                {t("scanner.activeHeuristicsReport", "Active Heuristics Report")}
               </span>
             </div>
 
@@ -260,10 +262,10 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
               <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-card border-2 border-mint/40 dark:border-mint/30 shadow-xs">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-mint/20">
                   <h4 className="font-serif font-bold text-forest dark:text-mint text-base flex items-center gap-2">
-                    <TrendingUp className="size-5 text-mint" /> Strengths (Internal Advantage)
+                    <TrendingUp className="size-5 text-mint" /> {t("scanner.strengthsTitle", "Strengths (Internal Advantage)")}
                   </h4>
                   <span className="text-[10px] uppercase font-bold bg-mint-pale dark:bg-mint/20 text-forest dark:text-mint px-2 py-0.5 rounded-md">
-                    High Moat
+                    {t("scanner.highMoat", "High Moat")}
                   </span>
                 </div>
                 <ul className="space-y-2.5 text-xs sm:text-sm text-foreground/90 list-disc list-inside leading-relaxed">
@@ -277,10 +279,10 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
               <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-card border-2 border-orange/40 dark:border-orange/30 shadow-xs">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-orange/20">
                   <h4 className="font-serif font-bold text-orange text-base flex items-center gap-2">
-                    <ShieldAlert className="size-5 text-orange" /> Weaknesses (Internal Gaps)
+                    <ShieldAlert className="size-5 text-orange" /> {t("scanner.weaknessesTitle", "Weaknesses (Internal Gaps)")}
                   </h4>
                   <span className="text-[10px] uppercase font-bold bg-orange/10 text-orange px-2 py-0.5 rounded-md">
-                    Attention
+                    {t("scanner.attention", "Attention")}
                   </span>
                 </div>
                 <ul className="space-y-2.5 text-xs sm:text-sm text-foreground/90 list-disc list-inside leading-relaxed">
@@ -294,10 +296,10 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
               <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-card border-2 border-sage/50 dark:border-border shadow-xs">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-sage/20 dark:border-border">
                   <h4 className="font-serif font-bold text-forest dark:text-foreground text-base flex items-center gap-2">
-                    <Lightbulb className="size-5 text-mint" /> Opportunities (Growth &amp; Subsidies)
+                    <Lightbulb className="size-5 text-mint" /> {t("scanner.opportunitiesTitle", "Opportunities (Growth & Subsidies)")}
                   </h4>
                   <span className="text-[10px] uppercase font-bold bg-mint-pale dark:bg-mint/20 text-forest dark:text-mint px-2 py-0.5 rounded-md">
-                    High Upside
+                    {t("scanner.highUpside", "High Upside")}
                   </span>
                 </div>
                 <ul className="space-y-2.5 text-xs sm:text-sm text-foreground/90 list-disc list-inside leading-relaxed">
@@ -311,10 +313,10 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
               <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-card border-2 border-red-200 dark:border-red-900/40 shadow-xs">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-red-100 dark:border-red-900/30">
                   <h4 className="font-serif font-bold text-destructive text-base flex items-center gap-2">
-                    <ShieldAlert className="size-5 text-destructive" /> External Market Threats
+                    <ShieldAlert className="size-5 text-destructive" /> {t("scanner.threatsTitle", "External Market Threats")}
                   </h4>
                   <span className="text-[10px] uppercase font-bold bg-red-100 dark:bg-red-950/40 text-destructive px-2 py-0.5 rounded-md">
-                    Risk Factor
+                    {t("scanner.riskFactor", "Risk Factor")}
                   </span>
                 </div>
                 <ul className="space-y-2.5 text-xs sm:text-sm text-foreground/90 list-disc list-inside leading-relaxed">
@@ -328,10 +330,10 @@ export function ScannerClient({ profile }: { profile: ScannerBusinessProfile | n
             {/* Actionable Strategic Roadmap */}
             <div className="bg-white dark:bg-card rounded-2xl border border-sage/30 dark:border-border p-6 shadow-xs">
               <h3 className="font-serif font-bold text-lg text-forest dark:text-foreground flex items-center gap-2 mb-1">
-                <Layers className="size-5 text-mint" /> Strategic Action Roadmap
+                <Layers className="size-5 text-mint" /> {t("scanner.roadmapTitle", "Strategic Action Roadmap")}
               </h3>
               <p className="text-xs text-muted-foreground mb-5">
-                Targeted steps recommended to leverage local market strengths and mitigate structural risks.
+                {t("scanner.roadmapSubtitle", "Targeted steps recommended to leverage local market strengths and mitigate structural risks.")}
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

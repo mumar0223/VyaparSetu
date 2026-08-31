@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "./types";
+import { useTranslation } from "@/lib/i18n";
 
 interface HistorySidebarProps {
   conversations: ConversationSummary[];
@@ -50,6 +51,7 @@ export function HistorySidebar({
   onRenameChat,
   onTogglePin,
 }: HistorySidebarProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -93,12 +95,12 @@ export function HistorySidebar({
           className="flex flex-1 h-9 items-center justify-center gap-2 rounded-xl bg-cream dark:bg-muted hover:bg-mint-pale dark:hover:bg-muted/80 px-3 text-[13px] font-semibold text-forest dark:text-foreground transition-colors cursor-pointer border border-sage/40 dark:border-border shadow-2xs"
         >
           <Plus className="size-4 text-forest dark:text-mint" />
-          <span>New chat</span>
+          <span>{t("history.newChat", "New chat")}</span>
         </button>
 
         <button
           onClick={onToggle}
-          title="Close chat history"
+          title={t("history.closeHistory", "Close chat history")}
           className="size-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer border border-transparent hover:border-sage/30"
         >
           <PanelRightClose className="size-4" />
@@ -113,7 +115,7 @@ export function HistorySidebar({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search chats..."
+            placeholder={t("history.searchPlaceholder", "Search chats...")}
             className="w-full bg-transparent focus:outline-hidden text-[12.5px] text-foreground placeholder:text-muted-foreground"
           />
           {searchQuery && (
@@ -138,10 +140,10 @@ export function HistorySidebar({
         >
           <div className="flex items-center gap-2">
             <AudioLines className="size-4 text-mint group-hover:scale-110 transition-transform animate-pulse" />
-            <span className="text-[12.5px] font-semibold">Voice Agent OS</span>
+            <span className="text-[12.5px] font-semibold">{t("history.voiceAgent", "Voice Agent OS")}</span>
           </div>
           <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-mint/20 text-forest dark:text-mint border border-mint/30">
-            Live
+            {t("history.liveBadge", "Live")}
           </span>
         </button>
       </div>
@@ -153,7 +155,7 @@ export function HistorySidebar({
           <div>
             <div className="flex items-center gap-1.5 px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               <Pin className="size-3 text-mint" />
-              <span>Pinned</span>
+              <span>{t("history.pinned", "Pinned")}</span>
             </div>
             <ul className="flex flex-col gap-0.5">
               {pinnedChats.map((c) => (
@@ -182,11 +184,11 @@ export function HistorySidebar({
         {/* Recents Section */}
         <div>
           <div className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Recents
+            {t("history.recents", "Recents")}
           </div>
           {recentChats.length === 0 && pinnedChats.length === 0 ? (
             <div className="px-3 py-8 text-center text-[12.5px] text-muted-foreground">
-              No chat history yet
+              {t("history.noHistory", "No chat history yet")}
             </div>
           ) : (
             <ul className="flex flex-col gap-0.5">
@@ -276,6 +278,7 @@ function ChatItem({
   onDelete,
   onTogglePin,
 }: ChatItemProps) {
+  const { t } = useTranslation();
   return (
     <li className="relative group">
       {isEditing ? (
@@ -359,7 +362,7 @@ function ChatItem({
                   className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] text-foreground rounded-lg hover:bg-cream dark:hover:bg-muted cursor-pointer"
                 >
                   <Edit2 className="size-3.5 text-muted-foreground" />
-                  <span>Rename</span>
+                  <span>{t("history.rename", "Rename")}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator className="bg-sage/20 dark:bg-border my-1 -mx-1" />
@@ -371,12 +374,12 @@ function ChatItem({
                   {conversation.pinned ? (
                     <>
                       <PinOff className="size-3.5 text-muted-foreground" />
-                      <span>Unpin chat</span>
+                      <span>{t("history.unpin", "Unpin chat")}</span>
                     </>
                   ) : (
                     <>
                       <Pin className="size-3.5 text-muted-foreground" />
-                      <span>Pin chat</span>
+                      <span>{t("history.pin", "Pin chat")}</span>
                     </>
                   )}
                 </DropdownMenuItem>
@@ -386,7 +389,7 @@ function ChatItem({
                   className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
                 >
                   <Trash2 className="size-3.5 text-rose-500" />
-                  <span>Delete</span>
+                  <span>{t("history.delete", "Delete")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
