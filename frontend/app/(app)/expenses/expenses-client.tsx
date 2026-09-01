@@ -116,6 +116,9 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
 
   // Calculations
   const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
+  const recurringMonthly = expenses
+    .filter((e) => e.recurring)
+    .reduce((sum, item) => sum + item.amount, 0);
   const categoryTotals = expenses.reduce((acc, item) => {
     acc[item.category] = (acc[item.category] || 0) + item.amount;
     return acc;
@@ -152,7 +155,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-sage/30 dark:border-border shadow-xs">
+        <div className="bg-white/40 dark:bg-card/40 p-4 sm:p-5 rounded-2xl border border-sage/20 dark:border-border shadow-xs">
           <span className="text-[11px] font-bold text-ink-muted dark:text-muted-foreground uppercase tracking-wider block mb-1">
             {t("expenses.totalSpent", "Total Outflow")}
           </span>
@@ -161,7 +164,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
           </span>
         </div>
 
-        <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-sage/30 dark:border-border shadow-xs">
+        <div className="bg-white/40 dark:bg-card/40 p-4 sm:p-5 rounded-2xl border border-sage/20 dark:border-border shadow-xs">
           <span className="text-[11px] font-bold text-ink-muted dark:text-muted-foreground uppercase tracking-wider block mb-1">
             {t("expenses.highestCategory", "Highest Category")}
           </span>
@@ -170,21 +173,21 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
           </span>
         </div>
 
-        <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-sage/30 dark:border-border shadow-xs">
+        <div className="bg-white/40 dark:bg-card/40 p-4 sm:p-5 rounded-2xl border border-sage/20 dark:border-border shadow-xs">
           <span className="text-[11px] font-bold text-ink-muted dark:text-muted-foreground uppercase tracking-wider block mb-1">
-            {t("expenses.activeExpenses", "Recorded Bills")}
+            {t("expenses.recurringMonthly", "Recurring Monthly")}
           </span>
           <span className="text-xl sm:text-2xl font-bold text-forest dark:text-foreground">
-            {expenses.length}
+            ₹{recurringMonthly.toLocaleString("en-IN")}
           </span>
         </div>
 
-        <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-sage/30 dark:border-border shadow-xs">
+        <div className="bg-white/40 dark:bg-card/40 p-4 sm:p-5 rounded-2xl border border-sage/20 dark:border-border shadow-xs">
           <span className="text-[11px] font-bold text-ink-muted dark:text-muted-foreground uppercase tracking-wider block mb-1">
-            Avg Daily Spend
+            {t("expenses.recordsCount", "Total Entries")}
           </span>
           <span className="text-xl sm:text-2xl font-bold text-forest dark:text-foreground">
-            ₹{Math.round(totalSpent / (expenses.length || 1)).toLocaleString("en-IN")}
+            {expenses.length}
           </span>
         </div>
       </div>
@@ -196,7 +199,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
           className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
             selectedCategory === "ALL"
               ? "bg-forest dark:bg-mint text-white dark:text-black shadow-xs"
-              : "bg-white dark:bg-card border border-sage/40 dark:border-border text-ink-muted dark:text-muted-foreground hover:text-foreground"
+              : "bg-white/40 dark:bg-card/40 border border-sage/20 dark:border-border text-ink-muted dark:text-muted-foreground hover:text-foreground"
           }`}
         >
           All Categories ({expenses.length})
@@ -208,7 +211,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
             className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
               selectedCategory === cat
                 ? "bg-forest dark:bg-mint text-white dark:text-black shadow-xs"
-                : "bg-white dark:bg-card border border-sage/40 dark:border-border text-ink-muted dark:text-muted-foreground hover:text-foreground"
+                : "bg-white/40 dark:bg-card/40 border border-sage/20 dark:border-border text-ink-muted dark:text-muted-foreground hover:text-foreground"
             }`}
           >
             {cat} {categoryTotals[cat] ? `(₹${categoryTotals[cat].toLocaleString("en-IN")})` : ""}
@@ -217,7 +220,7 @@ export function ExpensesClient({ initialExpenses }: { initialExpenses: ExpenseIt
       </div>
 
       {/* Expenses Table */}
-      <div className="bg-white dark:bg-card rounded-2xl border border-sage/30 dark:border-border shadow-xs overflow-hidden flex-1">
+      <div className="bg-white/40 dark:bg-card/40 rounded-2xl border border-sage/20 dark:border-border shadow-xs overflow-hidden flex-1">
         {filteredExpenses.length === 0 ? (
           <div className="p-12 text-center">
             <IndianRupee className="size-10 text-sage mx-auto mb-2" />

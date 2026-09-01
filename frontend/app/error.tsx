@@ -9,7 +9,6 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { BrandLogo } from "@/components/brand-logo";
 
 export default function ErrorPage({
   error,
@@ -29,8 +28,11 @@ export default function ErrorPage({
 
       {/* Header */}
       <header className="flex items-center justify-between max-w-5xl w-full mx-auto shrink-0 z-10">
-        <Link href="/dashboard" className="flex items-center">
-          <BrandLogo iconSize={32} textClassName="text-xl text-forest dark:text-mint" />
+        <Link href="/ai-saathi" className="flex items-center gap-2.5">
+          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_12px_rgba(74,222,128,0.8)]" />
+          <span className="font-serif font-bold text-xl text-forest dark:text-mint tracking-tight">
+            VyaparSetu
+          </span>
         </Link>
         <ThemeToggle />
       </header>
@@ -72,11 +74,11 @@ export default function ErrorPage({
           </button>
 
           <Link
-            href="/dashboard"
+            href="/ai-saathi"
             className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-card border border-sage/40 dark:border-border hover:bg-cream dark:hover:bg-muted text-foreground font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <LayoutDashboard className="size-4 text-mint" />
-            <span>Go to Dashboard</span>
+            <span>Go to AI Saathi</span>
           </Link>
         </div>
       </main>

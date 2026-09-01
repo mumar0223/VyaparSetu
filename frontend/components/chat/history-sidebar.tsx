@@ -109,7 +109,7 @@ export function HistorySidebar({
 
       {/* Search Bar */}
       <div className="px-3 pt-2.5 pb-1">
-        <div className="flex h-9 items-center gap-2 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-background px-2.5 text-[12.5px] text-foreground">
+        <div className="flex h-9 items-center gap-2 rounded-xl border border-sage/20 dark:border-border bg-white/40 dark:bg-card/40 px-2.5 text-[12.5px] text-foreground">
           <Search className="size-3.5 shrink-0 text-muted-foreground" />
           <input
             type="text"
@@ -223,7 +223,7 @@ export function HistorySidebar({
       {/* ── Desktop Inline Collapsible History Sidebar (>= 1024px) ── */}
       <aside
         className={cn(
-          "hidden lg:flex shrink-0 flex-col border-l border-sage/30 dark:border-border bg-white/70 dark:bg-card/90 h-full transition-[width] duration-300 ease-in-out select-none overflow-hidden font-sans",
+          "hidden lg:flex shrink-0 flex-col border-l border-sage/20 dark:border-border bg-white/35 dark:bg-card/35 h-full transition-[width] duration-300 ease-in-out select-none overflow-hidden font-sans",
           isOpen ? "w-[260px]" : "w-0 border-l-0"
         )}
       >
@@ -242,7 +242,7 @@ export function HistorySidebar({
           />
 
           {/* Sliding Sheet Drawer */}
-          <aside className="absolute inset-y-0 right-0 w-[280px] max-w-[85vw] bg-white dark:bg-card border-l border-sage/30 dark:border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-250 z-10">
+          <aside className="absolute inset-y-0 right-0 w-[280px] max-w-[85vw] bg-white/60 dark:bg-card/60 border-l border-sage/20 dark:border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-250 z-10">
             {renderContent(true)}
           </aside>
         </div>

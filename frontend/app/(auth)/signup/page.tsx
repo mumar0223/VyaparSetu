@@ -15,7 +15,6 @@ import {
   EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
-import { BrandLogo } from "@/components/brand-logo";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -56,7 +55,7 @@ export default function SignupPage() {
       }
 
       toast.success("Account created successfully!");
-      router.push("/dashboard");
+      router.push("/ai-saathi");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "An unexpected error occurred");
@@ -66,12 +65,13 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="h-screen h-[100dvh] overflow-hidden bg-cream text-ink font-sans flex flex-col lg:flex-row selection:bg-mint-light selection:text-forest">
+    <div className="min-h-screen md:h-screen md:overflow-hidden bg-cream text-ink font-sans flex flex-col md:flex-row selection:bg-mint-light selection:text-forest">
       {/* Left panel - Branding & Value Prop */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-forest via-[#0a2318] to-[#04120a] p-6 sm:p-8 lg:p-10 xl:p-12 flex-col justify-between relative overflow-hidden">
+      <div className="md:w-1/2 bg-gradient-to-br from-forest via-[#0a2318] to-[#04120a] p-6 sm:p-8 lg:p-10 xl:p-12 flex flex-col justify-between relative overflow-hidden">
         <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center">
-            <BrandLogo iconSize={36} textClassName="text-xl sm:text-2xl text-white" />
+          <Link href="/" className="inline-flex items-center gap-2">
+            <div className="w-4 h-4 sm:w-5 sm:h-5 bg-mint rounded-full shadow-[0_0_12px_rgba(33,184,124,0.6)]" />
+            <span className="font-serif font-bold text-xl sm:text-2xl text-white tracking-tight">VyaparSetu</span>
           </Link>
 
           <div className="mt-6 sm:mt-8 lg:mt-10 max-w-md">
@@ -128,10 +128,10 @@ export default function SignupPage() {
       </div>
 
       {/* Right panel - Auth Form */}
-      <div className="w-full lg:w-1/2 h-full bg-cream p-6 sm:p-8 lg:p-10 xl:p-12 flex items-center justify-center relative overflow-y-auto lg:overflow-hidden">
+      <div className="md:w-1/2 bg-cream p-6 sm:p-8 lg:p-10 xl:p-12 flex items-center justify-center relative overflow-hidden">
         <div className="w-full max-w-sm sm:max-w-md relative z-10">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <div className="mb-5 text-center lg:text-left">
+            <div className="mb-5 text-center md:text-left">
               <h2 className="text-2xl sm:text-3xl font-serif font-bold text-forest mb-1">Create an Account</h2>
               <p className="text-ink-muted text-xs sm:text-sm">Enter your details to get started with VyaparSetu</p>
             </div>
@@ -223,7 +223,7 @@ export default function SignupPage() {
               </button>
             </form>
 
-            <div className="mt-4 sm:mt-5 text-center lg:text-left">
+            <div className="mt-4 sm:mt-5 text-center md:text-left">
               <p className="text-ink-muted text-xs sm:text-sm font-medium">
                 Already have an account?{" "}
                 <Link href="/login" className="font-semibold text-forest hover:text-mint transition-colors underline decoration-mint/40 underline-offset-4">

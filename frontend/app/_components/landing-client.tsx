@@ -1,8 +1,7 @@
 "use client";
 
 import { motion, useScroll, useTransform } from "motion/react";
-import { useRef, useState, useEffect } from "react";
-import { ConnectionDiagram } from "./connection-diagram";
+import { useRef } from "react";
 import { Navbar } from "./navbar";
 import { HowItWorks } from "./how-it-works";
 import { Technologies } from "./technologies";
@@ -20,7 +19,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { AuthUser } from "@/lib/auth-types";
-import { BrandLogo } from "@/components/brand-logo";
 
 interface LandingClientProps {
   currentUser?: AuthUser | null;
@@ -32,26 +30,6 @@ export function LandingClient({ currentUser }: LandingClientProps) {
     target: heroRef,
     offset: ["start start", "end start"],
   });
-
-  const [windowWidth, setWindowWidth] = useState(1440);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const HERO_SCALE_CONSTANT = 0.00055;
-  const calculatedHeroScale = Math.min(
-    1.1,
-    Math.max(0.5, windowWidth * HERO_SCALE_CONSTANT),
-  );
-  const calculatedHeroLeft = Math.min(
-    74,
-    Math.max(65, 65 + ((windowWidth - 1024) * 9) / (1920 - 1024)),
-  );
 
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
   const opacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
@@ -79,37 +57,17 @@ export function LandingClient({ currentUser }: LandingClientProps) {
             <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 sm:w-[500px] h-96 sm:h-[500px] bg-mint/15 dark:bg-mint/5 rounded-full blur-[140px] -z-10 pointer-events-none" />
             <div className="absolute bottom-10 right-1/4 translate-x-1/2 translate-y-1/2 w-80 sm:w-[400px] h-80 sm:h-[400px] bg-orange/10 dark:bg-orange/5 rounded-full blur-[120px] -z-10 pointer-events-none" />
 
-            {/* Connection Diagram Layer */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
-              className="hidden lg:flex absolute inset-0 z-0 items-center justify-end overflow-hidden pointer-events-none opacity-100"
-            >
-              <div className="w-full h-full max-w-7xl mx-auto relative">
-                <div
-                  className="absolute top-1/2 origin-center w-[950px]"
-                  style={{
-                    left: `${calculatedHeroLeft}%`,
-                    transform: `translate(-50%, -50%) scale(${calculatedHeroScale})`,
-                  }}
-                >
-                  <ConnectionDiagram />
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Left Hero Content */}
-            <div className="container lg:pl-16 mx-auto px-4 md:px-8 flex items-center flex-1 min-h-0 pb-6 md:pb-10 w-full h-full relative z-10 pointer-events-none">
+            {/* Hero Content Grid (Left: Copy & Actions, Right: Hero Image) */}
+            <div className="container lg:px-12 mx-auto px-4 md:px-8 flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12 flex-1 min-h-0 pb-6 md:pb-10 w-full h-full relative z-10">
               <motion.div
                 initial={{ opacity: 0, x: -40 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut" }}
-                className="flex flex-col gap-4 sm:gap-6 max-w-xl lg:max-w-2xl z-10 pointer-events-auto"
+                className="flex flex-col gap-4 sm:gap-6 max-w-xl lg:max-w-2xl z-10"
               >
                 <h1 className="text-3xl sm:text-5xl md:text-5xl lg:text-6xl font-serif font-bold tracking-tight leading-[1.12] text-forest dark:text-foreground">
                   Grow your local business.{" "}
-                  <span className="text-forest dark:text-mint block mt-1">
+                  <span className="text-orange dark:text-orange block mt-1">
                     In your own language.
                   </span>
                 </h1>
@@ -125,10 +83,10 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                 <div className="flex flex-wrap items-center gap-3 pt-2">
                   {currentUser ? (
                     <Link
-                      href="/dashboard"
+                      href="/ai-saathi"
                       className="px-6 py-3.5 bg-forest dark:bg-mint hover:bg-forest-deep dark:hover:bg-mint-light text-white dark:text-black font-bold rounded-xl shadow-lg transition-all active:scale-95 text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer"
                     >
-                      <span>Open Workspace Dashboard</span>
+                      <span>Open AI Saathi Workspace</span>
                       <ArrowRight className="size-4" />
                     </Link>
                   ) : (
@@ -164,6 +122,20 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                     </div>
                   ))}
                 </div>
+              </motion.div>
+
+              {/* Right Hero Image (Replacing Connection Diagram) */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, x: 30 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                transition={{ duration: 0.7, ease: "easeOut", delay: 0.15 }}
+                className="w-full max-w-md sm:max-w-lg lg:max-w-lg xl:max-w-xl shrink-0"
+              >
+                <img
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfmb1_ip4DJn-j_j1v4joG2lRxbO0IYe8NSH5FOlEjSm5nsVbWkGDcM5RfbbteCe-Wb6yOU_Hnm3vOXEzsN9fNj_JZHyOAqIY5XrJfjTsbwKY2Eww1zLxnn_rodicxtpoOK5YL9aIlwpj_1x1PS_rD4fcHuD1neaw95-4VDpNpKPh0ppCFR5zV0V1WfxYfdYJOdljY2HBoZaiLHghhBuZsEU3r46wq5hb8iuQL-HbN_LsdTgikHScDgw"
+                  alt="VyaparSetu Kirana Store"
+                  className="w-full h-auto object-cover rounded-2xl md:rounded-3xl shadow-2xl border border-sage/30 dark:border-border"
+                />
               </motion.div>
             </div>
           </motion.section>
@@ -243,7 +215,10 @@ export function LandingClient({ currentUser }: LandingClientProps) {
         {/* Footer */}
         <footer className="border-t border-sage/30 dark:border-border py-10 bg-white dark:bg-zinc-950 text-center text-xs text-muted-foreground">
           <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <BrandLogo iconSize={26} textClassName="text-sm text-forest dark:text-mint" />
+            <div className="flex items-center gap-2 font-serif font-bold text-sm text-forest dark:text-mint">
+              <div className="size-2.5 bg-mint rounded-full" />
+              <span>VyaparSetu</span>
+            </div>
             <p>
               © {new Date().getFullYear()} VyaparSetu. DPDP Act 2023 Compliant
               &amp; Encrypted.

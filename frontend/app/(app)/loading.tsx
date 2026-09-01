@@ -14,14 +14,14 @@ export default function AppLoading() {
 
       {/* KPI Cards Skeleton */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Skeleton className="h-24 rounded-2xl" />
-        <Skeleton className="h-24 rounded-2xl" />
-        <Skeleton className="h-24 rounded-2xl" />
-        <Skeleton className="h-24 rounded-2xl" />
+        <Skeleton className="h-24 rounded-2xl bg-white/40 dark:bg-card/40 border border-sage/20 dark:border-border" />
+        <Skeleton className="h-24 rounded-2xl bg-white/40 dark:bg-card/40 border border-sage/20 dark:border-border" />
+        <Skeleton className="h-24 rounded-2xl bg-white/40 dark:bg-card/40 border border-sage/20 dark:border-border" />
+        <Skeleton className="h-24 rounded-2xl bg-white/40 dark:bg-card/40 border border-sage/20 dark:border-border" />
       </div>
 
       {/* Main Content Area Skeleton */}
-      <div className="flex-1 bg-white dark:bg-card rounded-2xl border border-sage/30 dark:border-border p-6 shadow-xs space-y-4">
+      <div className="flex-1 bg-white/40 dark:bg-card/40 rounded-2xl border border-sage/20 dark:border-border p-6 shadow-xs space-y-4">
         <div className="flex justify-between">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-5 w-24" />

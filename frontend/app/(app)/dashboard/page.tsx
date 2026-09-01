@@ -1,10 +1,15 @@
 import { getCurrentUser } from "@/lib/auth";
-import { ChatWorkspace } from "@/components/chat/chat-workspace";
+import { DashboardView } from "@/components/dashboard/dashboard-view";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const user = await getCurrentUser();
+export const metadata = {
+  title: "Dashboard & Analytics | VyaparSetu",
+  description: "Comprehensive financial overview, cash flow analytics, APMC spot rates, and business health score.",
+};
 
-  return <ChatWorkspace currentUser={user} />;
+export default async function DashboardPage() {
+  await getCurrentUser();
+
+  return <DashboardView />;
 }

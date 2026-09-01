@@ -15,8 +15,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { message, conversationId, history = [] } = body;
+    const {
+      message,
+      conversationId,
+      history = [],
+      language = "en",
+    } = await req.json();
 
     if (!message || typeof message !== "string" || !message.trim()) {
       return NextResponse.json(
@@ -89,8 +93,51 @@ export async function POST(req: NextRequest) {
       DASHBOARD_CHAT_CONFIG.model
     );
 
+    const LANGUAGE_MAP: Record<string, { name: string; native: string }> = {
+      en: { name: "English", native: "English" },
+      hi: { name: "Hindi", native: "हिन्दी" },
+      hinglish: { name: "Hinglish", native: "Hinglish (Hindi in Roman script)" },
+      mr: { name: "Marathi", native: "मराठी" },
+      bn: { name: "Bengali", native: "বাংলা" },
+      gu: { name: "Gujarati", native: "ગુજરાતી" },
+      ta: { name: "Tamil", native: "தமிழ்" },
+      te: { name: "Telugu", native: "తెలుగు" },
+      pa: { name: "Punjabi", native: "ਪੰਜਾਬੀ" },
+      kn: { name: "Kannada", native: "ಕನ್ನಡ" },
+      ml: { name: "Malayalam", native: "മലയാളം" },
+    };
+
+    const targetLang = LANGUAGE_MAP[language] || LANGUAGE_MAP.en;
+    const isHinglish = language === "hinglish";
+    const isRegional = language && language !== "en" && !isHinglish;
+
+    let languageInstruction = "";
+    if (isHinglish) {
+      languageInstruction = `\nUSER SELECTED LANGUAGE: Hinglish (Conversational Hindi in Roman/English Alphabet)
+LANGUAGE & SCRIPT RULES (STRICT & HIGHEST PRIORITY):
+1. The user explicitly chose "Hinglish" in settings. You MUST ALWAYS speak and reply in natural conversational HINGLISH (Hindi phrasing written in English/Latin letters, blended with standard business terms like loan, profit, loss, turnover, mandi, budget, bahi-khata).
+2. Even if the user types a simple English greeting (e.g. "hi", "hello", "hey") or asks a question in English, ALWAYS REPLY IN HINGLISH.
+   - Example Greeting: "Namaste! VyaparSetu mein aapka swagat hai. Main aapka AI Vyapar Salahkar aur Trade Partner hoon. Aaj main aapke business, mandi rates ya bahi-khata mein kaise madad kar sakta hoon?"
+3. NEVER reply in 100% formal English when Hinglish is selected.
+4. Do NOT force Devanagari script (हिन्दी); keep responses in clean Romanized Hinglish so it is effortless to read on mobile.`;
+    } else if (isRegional) {
+      languageInstruction = `\nUSER SELECTED LANGUAGE: ${targetLang.name} (${targetLang.native})
+LANGUAGE & DYNAMIC SCRIPT MATCHING RULES (CRITICAL):
+1. The user selected "${targetLang.name}" in their language settings. Speak/reply in ${targetLang.name}.
+2. OBSERVE USER INPUT SCRIPT & PATTERN (DO NOT FORCE NATIVE SCRIPT):
+   - If the user writes in Romanized script / Latin alphabet (e.g. "Mera naam ye hai", "Mandi bhav batao", "Kasa ahes", "Kem cho"): You MUST respond in ${targetLang.name} using the ROMAN/ENGLISH ALPHABET (Romanized ${targetLang.name}). Do NOT force native script (${targetLang.native}) when the user types in Romanized letters!
+   - If the user writes in native script (${targetLang.native}) (e.g. "मेरा नाम यह है"): Respond in native script (${targetLang.native}).
+   - If the user writes in standard English or asks a question in English, still prioritize ${targetLang.name} with natural terminology.
+   - Always match the user's script style and tone dynamically.`;
+    } else {
+      languageInstruction = `\nLANGUAGE & SCRIPT RULES:
+1. Respond in clear, professional English, or adapt to the user's language (Hindi, Hinglish, Marathi, etc.) based on their input.
+2. If the user writes in Romanized/Hinglish text, reply in Romanized text. If the user writes in native script, reply in native script.`;
+    }
+
     const systemInstruction = `You are VyaparSetu's AI Business Advisor & Trade Partner for Indian micro-enterprises, shopkeepers, traders, and farmers.
 You provide clear, accurate market rates, actionable financial structuring, credit scheme eligibility, and operational advice.
+${languageInstruction}
 
 CAPABILITIES & TOOL USAGE (CRITICAL — YOU MUST USE TOOLS AUTONOMOUSLY):
 You have access to powerful tools. When the user's query relates to any of the following, you MUST autonomously call the appropriate tool — do NOT say "I can't do that" and do NOT output static text forms:
@@ -122,7 +169,7 @@ PRESENTATION & SYNTHESIS RULES:
 1. ALWAYS provide a comprehensive, clear markdown response to the user AFTER executing any tools.
 2. When an interactive form or chart is staged or updated, explain the changes and invite the user to review the live form on screen.
 3. Present rates, comparisons, and financial breakdowns in clean Markdown tables with key actionable insights.
-4. Respond in clear, professional English, Hindi, or Hinglish matching the user's language.`;
+4. Respond adhering to the language and dynamic script rules above.`;
 
     const rawFilteredHistory = history
       .filter((h: any) => h.role === "user" || h.role === "assistant")

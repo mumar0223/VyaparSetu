@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
 import en from "./dictionaries/en.json";
 import hi from "./dictionaries/hi.json";
+import hinglish from "./dictionaries/hinglish.json";
 import mr from "./dictionaries/mr.json";
 import bn from "./dictionaries/bn.json";
 import gu from "./dictionaries/gu.json";
@@ -15,6 +16,7 @@ import ml from "./dictionaries/ml.json";
 export type LanguageCode =
   | "en"
   | "hi"
+  | "hinglish"
   | "mr"
   | "bn"
   | "gu"
@@ -31,6 +33,7 @@ export const AVAILABLE_LANGUAGES: {
 }[] = [
   { code: "en", name: "English", nativeName: "English" },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी" },
+  { code: "hinglish", name: "Hinglish (Hindi)", nativeName: "Hinglish" },
   { code: "mr", name: "Marathi", nativeName: "मराठी" },
   { code: "bn", name: "Bengali", nativeName: "বাংলা" },
   { code: "gu", name: "Gujarati", nativeName: "ગુજરાતી" },
@@ -44,6 +47,7 @@ export const AVAILABLE_LANGUAGES: {
 const DICTIONARIES: Record<LanguageCode, any> = {
   en,
   hi,
+  hinglish,
   mr,
   bn,
   gu,

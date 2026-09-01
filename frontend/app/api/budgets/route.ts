@@ -58,23 +58,33 @@ export async function POST(req: Request) {
     const business = await getOrCreateUserBusiness(user.id);
     const body = await req.json();
 
-    const { name, period, startDate, endDate, totalAmount, items } = body;
-    if (!name || !totalAmount) {
-      return NextResponse.json({ error: "Budget name and total amount are required" }, { status: 400 });
+    const rawAmount = body.totalAmount ?? body.totalLimit ?? body.amount;
+    const parsedAmount = typeof rawAmount === "number" ? rawAmount : parseFloat(String(rawAmount || ""));
+
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return NextResponse.json(
+        { error: "A valid positive budget total amount is required" },
+        { status: 400 }
+      );
     }
+
+    const { period, startDate, endDate, items } = body;
+    const budgetName =
+      (typeof body.name === "string" && body.name.trim()) ||
+      `${period || "Monthly"} Operating Budget`;
 
     const budget = await prisma.budget.create({
       data: {
         businessId: business.id,
-        name,
+        name: budgetName,
         period: period || "Monthly",
         startDate: startDate ? new Date(startDate) : new Date(),
         endDate: endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        totalAmount: parseFloat(totalAmount),
+        totalAmount: parsedAmount,
         items: {
           create: (items || []).map((item: { category: string; allocatedAmount: number | string }) => ({
-            category: item.category,
-            allocatedAmount: parseFloat(String(item.allocatedAmount)),
+            category: item.category || "General",
+            allocatedAmount: parseFloat(String(item.allocatedAmount || 0)) || 0,
           })),
         },
       },

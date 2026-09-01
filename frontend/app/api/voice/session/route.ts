@@ -64,6 +64,51 @@ async function handleVoiceSession(req: NextRequest) {
       body.conversationId ||
       new URL(req.url).searchParams.get("conversationId") ||
       undefined;
+    const rawLang =
+      body.language ||
+      new URL(req.url).searchParams.get("language") ||
+      "en";
+    const languageCode = rawLang.split("-")[0]; // "hi-IN" -> "hi"
+
+    const LANGUAGE_MAP: Record<string, { name: string; native: string }> = {
+      en: { name: "English", native: "English" },
+      hi: { name: "Hindi", native: "हिन्दी" },
+      hinglish: { name: "Hinglish", native: "Hinglish (Hindi in Roman script)" },
+      mr: { name: "Marathi", native: "मराठी" },
+      bn: { name: "Bengali", native: "বাংলা" },
+      gu: { name: "Gujarati", native: "ગુજરાતી" },
+      ta: { name: "Tamil", native: "தமிழ்" },
+      te: { name: "Telugu", native: "తెలుగు" },
+      pa: { name: "Punjabi", native: "ਪੰਜਾਬੀ" },
+      kn: { name: "Kannada", native: "ಕನ್ನಡ" },
+      ml: { name: "Malayalam", native: "മലയാളം" },
+    };
+
+    const targetLang = LANGUAGE_MAP[languageCode] || LANGUAGE_MAP.en;
+    const isHinglish = languageCode === "hinglish";
+    const isRegional = languageCode && languageCode !== "en" && !isHinglish;
+
+    let languageInstruction = "";
+    if (isHinglish) {
+      languageInstruction = `\nUSER SELECTED LANGUAGE: Hinglish (Conversational Hindi + English)
+LANGUAGE & SPOKEN STYLE RULES (STRICT & HIGHEST PRIORITY):
+1. The user selected "Hinglish". Speak and respond in natural conversational HINGLISH (spoken Hindi mixed with common English trade & business terms).
+2. For text transcripts, use clean Romanized/English script rather than heavy Devanagari script.
+3. Keep spoken replies concise, friendly, and natural.`;
+    } else if (isRegional) {
+      languageInstruction = `\nUSER SELECTED LANGUAGE: ${targetLang.name} (${targetLang.native})
+LANGUAGE & DYNAMIC SCRIPT / SPOKEN STYLE RULES (CRITICAL):
+1. The user selected "${targetLang.name}" in their settings. Speak and respond primarily in ${targetLang.name}.
+2. DYNAMIC TRANSLITERATION & SCRIPT OBSERVATION:
+   - If the user writes or speaks in Romanized text / Latin alphabet (e.g. "Mera naam ye hai", "Mandi bhav batao", "Kasa ahes"): Speak and formulate outputs in natural conversational ${targetLang.name}, and in text transcripts use the Roman/English alphabet instead of forcing heavy native script.
+   - If the user uses pure native script or pure formal regional dialect: Respond in pure ${targetLang.name}.
+   - Always match the user's natural conversational flow, script, and tone.`;
+    } else {
+      languageInstruction = `\nLANGUAGE & SCRIPT RULES:
+1. Speak in clear, natural, professional English, or adapt to the user's spoken dialect (Hindi, Hinglish, Marathi, Gujarati, etc.) based on their input.
+2. Match the user's conversational pattern naturally.`;
+    }
+
     const modelId = (LIVE_VOICE_AGENT_CONFIG.model || "gemini-live-2.5-flash")
       .replace(/^models\//, "")
       .replace(
@@ -73,6 +118,7 @@ async function handleVoiceSession(req: NextRequest) {
     const model = `projects/${project}/locations/${location}/publishers/google/models/${modelId}`;
 
     let systemInstruction = `You are VyaparSetu Voice (व्यापारसेतु), a male AI business advisor and trade partner for Indian micro-enterprises, shopkeepers, traders, and farmers.
+${languageInstruction}
 
 MALE PERSONA & GRAMMAR RULES:
 1. You are strictly a male persona. In all Indian languages (Hindi, Marathi, Bengali, Punjabi, Gujarati, etc.), always use masculine self-referential verb inflections, pronouns, and adjectives (e.g. in Hindi: "मैं करूँगा", "बता सकता हूँ", "मैं समझता हूँ", never use feminine forms like "करूँगी" or "सकती हूँ").

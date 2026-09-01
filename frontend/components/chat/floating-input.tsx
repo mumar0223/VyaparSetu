@@ -62,7 +62,7 @@ export function FloatingInput({
   return (
     <div className="w-full transition-all duration-300 ease-out z-20 font-sans">
       {/* Elevated Pill Container */}
-      <div className="relative rounded-2xl md:rounded-3xl border border-sage/40 dark:border-border bg-white/95 dark:bg-card/95 p-2 shadow-xl backdrop-blur-xl transition-all focus-within:border-mint focus-within:ring-1 focus-within:ring-mint/40">
+      <div className="relative rounded-2xl md:rounded-3xl border border-sage/25 dark:border-border bg-white/45 dark:bg-card/45 p-2 shadow-lg transition-all focus-within:border-mint focus-within:ring-1 focus-within:ring-mint/40 focus-within:bg-white/65 dark:focus-within:bg-card/65">
         <div className="flex flex-col">
           {/* Main Input Textarea */}
           <textarea

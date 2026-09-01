@@ -7,7 +7,7 @@ import {
   useCallback,
   useRef,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 import {
   PanelRightOpen,
@@ -40,7 +40,8 @@ export function ChatWorkspace({
   initialChatId,
 }: ChatWorkspaceProps) {
   const router = useRouter();
-  const { t } = useTranslation();
+  const pathname = usePathname();
+  const { t, language } = useTranslation();
 
   const [activeChatId, setActiveChatId] = useState<string | null>(
     initialChatId || null,
@@ -60,7 +61,9 @@ export function ChatWorkspace({
     Boolean(initialChatId),
   );
   const [showScrollBottom, setShowScrollBottom] = useState(false);
-  const [activeArtifact, setActiveArtifact] = useState<ArtifactPayload | null>(null);
+  const [activeArtifact, setActiveArtifact] = useState<ArtifactPayload | null>(
+    null,
+  );
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const savedScrollPositionRef = useRef<number>(0);
@@ -116,8 +119,8 @@ export function ChatWorkspace({
               if (data?.title) {
                 setConversations((prev) =>
                   prev.map((c) =>
-                    c.id === currentChatId ? { ...c, title: data.title } : c
-                  )
+                    c.id === currentChatId ? { ...c, title: data.title } : c,
+                  ),
                 );
               }
             })
@@ -126,12 +129,15 @@ export function ChatWorkspace({
       }
 
       setMessages((prev) => {
-        const next: ChatMessage[] = [...prev, {
-          id: `user_${Date.now()}`,
-          role: "user",
-          content: turn.userTranscript,
-          createdAt: new Date(),
-        }];
+        const next: ChatMessage[] = [
+          ...prev,
+          {
+            id: `user_${Date.now()}`,
+            role: "user",
+            content: turn.userTranscript,
+            createdAt: new Date(),
+          },
+        ];
         if (turn.assistantTranscript.trim()) {
           next.push({
             id: `asst_${Date.now()}`,
@@ -146,6 +152,24 @@ export function ChatWorkspace({
       fetchConversations();
     },
   });
+
+  // Sync liveAgent voice language with dropdown language
+  useEffect(() => {
+    const codeMap: Record<string, any> = {
+      en: "en-IN",
+      hi: "hi-IN",
+      mr: "mr-IN",
+      bn: "bn-IN",
+      gu: "gu-IN",
+      ta: "ta-IN",
+      te: "te-IN",
+      pa: "pa-IN",
+      kn: "kn-IN",
+      ml: "ml-IN",
+    };
+    const voiceLang = codeMap[language] || "en-IN";
+    liveAgent.setLanguage(voiceLang);
+  }, [language, liveAgent]);
 
   const chatCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
@@ -186,14 +210,14 @@ export function ChatWorkspace({
           if (activeChatId === id) {
             setActiveChatId(null);
             setMessages([]);
-            window.history.pushState(null, "", "/dashboard");
+            router.push("/ai-saathi");
           }
         }
       } catch (err) {
         console.error("Failed to delete chat:", err);
       }
     },
-    [activeChatId],
+    [activeChatId, router],
   );
 
   // ── Start Live Voice Session ──
@@ -218,20 +242,26 @@ export function ChatWorkspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: "Live Voice Session" }),
         });
-        if (!res.ok) throw new Error("Could not create a chat for this voice session.");
+        if (!res.ok)
+          throw new Error("Could not create a chat for this voice session.");
         const data = await res.json();
         targetId = data?.conversation?.id;
-        if (!targetId) throw new Error("Voice session chat creation returned no chat ID.");
+        if (!targetId)
+          throw new Error("Voice session chat creation returned no chat ID.");
         setActiveChatId(targetId);
         fetchConversations();
       }
 
       // The URL update is also complete before any Vertex connection begins.
-      window.history.pushState(null, "", `/dashboard/c/${targetId}?mode=voice`);
+      window.history.pushState(null, "", `/ai-saathi/c/${targetId}?mode=voice`);
       await liveAgent.connect(targetId);
     } catch (error) {
       console.error("Failed to initialize voice session:", error);
-      liveAgent.reportError(error instanceof Error ? error.message : "Unable to start the voice session.");
+      liveAgent.reportError(
+        error instanceof Error
+          ? error.message
+          : "Unable to start the voice session.",
+      );
     } finally {
       voiceStartInFlightRef.current = false;
       setIsStartingVoiceSession(false);
@@ -254,12 +284,16 @@ export function ChatWorkspace({
       } catch (err) {
         console.error("Failed to delete empty chat on exit:", err);
       }
-      window.history.replaceState(null, "", "/dashboard");
+      window.history.replaceState(null, "", "/ai-saathi");
     } else if (currentChatId) {
       // Trigger background title generation if title is still default
       if (voiceTurnsRef.current.length > 0) {
         const existingConv = conversations.find((c) => c.id === currentChatId);
-        if (existingConv && (existingConv.title === "Live Voice Session" || existingConv.title === "New Conversation")) {
+        if (
+          existingConv &&
+          (existingConv.title === "Live Voice Session" ||
+            existingConv.title === "New Conversation")
+        ) {
           fetch(`/api/chats/${currentChatId}/title`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -272,17 +306,19 @@ export function ChatWorkspace({
               if (data?.title) {
                 setConversations((prev) =>
                   prev.map((c) =>
-                    c.id === currentChatId ? { ...c, title: data.title } : c
-                  )
+                    c.id === currentChatId ? { ...c, title: data.title } : c,
+                  ),
                 );
               }
             })
-            .catch((err) => console.warn("Voice session end title generation error:", err));
+            .catch((err) =>
+              console.warn("Voice session end title generation error:", err),
+            );
         }
       }
-      window.history.replaceState(null, "", `/dashboard/c/${currentChatId}`);
+      window.history.replaceState(null, "", `/ai-saathi/c/${currentChatId}`);
     } else {
-      window.history.replaceState(null, "", "/dashboard");
+      window.history.replaceState(null, "", "/ai-saathi");
     }
 
     setIsVoiceMode(false);
@@ -305,8 +341,8 @@ export function ChatWorkspace({
   // 2. Load Active Conversation Messages if initialChatId provided
   useEffect(() => {
     if (!initialChatId) {
-      setMessages([]);
       setActiveChatId(null);
+      setMessages([]);
       setIsInitialLoading(false);
       return;
     }
@@ -353,7 +389,7 @@ export function ChatWorkspace({
     };
   }, [initialChatId]);
 
-  // 3. Start New Chat
+  // 3. Start New Chat (Instant 0ms in-memory state change, zero page reload)
   const handleNewChat = useCallback(() => {
     if (isVoiceMode) {
       liveAgent.disconnect();
@@ -364,10 +400,11 @@ export function ChatWorkspace({
     }
     setActiveChatId(null);
     setMessages([]);
-    window.history.pushState(null, "", "/dashboard");
+    setIsInitialLoading(false);
+    window.history.pushState(null, "", "/ai-saathi");
   }, [isVoiceMode, liveAgent, activeChatId, messages.length, handleDeleteChat]);
 
-  // 4. Select existing chat from history (Instant Cache / Clear Old Messages Immediately)
+  // 4. Select existing chat from history (Instant 0ms in-memory load, zero page reload)
   const handleSelectChat = useCallback(
     async (id: string) => {
       if (id === activeChatId && !isVoiceMode) return;
@@ -381,7 +418,7 @@ export function ChatWorkspace({
       }
 
       setActiveChatId(id);
-      window.history.pushState(null, "", `/dashboard/c/${id}`);
+      window.history.pushState(null, "", `/ai-saathi/c/${id}`);
 
       // If cached in RAM: Instant 0ms load!
       if (chatCache.current.has(id)) {
@@ -417,6 +454,52 @@ export function ChatWorkspace({
     },
     [activeChatId, isVoiceMode, liveAgent, messages.length, handleDeleteChat],
   );
+
+  // ── Browser Back / Forward (popstate) Support ──
+  useEffect(() => {
+    const onPopState = () => {
+      const currentPath = window.location.pathname;
+      if (currentPath === "/ai-saathi" || currentPath === "/dashboard") {
+        if (isVoiceMode) {
+          liveAgent.disconnect();
+          setIsVoiceMode(false);
+        }
+        setActiveChatId(null);
+        setMessages([]);
+        setIsInitialLoading(false);
+      } else if (
+        currentPath.startsWith("/ai-saathi/c/") ||
+        currentPath.startsWith("/dashboard/c/")
+      ) {
+        const id = currentPath
+          .replace(/^\/(?:ai-saathi|dashboard)\/c\//, "")
+          .split("?")[0];
+        if (id) {
+          if (chatCache.current.has(id)) {
+            setActiveChatId(id);
+            setMessages(chatCache.current.get(id)!);
+          } else {
+            handleSelectChat(id);
+          }
+        }
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [isVoiceMode, liveAgent, handleSelectChat]);
+
+  // ── Listen for custom reset event (e.g. clicking AI Saathi in sidebar) ──
+  useEffect(() => {
+    const handleReset = () => {
+      handleNewChat();
+    };
+    window.addEventListener("reset-ai-saathi", handleReset);
+    window.addEventListener("reset-dashboard", handleReset);
+    return () => {
+      window.removeEventListener("reset-ai-saathi", handleReset);
+      window.removeEventListener("reset-dashboard", handleReset);
+    };
+  }, [handleNewChat]);
 
   // 6. Rename Chat
   const handleRenameChat = async (id: string, newTitle: string) => {
@@ -495,7 +578,10 @@ export function ChatWorkspace({
       }
       bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
       if (typeof window !== "undefined") {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: "smooth",
+        });
       }
     });
     setTimeout(() => {
@@ -513,6 +599,7 @@ export function ChatWorkspace({
         body: JSON.stringify({
           message: text.trim(),
           conversationId: activeChatId,
+          language,
           history: previousMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -557,7 +644,7 @@ export function ChatWorkspace({
               window.history.replaceState(
                 null,
                 "",
-                `/dashboard/c/${conversationId}`,
+                `/ai-saathi/c/${conversationId}`,
               );
               // Add to conversations history list
               setConversations((prev) => [
@@ -620,7 +707,8 @@ export function ChatWorkspace({
               }),
             );
           } else if (eventType === "tool_result") {
-            const targetId = data.result?.targetArtifactId || data.result?.artifactId;
+            const targetId =
+              data.result?.targetArtifactId || data.result?.artifactId;
             const isUpdated = data.result?.isUpdated;
 
             setMessages((prev) => {
@@ -744,9 +832,10 @@ export function ChatWorkspace({
   const activeConversation = conversations.find((c) => c.id === activeChatId);
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-cream dark:bg-background text-foreground font-sans">
+    <div className="relative flex h-screen w-full overflow-hidden bg-transparent text-foreground font-sans">
       {/* ── Top-Right Floating Controls (ChatGPT Style Mobile & Collapsed Desktop) ── */}
-      {(!isSidebarOpen || (typeof window !== "undefined" && window.innerWidth < 1024)) && (
+      {(!isSidebarOpen ||
+        (typeof window !== "undefined" && window.innerWidth < 1024)) && (
         <div className="absolute top-3 right-3 z-30 flex items-center pointer-events-auto select-none">
           <div className="h-10 px-1.5 flex items-center gap-1 bg-white/90 dark:bg-card/90 backdrop-blur-md border border-sage/40 dark:border-border rounded-2xl shadow-xs">
             <button
@@ -795,7 +884,7 @@ export function ChatWorkspace({
           />
         ) : isNewChatView ? (
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
-          <div className="w-full h-full overflow-y-auto flex flex-col justify-center items-center px-4 py-8 -mt-6">
+          <div className="w-full h-full overflow-y-auto flex flex-col justify-center items-center px-4 pt-16 pb-8 md:py-8 -mt-6">
             <div className="w-full max-w-3xl text-center mb-8 animate-in fade-in-50 duration-300">
               <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-forest dark:text-foreground mb-2">
                 {t("chat.agendaTitle", "What's on the agenda today?")}
@@ -846,10 +935,7 @@ export function ChatWorkspace({
                   ),
                 },
                 {
-                  label: t(
-                    "chat.prompt3Title",
-                    "Working Capital Optimization",
-                  ),
+                  label: t("chat.prompt3Title", "Working Capital Optimization"),
                   desc: t(
                     "chat.prompt3Desc",
                     "Analyze 14-day cash flow & stock buffer",
@@ -876,7 +962,7 @@ export function ChatWorkspace({
                 <button
                   key={i}
                   onClick={() => handleSendMessage(chip.prompt)}
-                  className="p-3.5 rounded-2xl border border-sage/30 dark:border-border bg-white dark:bg-card hover:border-mint transition-all shadow-xs hover:shadow-md text-left group flex items-start gap-3.5 cursor-pointer"
+                  className="p-3.5 rounded-2xl border border-sage/20 dark:border-border bg-white/40 dark:bg-card/40 hover:bg-white/65 dark:hover:bg-card/65 hover:border-mint transition-all shadow-xs hover:shadow-md text-left group flex items-start gap-3.5 cursor-pointer"
                 >
                   <div className="size-9 rounded-xl bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint flex items-center justify-center shrink-0 group-hover:bg-mint group-hover:text-black transition-colors">
                     <chip.icon className="size-4" />
@@ -907,7 +993,7 @@ export function ChatWorkspace({
             />
 
             {/* Scrollable Message List */}
-            <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-6 py-6">
+            <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-6 pt-16 pb-6 md:py-6">
               <ChatMessageList
                 messages={messages}
                 isLoading={isLoading}

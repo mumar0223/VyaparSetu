@@ -68,13 +68,15 @@ export function BudgetClient({ initialBudgets }: { initialBudgets: BudgetData[] 
 
     setSubmitting(true);
     try {
+      const amountVal = parseFloat(totalLimit);
       const res = await fetch("/api/budgets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
+          name: name?.trim() || `${period} Operating Budget`,
           period,
-          totalLimit: parseFloat(totalLimit),
+          totalAmount: amountVal,
+          totalLimit: amountVal,
           items: items.filter((it) => it.allocatedAmount > 0),
         }),
       });

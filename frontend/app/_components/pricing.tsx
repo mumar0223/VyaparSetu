@@ -23,8 +23,8 @@ export function Pricing({ currentUser }: { currentUser?: AuthUser | null }) {
       tagline: "For individual village artisans & nano-traders.",
       monthly: 0,
       yearly: 0,
-      cta: currentUser ? "Go to Dashboard" : "Start Free",
-      href: currentUser ? "/dashboard" : "/signup",
+      cta: currentUser ? "Go to AI Saathi" : "Start Free",
+      href: currentUser ? "/ai-saathi" : "/signup",
       features: [
         "50 voice & chat advisory queries/mo",
         "Daily expense & ledger logging",

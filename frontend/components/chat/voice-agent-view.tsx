@@ -676,7 +676,7 @@ export function VoiceAgentView({
 
           {/* Hold to Speak Button */}
           <button
-            onPointerDown={() => {
+            onPointerDown={(e) => {
               if (
                 status === "speaking" ||
                 isMuted ||
@@ -685,28 +685,17 @@ export function VoiceAgentView({
                 isError
               )
                 return;
+              // Capture the pointer so that pointerUp fires on THIS element
+              // even if the finger/mouse drifts outside the button bounds.
+              // This prevents onPointerLeave from firing and stopping speech.
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              e.preventDefault();
               onStartSpeaking?.();
             }}
-            onPointerUp={onStopSpeaking}
-            onPointerLeave={onStopSpeaking}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              if (
-                status === "speaking" ||
-                isMuted ||
-                isInitializing ||
-                isEnding ||
-                isError
-              )
-                return;
-              onStartSpeaking?.();
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              onStopSpeaking?.();
-            }}
-            onTouchCancel={(e) => {
-              e.preventDefault();
+            onPointerUp={(e) => {
+              try {
+                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+              } catch { /* already released */ }
               onStopSpeaking?.();
             }}
             onContextMenu={(e) => {
@@ -742,6 +731,7 @@ export function VoiceAgentView({
               WebkitTouchCallout: "none",
               WebkitUserSelect: "none",
               userSelect: "none",
+              touchAction: "none",
             }}
           >
             <Mic

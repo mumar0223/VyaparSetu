@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PCMPlayer } from "@/lib/voice/pcm-player";
 import { PCMRecorder } from "@/lib/voice/pcm-recorder";
 import {
-  SUPPORTED_INDIAN_LANGUAGES,
   type SupportedLanguageCode,
 } from "@/lib/agent/chat-config";
 import type { VoiceAgentStatus } from "./voice-agent-view";
@@ -44,29 +43,6 @@ type VertexFunctionResponse = {
   name?: string;
   response: { output: unknown };
 };
-
-type BrowserSpeechRecognitionResult = {
-  isFinal: boolean;
-  0?: { transcript?: string };
-};
-
-type BrowserSpeechRecognitionEvent = {
-  resultIndex: number;
-  results: ArrayLike<BrowserSpeechRecognitionResult>;
-};
-
-type BrowserSpeechRecognition = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  abort: () => void;
-};
-
-type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
 
 function mergeTranscript(current: string, incoming: string) {
   const next = incoming.trim();
@@ -129,14 +105,12 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
   const socketRef = useRef<WebSocket | null>(null);
   const recorderRef = useRef<PCMRecorder | null>(null);
   const playerRef = useRef<PCMPlayer | null>(null);
-  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const connectedRef = useRef(false);
   const mutedRef = useRef(false);
   const assistantSpeakingRef = useRef(false);
   const playbackActiveRef = useRef(false);
   const userSpeakingRef = useRef(false);
   const isHoldingRef = useRef(false);
-  const heldAudioChunksRef = useRef<{ mimeType: string; data: string }[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushingRef = useRef(false);
   const userTranscriptRef = useRef("");
@@ -144,9 +118,12 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
   const assistantUsesOutputTranscriptRef = useRef(false);
   const toolCallsRef = useRef<ToolCallItem[]>([]);
   const nativeCaptionFinalRef = useRef("");
-  const nativeCaptionsEnabledRef = useRef(false);
   /** True once the model signals turnComplete for the current response. */
   const turnCompleteRef = useRef(false);
+  /** Native sample rate from the PCMRecorder's AudioContext. */
+  const micSampleRateRef = useRef(48000);
+  /** Safety timer: if thinking state lasts longer than this, auto-recover. */
+  const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     activeChatIdRef.current = options.activeChatId || null;
@@ -155,9 +132,6 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
   const setLanguage = useCallback((lang: SupportedLanguageCode) => {
     selectedLanguageRef.current = lang;
     setSelectedLanguage(lang);
-    if (recognitionRef.current) {
-      recognitionRef.current.lang = lang;
-    }
   }, []);
 
   const clearFlushTimer = useCallback(() => {
@@ -246,99 +220,19 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     }, 2500);
   }, [clearFlushTimer, persistCurrentTurn]);
 
-  const resumeNativeCaptions = useCallback(() => {
-    const recognition = recognitionRef.current;
-    if (
-      !recognition ||
-      !connectedRef.current ||
-      mutedRef.current ||
-      assistantSpeakingRef.current
-    )
-      return;
-    try {
-      recognition.start();
-    } catch {
-      // Calling start while Chrome is already listening throws InvalidStateError.
+  // ── Web Speech API (SpeechRecognition) REMOVED ──
+  // Running SpeechRecognition simultaneously with getUserMedia causes the
+  // mobile OS to fight over the microphone hardware, producing audio
+  // dropouts and corrupted PCM frames.  Gemini Live's own
+  // inputTranscription / interimInputTranscription is used for captions
+  // instead — it's more accurate and doesn't require a second mic stream.
+
+  const clearThinkingTimeout = useCallback(() => {
+    if (thinkingTimeoutRef.current) {
+      clearTimeout(thinkingTimeoutRef.current);
+      thinkingTimeoutRef.current = null;
     }
   }, []);
-
-  const stopNativeCaptions = useCallback(() => {
-    const recognition = recognitionRef.current;
-    if (!recognition) return;
-    recognition.onresult = null;
-    recognition.onerror = null;
-    recognition.onend = null;
-    try {
-      recognition.abort();
-    } catch {
-      // Recognition may already be stopped.
-    }
-    recognitionRef.current = null;
-    nativeCaptionsEnabledRef.current = false;
-  }, []);
-
-  const startNativeCaptions = useCallback(() => {
-    if (recognitionRef.current || typeof window === "undefined") return;
-    const SpeechRecognition =
-      (
-        window as Window & {
-          SpeechRecognition?: BrowserSpeechRecognitionConstructor;
-          webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
-        }
-      ).SpeechRecognition ||
-      (
-        window as Window & {
-          webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
-        }
-      ).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = selectedLanguageRef.current || "hi-IN";
-    recognition.onresult = (event) => {
-      if (mutedRef.current || assistantSpeakingRef.current) return;
-      let interim = "";
-      for (
-        let index = event.resultIndex;
-        index < event.results.length;
-        index++
-      ) {
-        const result = event.results[index];
-        const transcript = result?.[0]?.transcript?.trim() || "";
-        if (!transcript) continue;
-        if (result.isFinal)
-          nativeCaptionFinalRef.current =
-            `${nativeCaptionFinalRef.current} ${transcript}`.trim();
-        else interim = `${interim} ${transcript}`.trim();
-      }
-      const caption = `${nativeCaptionFinalRef.current} ${interim}`.trim();
-      if (caption) setLiveUserTranscript(caption);
-    };
-    recognition.onerror = (event) => {
-      // Chrome occasionally emits no-speech/network while preserving the mic
-      // stream. The recognition instance restarts on end instead of surfacing
-      // that as a broken voice session.
-      if (
-        event.error === "not-allowed" ||
-        event.error === "service-not-allowed"
-      ) {
-        nativeCaptionsEnabledRef.current = false;
-      }
-    };
-    recognition.onend = () => {
-      if (
-        recognitionRef.current !== recognition ||
-        !nativeCaptionsEnabledRef.current
-      )
-        return;
-      window.setTimeout(resumeNativeCaptions, 120);
-    };
-    recognitionRef.current = recognition;
-    nativeCaptionsEnabledRef.current = true;
-    resumeNativeCaptions();
-  }, [resumeNativeCaptions]);
 
   const startSpeaking = useCallback(() => {
     if (mutedRef.current || !connectedRef.current) return;
@@ -354,6 +248,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     // 3. Persist the previous turn NOW if there is unsaved data, and
     //    cancel any pending delayed persistence timer.
     clearFlushTimer();
+    clearThinkingTimeout();
     if (
       userTranscriptRef.current.trim() ||
       nativeCaptionFinalRef.current.trim() ||
@@ -375,15 +270,22 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     // 5. Begin new recording turn.
     void recorderRef.current?.resume();
     recorderRef.current?.setMuted(false);
-    heldAudioChunksRef.current = [];
     isHoldingRef.current = true;
     setIsHoldingToSpeak(true);
     userSpeakingRef.current = true;
     setIsUserSpeaking(true);
 
+    // 6. Signal Gemini that user audio is about to start.
+    //    With automatic VAD disabled, this is required for manual endpointing.
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        realtimeInput: { activityStart: {} },
+      }));
+    }
+
     setStatus("listening");
-    resumeNativeCaptions();
-  }, [resumeNativeCaptions, clearFlushTimer, persistCurrentTurn]);
+  }, [clearFlushTimer, clearThinkingTimeout, persistCurrentTurn]);
 
   const stopSpeaking = useCallback(() => {
     if (!isHoldingRef.current) return;
@@ -392,42 +294,39 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     userSpeakingRef.current = false;
     setIsUserSpeaking(false);
 
-    const socket = socketRef.current;
-    const chunksToSend = [...heldAudioChunksRef.current];
-    heldAudioChunksRef.current = [];
-    const capturedText = (
-      nativeCaptionFinalRef.current || liveUserTranscript
-    ).trim();
+    // Flush any partial audio buffer still sitting in the AudioWorklet
+    // so we don't lose the tail end of the user's speech.
+    recorderRef.current?.flush();
 
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      if (chunksToSend.length > 0) {
-        // Send all collected audio chunks.  The model's built-in VAD
-        // (automatic activity detection) will detect end-of-speech from
-        // the audio and trigger a response.  Do NOT send a separate
-        // clientContent.turnComplete — that causes a DUPLICATE response
-        // (one from VAD, one from the explicit turnComplete signal).
+    const socket = socketRef.current;
+    // Allow a brief delay for the flushed chunk to post its final data
+    // to the WebSocket (the worklet runs on a different thread).
+    setTimeout(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        // Signal Gemini that the user has finished speaking.
+        // Audio was already streamed in real-time via onChunk, so we
+        // only need to send the activityEnd "go" signal here.
         socket.send(
           JSON.stringify({
-            realtimeInput: { mediaChunks: chunksToSend },
-          }),
-        );
-      } else if (capturedText) {
-        // Fallback: if audio chunks were empty but text was recognized,
-        // send as text.  Text input requires explicit turnComplete.
-        socket.send(
-          JSON.stringify({
-            clientContent: {
-              turns: [{ role: "user", parts: [{ text: capturedText }] }],
-              turnComplete: true,
-            },
+            realtimeInput: { activityEnd: {} },
           }),
         );
       }
-    }
-    if (connectedRef.current && !assistantSpeakingRef.current) {
-      setStatus("thinking");
-    }
-  }, [liveUserTranscript]);
+      if (connectedRef.current && !assistantSpeakingRef.current) {
+        setStatus("thinking");
+        // Safety net: if thinking state persists for more than 20 seconds
+        // without any model response, auto-recover to ready state.
+        clearThinkingTimeout();
+        thinkingTimeoutRef.current = setTimeout(() => {
+          thinkingTimeoutRef.current = null;
+          if (!assistantSpeakingRef.current && !isHoldingRef.current && connectedRef.current) {
+            console.warn("[voice] thinking timeout — auto-recovering to ready state");
+            setStatus("ready");
+          }
+        }, 20_000);
+      }
+    }, 100); // 100ms: enough for worklet flush to post its final chunk
+  }, [clearThinkingTimeout]);
 
   const setAssistantSpeaking = useCallback(
     (speaking: boolean) => {
@@ -447,15 +346,6 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
         setIsUserSpeaking(false);
         isHoldingRef.current = false;
         setIsHoldingToSpeak(false);
-        heldAudioChunksRef.current = [];
-        const recognition = recognitionRef.current;
-        if (recognition) {
-          try {
-            recognition.abort();
-          } catch {
-            // Recognition may have stopped between response chunks.
-          }
-        }
         setStatus("speaking");
       } else {
         if (!assistantSpeakingRef.current) return; // already not speaking
@@ -469,7 +359,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
         }
       }
     },
-    [resumeNativeCaptions],
+    [],
   );
 
   const handleAudioLevel = useCallback((rms: number) => {
@@ -488,8 +378,8 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     playbackActiveRef.current = false;
     isHoldingRef.current = false;
     setIsHoldingToSpeak(false);
-    heldAudioChunksRef.current = [];
     clearFlushTimer();
+    clearThinkingTimeout();
     if (
       nativeCaptionFinalRef.current.trim() ||
       userTranscriptRef.current.trim()
@@ -511,7 +401,6 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     }
     recorderRef.current?.stop();
     recorderRef.current = null;
-    stopNativeCaptions();
     playerRef.current?.stop();
     playerRef.current = null;
 
@@ -522,7 +411,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     setLiveUserTranscript("");
     setLiveAssistantTranscript("");
     setActiveToolName(null);
-  }, [clearFlushTimer, persistCurrentTurn, stopNativeCaptions]);
+  }, [clearFlushTimer, clearThinkingTimeout, persistCurrentTurn]);
 
   useEffect(() => disconnect, [disconnect]);
 
@@ -610,6 +499,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             conversationId: activeChatIdRef.current || undefined,
+            language: selectedLanguageRef.current,
           }),
         });
         const session = (await response.json()) as VoiceSessionConfig & {
@@ -659,6 +549,15 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
                     },
                   },
                 },
+                // ── Manual endpointing: disable automatic VAD ──
+                // With this disabled, Gemini will NEVER interrupt the user
+                // during natural pauses. It will ONLY respond after we
+                // explicitly send activityEnd on button release.
+                realtimeInputConfig: {
+                  automaticActivityDetection: {
+                    disabled: true,
+                  },
+                },
                 inputAudioTranscription: {},
                 outputAudioTranscription: {},
                 systemInstruction: {
@@ -681,17 +580,32 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             const message = JSON.parse(raw);
             if (message.setupComplete) {
               const recorder = new PCMRecorder({
-                targetSampleRate: 16000,
                 onChunk: (data) => {
+                  // ── REAL-TIME STREAMING ──
+                  // Send each audio chunk to Gemini immediately as it arrives
+                  // from the AudioWorklet.  This gives Gemini a clean,
+                  // continuous audio stream instead of a burst-dump which
+                  // confuses its audio decoder and produces garbage.
                   if (
                     isHoldingRef.current &&
                     !mutedRef.current &&
-                    !assistantSpeakingRef.current
+                    !assistantSpeakingRef.current &&
+                    socketRef.current &&
+                    socketRef.current.readyState === WebSocket.OPEN
                   ) {
-                    heldAudioChunksRef.current.push({
-                      mimeType: "audio/pcm;rate=16000",
-                      data,
-                    });
+                    const rate = micSampleRateRef.current;
+                    socketRef.current.send(
+                      JSON.stringify({
+                        realtimeInput: {
+                          mediaChunks: [
+                            {
+                              mimeType: `audio/pcm;rate=${rate}`,
+                              data,
+                            },
+                          ],
+                        },
+                      }),
+                    );
                   }
                 },
                 onVolume: setMicVolume,
@@ -703,14 +617,29 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
               });
               recorderRef.current = recorder;
               if (!(await recorder.start())) return;
-              startNativeCaptions();
+              // Store the native sample rate for MIME type in audio chunks.
+              micSampleRateRef.current = recorder.getNativeSampleRate();
+              console.log("[voice] mic native sample rate:", micSampleRateRef.current);
+              console.log("[voice] mic input info:", recorder.getInputInfo());
               setStatus("ready");
               return;
             }
 
             const serverContent = message.serverContent;
+
+            // ── Any model response clears the thinking timeout ──
+            if (serverContent) {
+              clearThinkingTimeout();
+            }
+
+            // ── Interim input transcription (diagnostic) ──
+            if (serverContent?.interimInputTranscription?.text) {
+              console.log("[voice] INTERIM user:", serverContent.interimInputTranscription.text);
+            }
+
             if (serverContent?.inputTranscription?.text) {
               const vertexText = serverContent.inputTranscription.text.trim();
+              console.log("[voice] FINAL user:", vertexText);
               if (vertexText) {
                 // Vertex AI's Gemini-powered transcription is far more accurate
                 // than the browser's Web Speech API. ALWAYS use it to replace
@@ -806,7 +735,6 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
           playbackActiveRef.current = false;
           recorderRef.current?.stop();
           recorderRef.current = null;
-          stopNativeCaptions();
           playerRef.current?.stop();
           playerRef.current = null;
           setStatus("error");
@@ -829,8 +757,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
       handleToolCalls,
       schedulePersistence,
       setAssistantSpeaking,
-      startNativeCaptions,
-      stopNativeCaptions,
+      clearThinkingTimeout,
     ],
   );
 
@@ -848,7 +775,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     } else if (connectedRef.current && !assistantSpeakingRef.current) {
       setStatus("ready");
     }
-  }, [resumeNativeCaptions]);
+  }, []);
 
   const reportError = useCallback((message: string) => {
     connectedRef.current = false;

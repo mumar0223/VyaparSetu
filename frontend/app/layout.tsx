@@ -13,11 +13,6 @@ export const metadata: Metadata = {
   title: "VyaparSetu — AI Hyper-Local Business Advisory & Financial Structuring",
   description:
     "AI-driven hyper-local business advisory and financial structuring assistant for rural micro-entrepreneurs. Transform grassroots commerce with intelligent credit structuring, scheme matching, and local market advisory.",
-  icons: {
-    icon: "/logos/vyaparsetu-icon.svg",
-    shortcut: "/logos/vyaparsetu-icon.svg",
-    apple: "/logos/vyaparsetu-icon.svg",
-  },
 };
 
 export const viewport: Viewport = {

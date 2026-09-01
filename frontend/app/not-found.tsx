@@ -10,14 +10,13 @@ import {
   ScanEye,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { BrandLogo } from "@/components/brand-logo";
 
 export default function NotFound() {
   const QUICK_LINKS = [
     {
-      title: "Main Dashboard",
+      title: "AI Saathi Workspace",
       desc: "Return to your primary business overview and daily summaries",
-      href: "/dashboard",
+      href: "/ai-saathi",
       icon: LayoutDashboard,
     },
     {
@@ -48,8 +47,11 @@ export default function NotFound() {
 
       {/* Top Header */}
       <header className="flex items-center justify-between max-w-5xl w-full mx-auto shrink-0 z-10">
-        <Link href="/dashboard" className="flex items-center">
-          <BrandLogo iconSize={32} textClassName="text-xl text-forest dark:text-mint" />
+        <Link href="/ai-saathi" className="flex items-center gap-2.5">
+          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_12px_rgba(74,222,128,0.8)]" />
+          <span className="font-serif font-bold text-xl text-forest dark:text-mint tracking-tight">
+            VyaparSetu
+          </span>
         </Link>
         <ThemeToggle />
       </header>
@@ -80,11 +82,11 @@ export default function NotFound() {
         {/* Primary CTA */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
           <Link
-            href="/dashboard"
+            href="/ai-saathi"
             className="w-full sm:w-auto px-6 py-3.5 bg-forest dark:bg-mint hover:bg-forest-deep dark:hover:bg-mint-light text-white dark:text-black font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer group"
           >
             <ArrowLeft className="size-4 group-hover:-translate-x-1 transition-transform" />
-            <span>Return to Safe Dashboard</span>
+            <span>Return to AI Saathi</span>
           </Link>
           <Link
             href="/scanner"

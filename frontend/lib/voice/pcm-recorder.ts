@@ -6,9 +6,16 @@
  * Capture is deliberately left to the browser's platform audio stack for
  * echo cancellation, noise suppression, and gain control. This is much more
  * reliable on desktop devices than a hand-rolled noise gate.
+ *
+ * IMPORTANT: No sample-rate conversion is performed. Audio is captured at the
+ * browser's native sample rate (usually 48 kHz) and sent as-is. The Gemini
+ * Live API natively resamples when the MIME type declares the actual rate
+ * (e.g., "audio/pcm;rate=48000"), so there is no need for a client-side
+ * resampler. This eliminates interpolation artifacts and simplifies the code.
  */
 
 export interface PCMRecorderOptions {
+  /** @deprecated Not used — audio is sent at native sample rate. */
   targetSampleRate?: number;
   bufferSize?: number;
   noiseGateThreshold?: number; // API compatibility; NOT USED
@@ -29,10 +36,11 @@ export class PCMRecorder {
   private isMuted = false;
   private isAssistantSpeaking = false;
   private options: PCMRecorderOptions;
+  /** The actual sample rate of the AudioContext (browser native). */
+  private nativeSampleRate: number = 48000;
 
   constructor(options: PCMRecorderOptions) {
     this.options = {
-      targetSampleRate: 16000,
       bufferSize: 2048,
       ...options,
     };
@@ -42,8 +50,11 @@ export class PCMRecorder {
     if (this.isRecording) return true;
 
     try {
+      // Use explicit constraints. `exact` for channelCount ensures mono.
+      // `ideal` for processing features is appropriate — the browser will
+      // enable them if the hardware/driver supports them.
       const audioConstraints: MediaTrackConstraints = {
-        channelCount: { ideal: 1 },
+        channelCount: { exact: 1 },
         echoCancellation: { ideal: true },
         noiseSuppression: { ideal: true },
         autoGainControl: { ideal: true },
@@ -58,6 +69,18 @@ export class PCMRecorder {
         throw new Error("No microphone audio track was returned.");
       }
 
+      // ── Log actual mic settings for diagnostics ──
+      const actualSettings = track.getSettings();
+      console.log("[PCMRecorder] Microphone granted:", {
+        label: track.label,
+        sampleRate: actualSettings.sampleRate ?? "unknown",
+        channelCount: actualSettings.channelCount ?? "unknown",
+        echoCancellation: actualSettings.echoCancellation ?? "unknown",
+        noiseSuppression: actualSettings.noiseSuppression ?? "unknown",
+        autoGainControl: actualSettings.autoGainControl ?? "unknown",
+        deviceId: actualSettings.deviceId ?? "unknown",
+      });
+
       const AudioCtx =
         window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
@@ -71,24 +94,41 @@ export class PCMRecorder {
         await this.audioContext.resume();
       }
 
+      // Store the native sample rate — this is what Gemini needs in the MIME type.
+      this.nativeSampleRate = this.audioContext.sampleRate;
+      console.log("[PCMRecorder] AudioContext sample rate:", this.nativeSampleRate);
+
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 
-      const targetSampleRate = this.options.targetSampleRate ?? 16000;
       const bufferSize = this.options.bufferSize ?? 2048;
-      const inputSampleRate = this.audioContext.sampleRate;
 
-      // Only sample-rate conversion and chunking happen inside the worklet.
+      // The worklet performs NO resampling. It simply collects Float32 samples
+      // into fixed-size chunks and posts them to the main thread.
+      // It also supports a "flush" command to emit any partial buffer.
       const workletCode = `
         class RawPCMProcessor extends AudioWorkletProcessor {
           constructor() {
             super();
-            this.inputSampleRate = ${inputSampleRate};
-            this.targetSampleRate = ${targetSampleRate};
-            this.ratio = this.inputSampleRate / this.targetSampleRate;
             this.bufferSize = ${bufferSize};
             this.outputBuffer = new Float32Array(this.bufferSize);
             this.outputIndex = 0;
-            this.resampleOffset = 0;
+
+            // Listen for flush commands from the main thread.
+            this.port.onmessage = (event) => {
+              if (event.data && event.data.type === 'flush') {
+                this._flushPartial();
+              }
+            };
+          }
+
+          _flushPartial() {
+            if (this.outputIndex > 0) {
+              this.port.postMessage({
+                type: 'chunk',
+                buffer: this.outputBuffer.slice(0, this.outputIndex),
+              });
+              this.outputIndex = 0;
+            }
           }
 
           process(inputs) {
@@ -96,37 +136,23 @@ export class PCMRecorder {
             if (!input || !input[0] || input[0].length === 0) return true;
 
             const inputChannel = input[0];
-            const inputLen = inputChannel.length;
 
-            while (this.resampleOffset < inputLen) {
-              const index0 = Math.floor(this.resampleOffset);
-              const index1 = Math.min(index0 + 1, inputLen - 1);
-              const fraction = this.resampleOffset - index0;
-
-              // The browser has already applied any device-level processing.
-              const sample =
-                inputChannel[index0] * (1 - fraction) +
-                inputChannel[index1] * fraction;
-
-              this.outputBuffer[this.outputIndex++] = sample;
+            for (let i = 0; i < inputChannel.length; i++) {
+              this.outputBuffer[this.outputIndex++] = inputChannel[i];
 
               if (this.outputIndex >= this.bufferSize) {
                 this.port.postMessage({
-                  type: "chunk",
+                  type: 'chunk',
                   buffer: this.outputBuffer.slice(0, this.bufferSize),
                 });
                 this.outputIndex = 0;
               }
-
-              this.resampleOffset += this.ratio;
             }
-
-            this.resampleOffset -= inputLen;
             return true;
           }
         }
 
-        registerProcessor("raw-pcm-processor", RawPCMProcessor);
+        registerProcessor('raw-pcm-processor', RawPCMProcessor);
       `;
 
       const blob = new Blob([workletCode], {
@@ -193,6 +219,20 @@ export class PCMRecorder {
     }
   }
 
+  /**
+   * Flush any partial buffer remaining in the AudioWorklet.
+   *
+   * Call this when the user releases the hold-to-speak button so that the
+   * last few milliseconds of audio are not silently discarded.  Without
+   * this, up to `bufferSize` samples (~42 ms at 48 kHz with 2048) could be
+   * lost at the tail of each utterance.
+   */
+  public flush(): void {
+    if (this.workletNode) {
+      this.workletNode.port.postMessage({ type: "flush" });
+    }
+  }
+
   public setAssistantSpeaking(speaking: boolean): void {
     // Kept for API compatibility. RAW mode does not suppress microphone audio.
     this.isAssistantSpeaking = speaking;
@@ -200,12 +240,12 @@ export class PCMRecorder {
 
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
-    // Stop the physical track while the assistant is speaking or the user has
-    // muted the call. This prevents both outbound audio and accidental local
-    // capture; unmuting restores the same selected microphone immediately.
-    this.mediaStream?.getAudioTracks().forEach((track) => {
-      track.enabled = !muted;
-    });
+    // NOTE: We deliberately do NOT toggle track.enabled here.
+    // On mobile browsers (Chrome Android, iOS Safari), toggling
+    // track.enabled causes the OS to re-initialize the microphone
+    // hardware, creating audio pops, gaps, and frame corruption.
+    // Instead, the isMuted flag is checked in the onmessage handler
+    // which silently discards chunks while muted.
   }
 
   public getIsMuted(): boolean {
@@ -214,6 +254,15 @@ export class PCMRecorder {
 
   public getIsRecording(): boolean {
     return this.isRecording;
+  }
+
+  /**
+   * Returns the native sample rate of the AudioContext.
+   * Use this to set the correct MIME type when sending to Gemini Live
+   * (e.g., `audio/pcm;rate=48000`).
+   */
+  public getNativeSampleRate(): number {
+    return this.nativeSampleRate;
   }
 
   public async resume(): Promise<void> {

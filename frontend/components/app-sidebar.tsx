@@ -32,9 +32,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 import { useTranslation } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { BrandLogo } from "@/components/brand-logo";
 
 const I18N_NAV_MAP: Record<string, string> = {
+  "/ai-saathi": "sidebar.aiSaathi",
   "/dashboard": "sidebar.dashboard",
   "/scanner": "sidebar.swotScanner",
   "/profile/business": "sidebar.enterpriseProfile",
@@ -56,13 +56,18 @@ const NAV_SECTIONS = [
     title: "Workspace",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/ai-saathi", label: "AI Saathi", icon: Bot },
     ],
   },
   {
     title: "Grow & Advisory",
     items: [
       { href: "/scanner", label: "SWOT Market Scanner", icon: TrendingUp },
-      { href: "/profile/business", label: "Enterprise Profile", icon: Building2 },
+      {
+        href: "/profile/business",
+        label: "Enterprise Profile",
+        icon: Building2,
+      },
       { href: "/ai-recommendations", label: "AI Recommendations", icon: Bot },
       { href: "/schemes-for-you", label: "Govt. Schemes", icon: Award },
       { href: "/success-stories", label: "Success Stories", icon: Star },
@@ -101,21 +106,30 @@ interface AppSidebarProps {
 }
 
 const SECTION_TITLE_MAP: Record<string, string> = {
-  "Workspace": "sidebar.workspace",
+  Workspace: "sidebar.workspace",
   "Grow & Advisory": "sidebar.growAdvisory",
   "Money & Credit": "sidebar.moneyCredit",
   "Account & Governance": "sidebar.accountGovernance",
 };
 
-export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps) {
+export function AppSidebar({
+  currentUser,
+  className,
+  onClose,
+}: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useTranslation();
 
-  const isActive = (href: string) =>
-    href === "/dashboard"
-      ? pathname === "/dashboard"
-      : pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => {
+    if (href === "/dashboard") {
+      return pathname === "/dashboard";
+    }
+    if (href === "/ai-saathi") {
+      return pathname === "/ai-saathi" || pathname.startsWith("/ai-saathi/");
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   const userName = currentUser?.name || "Operator";
   const userRole = currentUser?.role || "Enterprise";
@@ -143,18 +157,23 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
   return (
     <aside
       className={cn(
-        "flex w-64 shrink-0 flex-col border-r border-sage/30 dark:border-border bg-white dark:bg-card h-full font-sans text-foreground select-none",
-        className
+        "flex w-64 shrink-0 flex-col border-r border-sage/20 dark:border-border bg-white/35 dark:bg-card/35 h-full font-sans text-foreground select-none",
+        className,
       )}
     >
       {/* Brand Header */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-sage/30 dark:border-border shrink-0">
-        <Link href="/dashboard" className="flex items-center min-w-0">
-          <BrandLogo
-            iconSize={28}
-            text={t("common.appName", "VyaparSetu")}
-            textClassName="text-lg text-forest dark:text-mint truncate"
-          />
+        <Link
+          href="/dashboard"
+          onClick={() => {
+            onClose?.();
+          }}
+          className="flex items-center gap-2 min-w-0"
+        >
+          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_10px_rgba(74,222,128,0.7)] shrink-0" />
+          <span className="font-serif font-bold text-lg text-forest dark:text-mint tracking-tight truncate">
+            {t("common.appName", "VyaparSetu")}
+          </span>
         </Link>
         <LanguageSwitcher variant="brand" className="shrink-0" />
       </div>
@@ -178,12 +197,23 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      onClick={onClose}
+                      onClick={(e) => {
+                        onClose?.();
+                        if (
+                          item.href === "/ai-saathi" &&
+                          pathname.startsWith("/ai-saathi")
+                        ) {
+                          e.preventDefault();
+                          window.dispatchEvent(
+                            new CustomEvent("reset-ai-saathi"),
+                          );
+                        }
+                      }}
                       className={cn(
                         "flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all",
                         active
                           ? "bg-mint-pale dark:bg-mint/15 text-forest dark:text-mint font-bold shadow-xs border border-mint/20 dark:border-mint/30"
-                          : "text-ink-muted dark:text-muted-foreground hover:bg-cream dark:hover:bg-muted hover:text-forest dark:hover:text-foreground"
+                          : "text-ink-muted dark:text-muted-foreground hover:bg-cream dark:hover:bg-muted hover:text-forest dark:hover:text-foreground",
                       )}
                     >
                       <item.icon
@@ -191,7 +221,7 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
                           "size-4 shrink-0",
                           active
                             ? "text-forest dark:text-mint"
-                            : "text-ink-muted dark:text-muted-foreground group-hover:text-forest dark:group-hover:text-foreground"
+                            : "text-ink-muted dark:text-muted-foreground group-hover:text-forest dark:group-hover:text-foreground",
                         )}
                       />
                       <span className="truncate">{translatedLabel}</span>
@@ -205,7 +235,7 @@ export function AppSidebar({ currentUser, className, onClose }: AppSidebarProps)
       </nav>
 
       {/* Footer Profile & Logout */}
-      <div className="border-t border-sage/30 dark:border-border p-3 flex items-center justify-between gap-2 shrink-0 bg-white dark:bg-card">
+      <div className="border-t border-sage/30 dark:border-border p-3 flex items-center justify-between gap-2 shrink-0 bg-transparent">
         <Link
           href="/profile"
           onClick={onClose}

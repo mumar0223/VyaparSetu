@@ -1,15 +1,12 @@
-import { getCurrentUser } from "@/lib/auth";
-import { ChatWorkspace } from "@/components/chat/chat-workspace";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function ConversationPage({
+export default async function ConversationRedirect({
   params,
 }: {
   params: Promise<{ chatId: string }>;
 }) {
-  const user = await getCurrentUser();
   const { chatId } = await params;
-
-  return <ChatWorkspace currentUser={user} initialChatId={chatId} />;
+  redirect(`/ai-saathi/c/${chatId}`);
 }

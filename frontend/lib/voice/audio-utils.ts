@@ -81,9 +81,9 @@ export function floatTo16BitPCMBase64(data: Float32Array): string {
   return bytesToBase64(new Uint8Array(int16.buffer));
 }
 
-export function createPcmBlob(data: Float32Array): GenAIBlob {
+export function createPcmBlob(data: Float32Array, sampleRate: number = 16000): GenAIBlob {
   return {
     data: floatTo16BitPCMBase64(data),
-    mimeType: "audio/pcm;rate=16000",
+    mimeType: `audio/pcm;rate=${sampleRate}`,
   };
 }

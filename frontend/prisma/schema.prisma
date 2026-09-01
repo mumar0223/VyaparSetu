@@ -12,25 +12,25 @@ enum Role {
 }
 
 model User {
-  id                 String     @id @default(cuid())
+  id                 String          @id @default(cuid())
   name               String
-  email              String     @unique
+  email              String          @unique
   passwordHash       String
-  role               String     @default("USER")
-  permissions        String[]   @default([])
-  mustChangePassword Boolean    @default(false)
-  isActive           Boolean    @default(true)
+  role               String          @default("USER")
+  permissions        String[]        @default([])
+  mustChangePassword Boolean         @default(false)
+  isActive           Boolean         @default(true)
   lastLoginAt        DateTime?
   avatar             String?
-  auditLogs          AuditLog[]     @relation("UserAuditLogs")
-  sessions           Session[]      @relation("UserSessions")
-  conversations      Conversation[] @relation("UserConversations")
+  auditLogs          AuditLog[]      @relation("UserAuditLogs")
+  sessions           Session[]       @relation("UserSessions")
+  conversations      Conversation[]  @relation("UserConversations")
   businesses         Business[]
   settings           Settings?
   privacyConsent     PrivacyConsent?
   notifications      Notification[]
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   @@index([email])
   @@index([role])
@@ -85,7 +85,7 @@ model ConversationMessage {
   id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role           String       // "user" | "assistant" | "system"
+  role           String // "user" | "assistant" | "system"
   content        String       @db.Text
   thinking       String?      @db.Text
   toolCalls      Json?
@@ -117,13 +117,13 @@ model Business {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  owner              User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  transactions       Transaction[]
-  expenses           Expense[]
-  savingGoals        SavingGoal[]
-  budgets            Budget[]
-  debts              Debt[]
-  milestones         BusinessMilestone[]
+  owner        User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  expenses     Expense[]
+  savingGoals  SavingGoal[]
+  budgets      Budget[]
+  debts        Debt[]
+  milestones   BusinessMilestone[]
 }
 
 enum TransactionType {
@@ -136,7 +136,7 @@ enum TransactionType {
 }
 
 model Transaction {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   businessId  String
   type        TransactionType
   amount      Float
@@ -144,14 +144,14 @@ model Transaction {
   category    String?
   description String?
   referenceId String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model Expense {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   businessId    String
   category      String
   amount        Float
@@ -159,27 +159,27 @@ model Expense {
   vendor        String?
   description   String?
   paymentMethod String?
-  recurring     Boolean  @default(false)
+  recurring     Boolean   @default(false)
   notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model SavingGoal {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   businessId   String
   name         String
   targetAmount Float
-  savedAmount  Float    @default(0)
+  savedAmount  Float     @default(0)
   targetDate   DateTime?
-  status       String   @default("ACTIVE")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  status       String    @default("ACTIVE")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  business      Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
   contributions SavingContribution[]
 }
 
@@ -189,8 +189,8 @@ model SavingContribution {
   amount       Float
   date         DateTime @default(now())
   notes        String?
-  
-  savingGoal   SavingGoal @relation(fields: [savingGoalId], references: [id], onDelete: Cascade)
+
+  savingGoal SavingGoal @relation(fields: [savingGoalId], references: [id], onDelete: Cascade)
 }
 
 model Budget {
@@ -204,17 +204,17 @@ model Budget {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  items       BudgetItem[]
+  business Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items    BudgetItem[]
 }
 
 model BudgetItem {
-  id             String   @id @default(uuid())
-  budgetId       String
-  category       String
+  id              String @id @default(uuid())
+  budgetId        String
+  category        String
   allocatedAmount Float
 
-  budget         Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 }
 
 enum DebtType {
@@ -226,7 +226,7 @@ enum DebtType {
 }
 
 model Debt {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   businessId        String
   type              DebtType
   lender            String
@@ -235,11 +235,11 @@ model Debt {
   interestRate      Float?
   nextPaymentDate   DateTime?
   emiAmount         Float?
-  status            String   @default("ACTIVE")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  business          Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  status            String    @default("ACTIVE")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model PrivacyConsent {
@@ -249,20 +249,20 @@ model PrivacyConsent {
   marketingEmails Boolean  @default(false)
   termsAccepted   Boolean  @default(true)
   updatedAt       DateTime @updatedAt
-  
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Settings {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  currency        String   @default("INR")
-  language        String   @default("en")
-  theme           String   @default("light")
-  emailAlerts     Boolean  @default(true)
-  updatedAt       DateTime @updatedAt
-  
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  currency    String   @default("INR")
+  language    String   @default("en")
+  theme       String   @default("light")
+  emailAlerts Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
@@ -273,7 +273,7 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model BusinessMilestone {
@@ -284,6 +284,60 @@ model BusinessMilestone {
   isAchieved  Boolean  @default(false)
   date        DateTime
   createdAt   DateTime @default(now())
-  
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
+
+model GovernmentSchemeMatch {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  schemes          Json
+  summary          String?  @db.Text
+  totalSubsidies   String?
+  district         String?
+  state            String?
+  lastEvaluatedAt  DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model DistrictBusinessPrediction {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  district         String
+  state            String
+  budget           Float
+  category         String?
+  riskLevel        String?
+  predictions      Json
+  districtSummary  String?  @db.Text
+  liveMandiInsight String?  @db.Text
+  mandiRecords     Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model SwotMarketAnalysis {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  district   String
+  state      String
+  radiusKm   Float
+  score      Float
+  swotData   Json
+  actionPlan Json?
+  dataSource String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model StrategicActionPlaybook {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  playbooks         Json
+  enterpriseSummary String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+
