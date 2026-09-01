@@ -55,7 +55,7 @@ The diagram above shows the shape of the system. In words:
 
 ---
 
-## 3. Prerequisites
+## 3. Prerequisites     
 
 - Node.js 20+ and npm
 - Two PostgreSQL databases (can be two local databases, two Neon projects, or one Postgres server with two schemas/databases) — **frontend and backend must each get their own `DATABASE_URL`**
