@@ -13,7 +13,7 @@ export function DashboardView() {
   const { data, loading, isRefreshing, lastFetched, refetch } = useDashboardAnalytics();
 
   return (
-    <div className="h-full w-full overflow-y-auto p-4 sm:p-6 lg:p-8 font-sans">
+    <div className="h-full w-full overflow-y-auto pt-16 sm:pt-16 lg:pt-8 p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-6 pb-24">
         {/* Executive Header */}
         <DashboardHeader

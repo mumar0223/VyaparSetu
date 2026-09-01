@@ -2,7 +2,7 @@ import { CreditCard, Check } from "lucide-react";
 
 export default function BillingPage() {
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 lg:p-8 font-sans text-foreground">
+    <div className="h-full overflow-y-auto pt-16 sm:pt-16 md:pt-16 lg:pt-8 p-4 md:p-6 lg:p-8 font-sans text-foreground">
       <div className="flex flex-col gap-6 max-w-4xl mx-auto">
         <div className="p-6 rounded-2xl border border-sage/30 dark:border-border bg-white dark:bg-card shadow-xs">
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-forest dark:text-mint flex items-center gap-2.5">

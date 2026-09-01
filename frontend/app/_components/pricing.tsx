@@ -23,8 +23,8 @@ export function Pricing({ currentUser }: { currentUser?: AuthUser | null }) {
       tagline: "For individual village artisans & nano-traders.",
       monthly: 0,
       yearly: 0,
-      cta: currentUser ? "Go to AI Saathi" : "Start Free",
-      href: currentUser ? "/ai-saathi" : "/signup",
+      cta: currentUser ? "Go to Dashboard" : "Start Free",
+      href: currentUser ? "/dashboard" : "/signup",
       features: [
         "50 voice & chat advisory queries/mo",
         "Daily expense & ledger logging",
@@ -95,8 +95,8 @@ export function Pricing({ currentUser }: { currentUser?: AuthUser | null }) {
               transition={{ delay: i * 0.1, duration: 0.5 }}
               className={`relative flex flex-col p-7 rounded-3xl border transition-all ${
                 plan.highlight
-                  ? "border-mint dark:border-mint/60 bg-white dark:bg-card shadow-xl ring-2 ring-mint/20"
-                  : "border-sage/30 dark:border-border bg-white dark:bg-card shadow-xs hover:shadow-md"
+                  ? "border-mint dark:border-mint/60 bg-white/60 dark:bg-card/60 shadow-xl ring-2 ring-mint/20"
+                  : "border-sage/20 dark:border-border bg-white/45 dark:bg-card/45 shadow-xs hover:shadow-md hover:bg-white/70 dark:hover:bg-card/65"
               }`}
             >
               {plan.highlight && (

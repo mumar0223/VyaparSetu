@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/lib/auth-types";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BrandLogo } from "@/components/brand-icons";
 
 import { useTranslation } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -168,12 +169,9 @@ export function AppSidebar({
           onClick={() => {
             onClose?.();
           }}
-          className="flex items-center gap-2 min-w-0"
+          className="flex items-center min-w-0"
         >
-          <div className="size-3.5 bg-mint rounded-full shadow-[0_0_10px_rgba(74,222,128,0.7)] shrink-0" />
-          <span className="font-serif font-bold text-lg text-forest dark:text-mint tracking-tight truncate">
-            {t("common.appName", "VyaparSetu")}
-          </span>
+          <BrandLogo iconSize={24} textClassName="text-[15px]" />
         </Link>
         <LanguageSwitcher variant="brand" className="shrink-0" />
       </div>

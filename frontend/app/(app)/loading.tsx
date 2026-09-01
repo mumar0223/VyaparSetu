@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AppLoading() {
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 lg:p-8 overflow-hidden font-sans space-y-6">
+    <div className="h-full flex flex-col pt-16 sm:pt-16 md:pt-16 lg:pt-8 p-4 md:p-6 lg:p-8 overflow-hidden font-sans space-y-6">
       {/* Header Skeleton */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">

@@ -34,8 +34,8 @@ export function AppMobileShell({ currentUser, children }: AppMobileShellProps) {
             className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative z-50 w-72 h-full bg-white/70 dark:bg-card/70 shadow-2xl flex flex-col border-r border-sage/30 dark:border-border">
-            <div className="flex items-center justify-between p-4 border-b border-sage/30 dark:border-border">
+          <div className="relative z-50 w-72 h-full bg-white dark:bg-zinc-950 shadow-2xl flex flex-col border-r border-sage/30 dark:border-border">
+            <div className="flex items-center justify-between p-4 border-b border-sage/30 dark:border-border bg-white dark:bg-zinc-950">
               <span className="font-serif font-bold text-lg text-forest dark:text-foreground">Menu</span>
               <button onClick={() => setMobileOpen(false)} className="p-1 text-ink-muted dark:text-muted-foreground hover:text-forest dark:hover:text-foreground cursor-pointer">
                 <X className="size-6" />

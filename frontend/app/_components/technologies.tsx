@@ -44,7 +44,7 @@ export function Technologies() {
     <section
       ref={containerRef}
       id="technologies"
-      className="py-20 md:py-28 bg-forest dark:bg-zinc-950 text-white relative border-y border-sage/30 dark:border-border overflow-hidden"
+      className="py-20 md:py-28 bg-forest/90 dark:bg-zinc-950/90 text-white relative border-y border-sage/20 dark:border-border overflow-hidden"
     >
       {/* Background radial ambient glow */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(74,222,128,0.15),transparent_60%)]" />

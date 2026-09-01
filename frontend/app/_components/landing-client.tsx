@@ -6,6 +6,8 @@ import { Navbar } from "./navbar";
 import { HowItWorks } from "./how-it-works";
 import { Technologies } from "./technologies";
 import { Pricing } from "./pricing";
+import { AppBackground } from "@/components/app-background";
+import { BrandLogo } from "@/components/brand-icons";
 import {
   Code2,
   Network,
@@ -43,7 +45,10 @@ export function LandingClient({ currentUser }: LandingClientProps) {
   ];
 
   return (
-    <main className="bg-cream dark:bg-background text-foreground selection:bg-mint-pale selection:text-forest min-h-screen font-sans overflow-x-clip max-w-full">
+    <main className="relative bg-transparent text-foreground selection:bg-mint-pale selection:text-forest min-h-screen font-sans overflow-x-clip max-w-full">
+      {/* Universal Fixed Animated Honeycomb Grid Background */}
+      <AppBackground />
+
       <Navbar currentUser={currentUser} />
 
       {/* Hero Section */}
@@ -83,10 +88,10 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                 <div className="flex flex-wrap items-center gap-3 pt-2">
                   {currentUser ? (
                     <Link
-                      href="/ai-saathi"
+                      href="/dashboard"
                       className="px-6 py-3.5 bg-forest dark:bg-mint hover:bg-forest-deep dark:hover:bg-mint-light text-white dark:text-black font-bold rounded-xl shadow-lg transition-all active:scale-95 text-xs sm:text-sm inline-flex items-center gap-2 cursor-pointer"
                     >
-                      <span>Open AI Saathi Workspace</span>
+                      <span>Go to Dashboard</span>
                       <ArrowRight className="size-4" />
                     </Link>
                   ) : (
@@ -143,9 +148,9 @@ export function LandingClient({ currentUser }: LandingClientProps) {
       </div>
 
       {/* Content Wrapper */}
-      <div className="bg-cream dark:bg-background relative z-10 w-full rounded-t-[2.5rem] md:rounded-t-[3.5rem] border-t border-sage/30 dark:border-border shadow-2xl">
+      <div className="bg-cream/40 dark:bg-background/40 relative z-10 w-full rounded-t-[2.5rem] md:rounded-t-[3.5rem] border-t border-sage/20 dark:border-border shadow-2xl">
         {/* Core Bottleneck Section */}
-        <section className="py-20 md:py-28 bg-white/70 dark:bg-card/30 border-b border-sage/30 dark:border-border rounded-t-[2.5rem] md:rounded-t-[3.5rem]">
+        <section className="py-20 md:py-28 bg-white/30 dark:bg-card/20 border-b border-sage/20 dark:border-border rounded-t-[2.5rem] md:rounded-t-[3.5rem]">
           <div className="container mx-auto px-6 max-w-6xl">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -190,7 +195,7 @@ export function LandingClient({ currentUser }: LandingClientProps) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-100px" }}
                   transition={{ delay: i * 0.1, duration: 0.5 }}
-                  className="p-7 rounded-3xl border border-sage/30 dark:border-border bg-white dark:bg-card shadow-xs hover:shadow-md transition-all group"
+                  className="p-7 rounded-3xl border border-sage/20 dark:border-border bg-white/45 dark:bg-card/45 hover:bg-white/70 dark:hover:bg-card/65 shadow-xs hover:shadow-md transition-all group"
                 >
                   <div className="size-12 rounded-2xl bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint border border-mint/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:bg-mint group-hover:text-black transition-all duration-300">
                     <feature.icon className="size-6" />
@@ -213,12 +218,9 @@ export function LandingClient({ currentUser }: LandingClientProps) {
         <Pricing currentUser={currentUser} />
 
         {/* Footer */}
-        <footer className="border-t border-sage/30 dark:border-border py-10 bg-white dark:bg-zinc-950 text-center text-xs text-muted-foreground">
+        <footer className="border-t border-sage/20 dark:border-border py-10 bg-white/40 dark:bg-zinc-950/40 text-center text-xs text-muted-foreground">
           <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 font-serif font-bold text-sm text-forest dark:text-mint">
-              <div className="size-2.5 bg-mint rounded-full" />
-              <span>VyaparSetu</span>
-            </div>
+            <BrandLogo iconSize={24} textClassName="text-sm" />
             <p>
               © {new Date().getFullYear()} VyaparSetu. DPDP Act 2023 Compliant
               &amp; Encrypted.

@@ -157,7 +157,7 @@ export function BusinessClient({ initialData }: { initialData: BusinessFormData 
   };
 
   return (
-    <div className="h-full w-full overflow-y-auto p-4 sm:p-6 lg:p-8 font-sans text-foreground">
+    <div className="h-full w-full overflow-y-auto pt-16 sm:pt-16 lg:pt-8 p-4 sm:p-6 lg:p-8 font-sans text-foreground">
       <div className="max-w-4xl mx-auto space-y-6 pb-24">
         {/* Header Banner */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/50">
