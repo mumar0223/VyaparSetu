@@ -1,7 +1,4 @@
 # <img width="800" height="600" alt="ChatGPT Image Sep 1, 2026, 08_30_10 PM" src="https://github.com/user-attachments/assets/e6c58832-8afe-44c0-9916-6a6cd1776456" />
-
-
-
 **AI-driven hyper-local business advisory and financial structuring assistant for rural micro-entrepreneurs.**
 
 VyaparSetu helps rural traders, farmers, and micro-enterprises track income and expenses, structure informal records into bank-ready financial statements, check government credit scheme eligibility, and get AI-powered business advice.
