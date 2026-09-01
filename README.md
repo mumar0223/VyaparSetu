@@ -1,4 +1,4 @@
-# VyaparSetu (व्यापारसेतु) <img width="508" height="132" alt="image" src="https://github.com/user-attachments/assets/c4ca36a5-55c3-4b80-b8e2-85528ef7fa01" />
+# VyaparSetu (व्यापारसेतु) 
 
 
 **AI-driven hyper-local business advisory and financial structuring assistant for rural micro-entrepreneurs.**
