@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider } from "@/lib/i18n";
+import { FloatingBotButton } from "@/components/floating-bot-button";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -39,6 +40,7 @@ export default function RootLayout({
               {children}
             </AuthProvider>
           </LanguageProvider>
+          <FloatingBotButton />
           <Toaster position="bottom-right" />
         </ThemeProvider>
       </body>

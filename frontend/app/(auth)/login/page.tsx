@@ -15,6 +15,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BrandLogo } from "@/components/brand-icons";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function LoginPage() {
       }
 
       toast.success("Signed in successfully");
-      router.push("/ai-saathi");
+      router.push("/dashboard");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "An unexpected error occurred");
@@ -57,9 +58,8 @@ export default function LoginPage() {
       {/* Left panel - Branding & Value Prop */}
       <div className="md:w-1/2 bg-gradient-to-br from-forest via-[#0a2318] to-[#04120a] p-6 sm:p-8 lg:p-10 xl:p-12 flex flex-col justify-between relative overflow-hidden">
         <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-4 h-4 sm:w-5 sm:h-5 bg-mint rounded-full shadow-[0_0_12px_rgba(33,184,124,0.6)]" />
-            <span className="font-serif font-bold text-xl sm:text-2xl text-white tracking-tight">VyaparSetu</span>
+          <Link href="/" className="inline-flex items-center">
+            <BrandLogo iconSize={32} textClassName="text-white text-xl sm:text-2xl" />
           </Link>
 
           <div className="mt-6 sm:mt-8 lg:mt-10 max-w-md">
