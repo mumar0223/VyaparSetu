@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <rect width="180" height="180" rx="36" fill="#0A150F" />
+  <g transform="translate(15, 15) scale(1.5)">
+    <!-- Top Finial Orb -->
+    <circle cx="50" cy="14" r="6" fill="#00C26F" />
+
+    <!-- Central Mast -->
+    <line x1="50" y1="18" x2="50" y2="64" stroke="#00C26F" stroke-width="4" stroke-linecap="round" />
+
+    <!-- Left Stay Cables -->
+    <line x1="50" y1="20" x2="10" y2="64" stroke="#00C26F" stroke-width="3" stroke-linecap="round" />
+    <line x1="50" y1="20" x2="23" y2="64" stroke="#00C26F" stroke-width="3" stroke-linecap="round" />
+    <line x1="50" y1="20" x2="36" y2="64" stroke="#00C26F" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Right Stay Cables -->
+    <line x1="50" y1="20" x2="64" y2="64" stroke="#00C26F" stroke-width="3" stroke-linecap="round" />
+    <line x1="50" y1="20" x2="77" y2="64" stroke="#00C26F" stroke-width="3" stroke-linecap="round" />
+    <line x1="50" y1="20" x2="90" y2="64" stroke="#00C26F" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Horizontal Bridge Deck -->
+    <rect x="5" y="64" width="90" height="7" rx="3.5" fill="#E2E8F0" stroke="#94A3B8" stroke-width="1.5" />
+
+    <!-- Pier Supports (Inverted V Trusses) -->
+    <path d="M 14 86 L 26 71 L 38 86" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M 62 86 L 74 71 L 86 86" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+    <!-- Base Foundation Line -->
+    <line x1="6" y1="87" x2="94" y2="87" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" />
+  </g>
+</svg>
