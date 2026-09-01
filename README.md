@@ -1,4 +1,5 @@
-# VyaparSetu
+# VyaparSetu <img width="788" height="197" alt="VyaparSetu_redesign_darkbg" src="https://github.com/user-attachments/assets/c9a84f3a-07f7-4fdd-9846-9bc508ccd357" />
+
 
 **AI-driven hyper-local business advisory and financial structuring assistant for rural micro-entrepreneurs.**
 
