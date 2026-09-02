@@ -1,231 +1,150 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { PCMPlayer } from "@/lib/voice/pcm-player";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { PCMRecorder } from "@/lib/voice/pcm-recorder";
-import {
-  type SupportedLanguageCode,
-} from "@/lib/agent/chat-config";
-import type { VoiceAgentStatus } from "./voice-agent-view";
-import type { ToolCallItem } from "./types";
+import { PCMPlayer } from "@/lib/voice/pcm-player";
+import type { SupportedLanguageCode } from "@/lib/agent/chat-config";
 import type { ArtifactPayload } from "./artifact-modal";
+import type { ToolCallItem } from "./types";
 
-export interface LiveTurnData {
-  userTranscript: string;
-  assistantTranscript: string;
-  toolCalls?: ToolCallItem[];
-}
+const GEMINI_LIVE_INPUT_SAMPLE_RATE = 16000;
 
-export interface UseLiveAgentOptions {
+export interface LiveAgentOptions {
   activeChatId?: string | null;
-  defaultLanguage?: SupportedLanguageCode;
-  onTurnComplete?: (turn: LiveTurnData) => void;
-  onArtifactAction?: (action: unknown) => void;
-  onError?: (err: Error) => void;
+  onTurnComplete?: (turn: {
+    userTranscript: string;
+    assistantTranscript: string;
+    toolCalls?: ToolCallItem[];
+  }) => void;
+  onError?: (error: Error) => void;
+  onArtifactAction?: (artifact: ArtifactPayload) => void;
 }
 
-type VoiceSessionConfig = {
+interface VoiceSessionConfig {
   accessToken: string;
+  projectId: string;
+  location: string;
   model: string;
   voiceName: string;
   systemInstruction: string;
-  tools: unknown[];
-};
+  tools: Array<{
+    functionDeclarations: Array<{
+      name: string;
+      description: string;
+      parameters?: {
+        type: string;
+        properties: Record<string, unknown>;
+        required?: string[];
+      };
+    }>;
+  }>;
+}
 
-type VertexFunctionCall = {
+interface VertexFunctionCall {
   id?: string;
   name: string;
   args?: Record<string, unknown>;
-};
+}
 
-type VertexFunctionResponse = {
+interface VertexFunctionResponse {
   id?: string;
-  name?: string;
+  name: string;
   response: { output: unknown };
-};
+}
 
 function mergeTranscript(current: string, incoming: string) {
-  const next = incoming.trim();
-  if (!next) return current;
-  if (!current) return next;
-  if (next.startsWith(current)) return next;
-  if (current.endsWith(next) || current.includes(next)) return current;
-
-  const limit = Math.min(current.length, next.length);
-  for (let overlap = limit; overlap > 0; overlap--) {
-    if (
-      current.slice(-overlap).toLowerCase() ===
-      next.slice(0, overlap).toLowerCase()
-    ) {
-      return `${current}${next.slice(overlap)}`.trim();
-    }
-  }
-  return `${current} ${next}`.trim();
+  const cleanCurrent = current.trim();
+  const cleanIncoming = incoming.trim();
+  if (!cleanCurrent) return cleanIncoming;
+  if (!cleanIncoming) return cleanCurrent;
+  if (cleanCurrent.endsWith(cleanIncoming)) return cleanCurrent;
+  if (cleanIncoming.startsWith(cleanCurrent)) return cleanIncoming;
+  return `${cleanCurrent} ${cleanIncoming}`;
 }
 
-function displayMicError(error: unknown) {
-  const name = error instanceof DOMException ? error.name : "";
-  if (name === "NotAllowedError" || name === "SecurityError") {
-    return "Microphone access is blocked. Allow it in your browser site settings, then retry.";
+function displayMicError(error: Error | string | null | undefined): string {
+  if (!error) return "Microphone connection lost.";
+  const msg = typeof error === "string" ? error : error.message;
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("notallowederror") ||
+    lower.includes("permission") ||
+    lower.includes("not allowed") ||
+    lower.includes("denied")
+  ) {
+    return "Microphone permission is blocked. Allow mic access in your browser site settings.";
   }
-  if (name === "NotFoundError")
-    return "No microphone was found. Connect or select a microphone, then retry.";
-  if (name === "NotReadableError")
-    return "Your microphone is busy in another app. Close the other app and retry.";
-  return error instanceof Error
-    ? error.message
-    : "Unable to start the microphone.";
+  if (lower.includes("notfounderror") || lower.includes("no microphone")) {
+    return "No microphone found on this device.";
+  }
+  if (lower.includes("notreadableerror") || lower.includes("busy")) {
+    return "Microphone is busy in another app. Please close other voice apps and retry.";
+  }
+  return msg;
 }
 
-export function useLiveAgent(options: UseLiveAgentOptions = {}) {
-  const optionsRef = useRef(options);
-  useEffect(() => {
-    optionsRef.current = options;
-  });
+export function useLiveAgent(options: LiveAgentOptions = {}) {
+  const [status, setStatus] = useState<
+    | "initializing"
+    | "connecting"
+    | "ready"
+    | "listening"
+    | "speaking"
+    | "thinking"
+    | "disconnected"
+    | "error"
+  >("disconnected");
 
-  const [status, setStatus] = useState<VoiceAgentStatus>("disconnected");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [micVolume, setMicVolume] = useState(0);
+  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
+  const [isHoldingToSpeak, setIsHoldingToSpeak] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [liveUserTranscript, setLiveUserTranscript] = useState("");
   const [liveAssistantTranscript, setLiveAssistantTranscript] = useState("");
   const [activeToolName, setActiveToolName] = useState<string | null>(null);
-  const [liveArtifact, setLiveArtifact] = useState<ArtifactPayload | null>(
-    null,
-  );
-  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
-  const [isHoldingToSpeak, setIsHoldingToSpeak] = useState(false);
+  const [liveArtifact, setLiveArtifact] = useState<ArtifactPayload | null>(null);
   const [selectedLanguage, setSelectedLanguage] =
-    useState<SupportedLanguageCode>(options.defaultLanguage || "hi-IN");
-  const selectedLanguageRef = useRef<SupportedLanguageCode>(
-    options.defaultLanguage || "hi-IN",
-  );
+    useState<SupportedLanguageCode>("hi-IN");
 
-  const activeChatIdRef = useRef<string | null>(options.activeChatId || null);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const socketRef = useRef<WebSocket | null>(null);
   const recorderRef = useRef<PCMRecorder | null>(null);
   const playerRef = useRef<PCMPlayer | null>(null);
+
   const connectedRef = useRef(false);
   const mutedRef = useRef(false);
   const assistantSpeakingRef = useRef(false);
   const playbackActiveRef = useRef(false);
-  const userSpeakingRef = useRef(false);
   const isHoldingRef = useRef(false);
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flushingRef = useRef(false);
+  const userSpeakingRef = useRef(false);
+  const thinkingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const activeChatIdRef = useRef<string | null>(options.activeChatId || null);
   const userTranscriptRef = useRef("");
+  const nativeCaptionFinalRef = useRef("");
   const assistantTranscriptRef = useRef("");
   const assistantUsesOutputTranscriptRef = useRef(false);
   const toolCallsRef = useRef<ToolCallItem[]>([]);
-  const nativeCaptionFinalRef = useRef("");
-  /** True once the model signals turnComplete for the current response. */
   const turnCompleteRef = useRef(false);
-  /** Native sample rate from the PCMRecorder's AudioContext. */
-  const micSampleRateRef = useRef(48000);
-  /** Safety timer: if thinking state lasts longer than this, auto-recover. */
-  const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const pendingMicVolumeRef = useRef(0);
+  const displayedMicVolumeRef = useRef(0);
+  const micVolumeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedLanguageRef = useRef<SupportedLanguageCode>("hi-IN");
 
   useEffect(() => {
     activeChatIdRef.current = options.activeChatId || null;
   }, [options.activeChatId]);
 
-  const setLanguage = useCallback((lang: SupportedLanguageCode) => {
-    selectedLanguageRef.current = lang;
-    setSelectedLanguage(lang);
-  }, []);
-
   const clearFlushTimer = useCallback(() => {
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     flushTimerRef.current = null;
   }, []);
-
-  const persistCurrentTurn = useCallback(async () => {
-    if (flushingRef.current) return;
-    // Pick the longer (more complete) transcript between Vertex AI's
-    // inputTranscription and the browser's Web Speech API.  Vertex often
-    // returns garbled romanised fragments for Hindi/regional speech, while
-    // the browser's recognition is more accurate for Indic scripts.
-    const vertexUser = userTranscriptRef.current.trim();
-    const browserUser = nativeCaptionFinalRef.current.trim();
-    const userTranscript =
-      vertexUser.length >= browserUser.length ? vertexUser : browserUser;
-    let assistantTranscript = assistantTranscriptRef.current.trim();
-    const toolCalls = [...toolCallsRef.current];
-
-    // If tools were called but the assistant transcript is empty or very
-    // short (outputTranscription may not have arrived yet), build a
-    // human-readable summary so the text chat view isn't blank.
-    if (toolCalls.length > 0 && assistantTranscript.length < 20) {
-      const summaries = toolCalls
-        .filter((tc) => tc.status === "completed")
-        .map((tc) => {
-          const r = tc.result as any;
-          if (r?.isArtifact) return `[${r.title || tc.toolName}]`;
-          return `[${tc.toolName}]`;
-        });
-      if (summaries.length > 0) {
-        assistantTranscript = assistantTranscript
-          ? `${assistantTranscript}\n\n${summaries.join(", ")}`
-          : summaries.join(", ");
-      }
-    }
-
-    // Do not invent placeholder data. A turn is useful only when we have
-    // an actual user transcript.
-    if (!userTranscript) return;
-    flushingRef.current = true;
-    userTranscriptRef.current = "";
-    nativeCaptionFinalRef.current = "";
-    assistantTranscriptRef.current = "";
-    assistantUsesOutputTranscriptRef.current = false;
-    toolCallsRef.current = [];
-
-    try {
-      optionsRef.current.onTurnComplete?.({
-        userTranscript,
-        assistantTranscript,
-        toolCalls,
-      });
-      const chatId = activeChatIdRef.current;
-      if (chatId) {
-        const response = await fetch(`/api/chats/${chatId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userTranscript,
-            assistantTranscript,
-            toolCalls,
-          }),
-        });
-        if (!response.ok) throw new Error("The voice turn could not be saved.");
-      }
-    } catch (error) {
-      console.error("[voice] persistence failed", error);
-      optionsRef.current.onError?.(
-        error instanceof Error ? error : new Error("Voice persistence failed"),
-      );
-    } finally {
-      flushingRef.current = false;
-    }
-  }, []);
-
-  const schedulePersistence = useCallback(() => {
-    clearFlushTimer();
-    // Output transcription can arrive well after turnComplete; Vertex sends
-    // outputTranscription fragments over several seconds as the audio plays.
-    // Wait long enough for ALL fragments to arrive before persisting to DB.
-    flushTimerRef.current = setTimeout(() => {
-      flushTimerRef.current = null;
-      void persistCurrentTurn();
-    }, 2500);
-  }, [clearFlushTimer, persistCurrentTurn]);
-
-  // ── Web Speech API (SpeechRecognition) REMOVED ──
-  // Running SpeechRecognition simultaneously with getUserMedia causes the
-  // mobile OS to fight over the microphone hardware, producing audio
-  // dropouts and corrupted PCM frames.  Gemini Live's own
-  // inputTranscription / interimInputTranscription is used for captions
-  // instead — it's more accurate and doesn't require a second mic stream.
 
   const clearThinkingTimeout = useCallback(() => {
     if (thinkingTimeoutRef.current) {
@@ -233,6 +152,115 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
       thinkingTimeoutRef.current = null;
     }
   }, []);
+
+  // ── IMMUTABLE SNAPSHOT PERSISTENCE ──
+  // Saves the turn using immutable values captured at the moment of completion,
+  // making it immune to immediate state wipes in subsequent turns.
+  const persistTurnSnapshot = useCallback(
+    async (snapshot: {
+      userTranscript: string;
+      assistantTranscript: string;
+      toolCalls: ToolCallItem[];
+    }) => {
+      let { userTranscript, assistantTranscript, toolCalls } = snapshot;
+      userTranscript = userTranscript.trim();
+      assistantTranscript = assistantTranscript.trim();
+
+      // If tools were called but assistant transcript is short, summarize tool execution
+      if (toolCalls.length > 0 && assistantTranscript.length < 20) {
+        const summaries = toolCalls
+          .filter((tc) => tc.status === "completed")
+          .map((tc) => {
+            const r = tc.result as any;
+            if (r?.isArtifact) return `[${r.title || tc.toolName}]`;
+            return `[${tc.toolName}]`;
+          });
+        if (summaries.length > 0) {
+          assistantTranscript = assistantTranscript
+            ? `${assistantTranscript}\n\n${summaries.join(", ")}`
+            : summaries.join(", ");
+        }
+      }
+
+      // We need at least userTranscript or assistantTranscript to persist a turn
+      if (!userTranscript && !assistantTranscript && toolCalls.length === 0) return;
+
+      // Ensure userTranscript is not blank if the assistant responded
+      if (!userTranscript && assistantTranscript) {
+        userTranscript = "Voice query";
+      }
+
+      console.log("[voice] Persisting turn snapshot to DB & chat list:", {
+        userTranscript,
+        assistantTranscript,
+        toolsCount: toolCalls.length,
+      });
+
+      try {
+        optionsRef.current.onTurnComplete?.({
+          userTranscript,
+          assistantTranscript,
+          toolCalls,
+        });
+        const chatId = activeChatIdRef.current;
+        if (chatId) {
+          const response = await fetch(`/api/chats/${chatId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userTranscript,
+              assistantTranscript,
+              toolCalls,
+            }),
+          });
+          if (!response.ok) throw new Error("The voice turn could not be saved.");
+        }
+      } catch (error) {
+        console.error("[voice] persistence failed", error);
+        optionsRef.current.onError?.(
+          error instanceof Error ? error : new Error("Voice persistence failed"),
+        );
+      }
+    },
+    [],
+  );
+
+  const flushAndPersistActiveTurn = useCallback(() => {
+    clearFlushTimer();
+    const vertexUser = userTranscriptRef.current.trim();
+    const browserUser = nativeCaptionFinalRef.current.trim();
+    const userTranscript =
+      vertexUser.length >= browserUser.length ? vertexUser : browserUser;
+    const assistantTranscript = assistantTranscriptRef.current.trim();
+    const toolCalls = [...toolCallsRef.current];
+
+    if (!userTranscript && !assistantTranscript && toolCalls.length === 0) return;
+
+    // Reset active refs immediately for the next turn
+    userTranscriptRef.current = "";
+    nativeCaptionFinalRef.current = "";
+    assistantTranscriptRef.current = "";
+    assistantUsesOutputTranscriptRef.current = false;
+    toolCallsRef.current = [];
+    turnCompleteRef.current = false;
+
+    // Safely persist with the captured immutable strings
+    void persistTurnSnapshot({
+      userTranscript,
+      assistantTranscript,
+      toolCalls,
+    });
+  }, [clearFlushTimer, persistTurnSnapshot]);
+
+  const schedulePersistence = useCallback(() => {
+    clearFlushTimer();
+    // Vertex sends outputTranscription fragments as audio streams.
+    // Wait for the fragments to finish streaming before auto-persisting.
+    flushTimerRef.current = setTimeout(() => {
+      flushTimerRef.current = null;
+      flushAndPersistActiveTurn();
+    }, 1500);
+  }, [clearFlushTimer, flushAndPersistActiveTurn]);
 
   const startSpeaking = useCallback(() => {
     if (mutedRef.current || !connectedRef.current) return;
@@ -245,25 +273,11 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     assistantSpeakingRef.current = false;
     playbackActiveRef.current = false;
 
-    // 3. Persist the previous turn NOW if there is unsaved data, and
-    //    cancel any pending delayed persistence timer.
-    clearFlushTimer();
+    // 3. Persist previous turn NOW before wiping state for the new turn.
     clearThinkingTimeout();
-    if (
-      userTranscriptRef.current.trim() ||
-      nativeCaptionFinalRef.current.trim() ||
-      assistantTranscriptRef.current.trim()
-    ) {
-      void persistCurrentTurn();
-    }
+    flushAndPersistActiveTurn();
 
-    // 4. Reset ALL transcript state for the new turn.
-    userTranscriptRef.current = "";
-    nativeCaptionFinalRef.current = "";
-    assistantTranscriptRef.current = "";
-    assistantUsesOutputTranscriptRef.current = false;
-    toolCallsRef.current = [];
-    turnCompleteRef.current = false;
+    // 4. Reset UI captions for new turn.
     setLiveUserTranscript("");
     setLiveAssistantTranscript("");
 
@@ -276,16 +290,17 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     setIsUserSpeaking(true);
 
     // 6. Signal Gemini that user audio is about to start.
-    //    With automatic VAD disabled, this is required for manual endpointing.
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
-        realtimeInput: { activityStart: {} },
-      }));
+      socket.send(
+        JSON.stringify({
+          realtimeInput: { activityStart: {} },
+        }),
+      );
     }
 
     setStatus("listening");
-  }, [clearFlushTimer, clearThinkingTimeout, persistCurrentTurn]);
+  }, [clearThinkingTimeout, flushAndPersistActiveTurn]);
 
   const stopSpeaking = useCallback(() => {
     if (!isHoldingRef.current) return;
@@ -295,17 +310,11 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     setIsUserSpeaking(false);
 
     // Flush any partial audio buffer still sitting in the AudioWorklet
-    // so we don't lose the tail end of the user's speech.
     recorderRef.current?.flush();
 
     const socket = socketRef.current;
-    // Allow a brief delay for the flushed chunk to post its final data
-    // to the WebSocket (the worklet runs on a different thread).
     setTimeout(() => {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        // Signal Gemini that the user has finished speaking.
-        // Audio was already streamed in real-time via onChunk, so we
-        // only need to send the activityEnd "go" signal here.
         socket.send(
           JSON.stringify({
             realtimeInput: { activityEnd: {} },
@@ -314,53 +323,52 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
       }
       if (connectedRef.current && !assistantSpeakingRef.current) {
         setStatus("thinking");
-        // Safety net: if thinking state persists for more than 20 seconds
-        // without any model response, auto-recover to ready state.
         clearThinkingTimeout();
         thinkingTimeoutRef.current = setTimeout(() => {
           thinkingTimeoutRef.current = null;
-          if (!assistantSpeakingRef.current && !isHoldingRef.current && connectedRef.current) {
-            console.warn("[voice] thinking timeout — auto-recovering to ready state");
+          if (
+            !assistantSpeakingRef.current &&
+            !isHoldingRef.current &&
+            connectedRef.current
+          ) {
+            console.warn(
+              "[voice] thinking timeout — auto-recovering to ready state",
+            );
             setStatus("ready");
           }
         }, 20_000);
       }
-    }, 100); // 100ms: enough for worklet flush to post its final chunk
+    }, 100);
   }, [clearThinkingTimeout]);
 
-  const setAssistantSpeaking = useCallback(
-    (speaking: boolean) => {
-      if (speaking) {
-        // ── IDEMPOTENT: if already speaking, do nothing. ──
-        // This prevents the mic from toggling on/off on every audio chunk,
-        // and stops hold-to-speak state from being reset mid-recording.
-        if (assistantSpeakingRef.current) return;
-
-        assistantSpeakingRef.current = true;
-        recorderRef.current?.setMuted(true);
-        // The next user utterance starts with a clean live caption.
-        nativeCaptionFinalRef.current = "";
-        setLiveUserTranscript("");
-        setMicVolume(0);
-        userSpeakingRef.current = false;
-        setIsUserSpeaking(false);
-        isHoldingRef.current = false;
-        setIsHoldingToSpeak(false);
-        setStatus("speaking");
-      } else {
-        if (!assistantSpeakingRef.current) return; // already not speaking
-        assistantSpeakingRef.current = false;
-        recorderRef.current?.setMuted(mutedRef.current);
-        if (connectedRef.current && !mutedRef.current) {
-          // Only transition to idle if the model has finished generating.
-          if (turnCompleteRef.current) {
-            setStatus("ready");
-          }
-        }
+  const setAssistantSpeaking = useCallback((speaking: boolean) => {
+    if (speaking) {
+      if (assistantSpeakingRef.current) return;
+      assistantSpeakingRef.current = true;
+      recorderRef.current?.setMuted(true);
+      nativeCaptionFinalRef.current = "";
+      setLiveUserTranscript("");
+      if (micVolumeTimerRef.current) {
+        clearTimeout(micVolumeTimerRef.current);
+        micVolumeTimerRef.current = null;
       }
-    },
-    [],
-  );
+      displayedMicVolumeRef.current = 0;
+      pendingMicVolumeRef.current = 0;
+      setMicVolume(0);
+      userSpeakingRef.current = false;
+      setIsUserSpeaking(false);
+      isHoldingRef.current = false;
+      setIsHoldingToSpeak(false);
+      setStatus("speaking");
+    } else {
+      assistantSpeakingRef.current = false;
+      playbackActiveRef.current = false;
+      recorderRef.current?.setMuted(mutedRef.current);
+      if (connectedRef.current && !mutedRef.current) {
+        setStatus("ready");
+      }
+    }
+  }, []);
 
   const handleAudioLevel = useCallback((rms: number) => {
     if (
@@ -369,51 +377,38 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
       !connectedRef.current
     )
       return;
-    // Volume level is provided directly via onVolume for visual feedback
   }, []);
 
-  const disconnect = useCallback(() => {
-    connectedRef.current = false;
-    assistantSpeakingRef.current = false;
-    playbackActiveRef.current = false;
-    isHoldingRef.current = false;
-    setIsHoldingToSpeak(false);
-    clearFlushTimer();
-    clearThinkingTimeout();
+  const handleMicVolume = useCallback((volume: number) => {
     if (
-      nativeCaptionFinalRef.current.trim() ||
-      userTranscriptRef.current.trim()
-    )
-      void persistCurrentTurn();
-
-    const socket = socketRef.current;
-    socketRef.current = null;
-    if (socket) {
-      socket.onopen = null;
-      socket.onmessage = null;
-      socket.onerror = null;
-      socket.onclose = null;
-      if (
-        socket.readyState === WebSocket.OPEN ||
-        socket.readyState === WebSocket.CONNECTING
-      )
-        socket.close();
+      !isHoldingRef.current ||
+      mutedRef.current ||
+      assistantSpeakingRef.current ||
+      !connectedRef.current
+    ) {
+      return;
     }
-    recorderRef.current?.stop();
-    recorderRef.current = null;
-    playerRef.current?.stop();
-    playerRef.current = null;
 
-    userSpeakingRef.current = false;
-    setIsUserSpeaking(false);
-    setMicVolume(0);
-    setStatus("disconnected");
-    setLiveUserTranscript("");
-    setLiveAssistantTranscript("");
-    setActiveToolName(null);
-  }, [clearFlushTimer, clearThinkingTimeout, persistCurrentTurn]);
+    pendingMicVolumeRef.current = volume;
+    if (micVolumeTimerRef.current) return;
 
-  useEffect(() => disconnect, [disconnect]);
+    micVolumeTimerRef.current = setTimeout(() => {
+      micVolumeTimerRef.current = null;
+      if (
+        !isHoldingRef.current ||
+        mutedRef.current ||
+        assistantSpeakingRef.current ||
+        !connectedRef.current
+      ) {
+        return;
+      }
+
+      const next = pendingMicVolumeRef.current;
+      if (Math.abs(next - displayedMicVolumeRef.current) < 0.04) return;
+      displayedMicVolumeRef.current = next;
+      setMicVolume(next);
+    }, 120);
+  }, []);
 
   const handleToolCalls = useCallback(
     async (calls: VertexFunctionCall[], socket: WebSocket) => {
@@ -478,6 +473,52 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
     [],
   );
 
+  const disconnect = useCallback(() => {
+    connectedRef.current = false;
+    assistantSpeakingRef.current = false;
+    playbackActiveRef.current = false;
+    isHoldingRef.current = false;
+    setIsHoldingToSpeak(false);
+    clearThinkingTimeout();
+    if (micVolumeTimerRef.current) {
+      clearTimeout(micVolumeTimerRef.current);
+      micVolumeTimerRef.current = null;
+    }
+
+    // Flush and persist any pending unsaved turn before closing
+    flushAndPersistActiveTurn();
+
+    const socket = socketRef.current;
+    socketRef.current = null;
+    if (socket) {
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      if (
+        socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING
+      )
+        socket.close();
+    }
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    playerRef.current?.stop();
+    playerRef.current = null;
+
+    userSpeakingRef.current = false;
+    setIsUserSpeaking(false);
+    displayedMicVolumeRef.current = 0;
+    pendingMicVolumeRef.current = 0;
+    setMicVolume(0);
+    setStatus("disconnected");
+    setLiveUserTranscript("");
+    setLiveAssistantTranscript("");
+    setActiveToolName(null);
+  }, [clearThinkingTimeout, flushAndPersistActiveTurn]);
+
+  useEffect(() => disconnect, [disconnect]);
+
   const connect = useCallback(
     async (conversationIdOverride?: string) => {
       if (conversationIdOverride)
@@ -516,16 +557,11 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             if (!connectedRef.current) return;
             playbackActiveRef.current = playing;
             if (playing) {
-              // Player started playing — ensure we are in speaking state
               setAssistantSpeaking(true);
             } else {
-              // Player finished playing ALL audio — NOW it's safe to leave
-              // speaking state.  But ONLY do so when the model has also
-              // signalled turnComplete. Otherwise we'd flicker to "ready"
-              // during inter-chunk gaps from the Vertex stream.
-              if (assistantSpeakingRef.current && turnCompleteRef.current) {
-                setAssistantSpeaking(false);
-              }
+              // Audio queue drained and finished playing: transition to ready immediately
+              setAssistantSpeaking(false);
+              flushAndPersistActiveTurn();
             }
           },
         });
@@ -549,10 +585,6 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
                     },
                   },
                 },
-                // ── Manual endpointing: disable automatic VAD ──
-                // With this disabled, Gemini will NEVER interrupt the user
-                // during natural pauses. It will ONLY respond after we
-                // explicitly send activityEnd on button release.
                 realtimeInputConfig: {
                   automaticActivityDetection: {
                     disabled: true,
@@ -581,11 +613,6 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             if (message.setupComplete) {
               const recorder = new PCMRecorder({
                 onChunk: (data) => {
-                  // ── REAL-TIME STREAMING ──
-                  // Send each audio chunk to Gemini immediately as it arrives
-                  // from the AudioWorklet.  This gives Gemini a clean,
-                  // continuous audio stream instead of a burst-dump which
-                  // confuses its audio decoder and produces garbage.
                   if (
                     isHoldingRef.current &&
                     !mutedRef.current &&
@@ -593,13 +620,12 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
                     socketRef.current &&
                     socketRef.current.readyState === WebSocket.OPEN
                   ) {
-                    const rate = micSampleRateRef.current;
                     socketRef.current.send(
                       JSON.stringify({
                         realtimeInput: {
                           mediaChunks: [
                             {
-                              mimeType: `audio/pcm;rate=${rate}`,
+                              mimeType: `audio/pcm;rate=${GEMINI_LIVE_INPUT_SAMPLE_RATE}`,
                               data,
                             },
                           ],
@@ -608,7 +634,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
                     );
                   }
                 },
-                onVolume: setMicVolume,
+                onVolume: handleMicVolume,
                 onAudioLevel: handleAudioLevel,
                 onError: (error) => {
                   setStatus("error");
@@ -617,9 +643,10 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
               });
               recorderRef.current = recorder;
               if (!(await recorder.start())) return;
-              // Store the native sample rate for MIME type in audio chunks.
-              micSampleRateRef.current = recorder.getNativeSampleRate();
-              console.log("[voice] mic native sample rate:", micSampleRateRef.current);
+              console.log(
+                "[voice] Gemini input sample rate:",
+                recorder.getNativeSampleRate(),
+              );
               console.log("[voice] mic input info:", recorder.getInputInfo());
               setStatus("ready");
               return;
@@ -627,23 +654,14 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
 
             const serverContent = message.serverContent;
 
-            // ── Any model response clears the thinking timeout ──
             if (serverContent) {
               clearThinkingTimeout();
-            }
-
-            // ── Interim input transcription (diagnostic) ──
-            if (serverContent?.interimInputTranscription?.text) {
-              console.log("[voice] INTERIM user:", serverContent.interimInputTranscription.text);
             }
 
             if (serverContent?.inputTranscription?.text) {
               const vertexText = serverContent.inputTranscription.text.trim();
               console.log("[voice] FINAL user:", vertexText);
               if (vertexText) {
-                // Vertex AI's Gemini-powered transcription is far more accurate
-                // than the browser's Web Speech API. ALWAYS use it to replace
-                // whatever the browser captured, even if native captions are on.
                 userTranscriptRef.current = mergeTranscript(
                   userTranscriptRef.current,
                   vertexText,
@@ -651,10 +669,8 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
                 setLiveUserTranscript(userTranscriptRef.current);
               }
             }
+
             if (serverContent?.outputTranscription?.text) {
-              // Don't call setAssistantSpeaking(true) here — the PCMPlayer's
-              // onPlaybackStateChange(true) is the single source of truth.
-              // Just update transcript text.
               if (!assistantUsesOutputTranscriptRef.current) {
                 assistantUsesOutputTranscriptRef.current = true;
                 assistantTranscriptRef.current = "";
@@ -668,11 +684,7 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
 
             for (const part of serverContent?.modelTurn?.parts || []) {
               if (part.inlineData?.data) {
-                // If the user has already started a new turn (isHoldingRef),
-                // discard stale audio from the previous AI response.
                 if (isHoldingRef.current) continue;
-                // playChunk triggers onPlaybackStateChange(true) which calls
-                // setAssistantSpeaking(true) exactly once (idempotent).
                 playerRef.current?.playChunk(part.inlineData.data);
               }
               if (part.text && !assistantUsesOutputTranscriptRef.current) {
@@ -690,22 +702,18 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
             if (serverContent?.interrupted) {
               playerRef.current?.interrupt();
               turnCompleteRef.current = true;
-              // After interrupt, player's onPlaybackStateChange(false) will fire
-              // and handle the state transition to ready. Don't force it here.
             }
+
             if (serverContent?.turnComplete) {
-              // turnComplete means the MODEL is done generating audio, but the
-              // PCMPlayer may still be playing queued chunks.  Set the flag so
-              // the player's onPlaybackStateChange(false) knows it's safe to
-              // transition to idle once the audio queue drains.
               turnCompleteRef.current = true;
-              schedulePersistence();
-              // If the player has ALREADY finished (no active nodes), we need
-              // to transition immediately since the callback already fired.
-              if (!playbackActiveRef.current && assistantSpeakingRef.current) {
+              if (!playbackActiveRef.current) {
                 setAssistantSpeaking(false);
+                flushAndPersistActiveTurn();
+              } else {
+                schedulePersistence();
               }
             }
+
             const calls: VertexFunctionCall[] = [
               ...((message.toolCall?.functionCalls ||
                 []) as VertexFunctionCall[]),
@@ -722,87 +730,97 @@ export function useLiveAgent(options: UseLiveAgentOptions = {}) {
         };
 
         socket.onerror = () => {
-          if (!connectedRef.current) return;
           setStatus("error");
           setErrorMessage(
-            "The secure Vertex voice connection could not be established. Please retry.",
+            "The voice connection failed. Please check your internet connection and try again.",
           );
         };
+
         socket.onclose = () => {
-          if (!connectedRef.current) return;
-          connectedRef.current = false;
-          assistantSpeakingRef.current = false;
-          playbackActiveRef.current = false;
-          recorderRef.current?.stop();
-          recorderRef.current = null;
-          playerRef.current?.stop();
-          playerRef.current = null;
-          setStatus("error");
-          setErrorMessage(
-            "The voice connection ended unexpectedly. Retry to reconnect.",
-          );
+          if (connectedRef.current) {
+            setStatus("disconnected");
+          }
         };
       } catch (error) {
-        connectedRef.current = false;
         setStatus("error");
-        setErrorMessage(displayMicError(error));
-        optionsRef.current.onError?.(
-          error instanceof Error ? error : new Error("Voice connection failed"),
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Voice agent connection error.",
         );
       }
     },
     [
+      clearThinkingTimeout,
       disconnect,
+      flushAndPersistActiveTurn,
       handleAudioLevel,
+      handleMicVolume,
       handleToolCalls,
       schedulePersistence,
       setAssistantSpeaking,
-      clearThinkingTimeout,
     ],
   );
 
+  const setLanguage = useCallback(
+    (lang: SupportedLanguageCode) => {
+      if (selectedLanguageRef.current === lang) return;
+      selectedLanguageRef.current = lang;
+      setSelectedLanguage(lang);
+      if (connectedRef.current) {
+        // Reconnect with new language session instructions immediately
+        void connect();
+      }
+    },
+    [connect],
+  );
+
   const toggleMute = useCallback(() => {
-    const nextMuted = !mutedRef.current;
-    mutedRef.current = nextMuted;
-    setIsMuted(nextMuted);
-    recorderRef.current?.setMuted(nextMuted || assistantSpeakingRef.current);
-    if (nextMuted) {
-      isHoldingRef.current = false;
-      setIsHoldingToSpeak(false);
-      userSpeakingRef.current = false;
-      setIsUserSpeaking(false);
+    const next = !mutedRef.current;
+    mutedRef.current = next;
+    setIsMuted(next);
+    recorderRef.current?.setMuted(next);
+    if (next) {
+      if (micVolumeTimerRef.current) {
+        clearTimeout(micVolumeTimerRef.current);
+        micVolumeTimerRef.current = null;
+      }
+      displayedMicVolumeRef.current = 0;
+      pendingMicVolumeRef.current = 0;
       setMicVolume(0);
-    } else if (connectedRef.current && !assistantSpeakingRef.current) {
-      setStatus("ready");
     }
   }, []);
 
-  const reportError = useCallback((message: string) => {
-    connectedRef.current = false;
+  const downloadDebugAudio = useCallback(() => {
+    recorderRef.current?.downloadDebugWav();
+  }, []);
+
+  const reportError = useCallback((msg: string) => {
     setStatus("error");
-    setErrorMessage(message);
+    setErrorMessage(msg);
   }, []);
 
   return {
     status,
-    errorMessage,
+    setStatus,
+    reportError,
     isMuted,
     micVolume,
     isUserSpeaking,
     isHoldingToSpeak,
-    selectedLanguage,
-    setLanguage,
-    startSpeaking,
-    stopSpeaking,
-    toggleMute,
-    connect,
-    disconnect,
+    errorMessage,
     liveUserTranscript,
     liveAssistantTranscript,
     activeToolName,
     liveArtifact,
-    setLiveArtifact,
-    setStatus,
-    reportError,
+    activeArtifact: liveArtifact,
+    selectedLanguage,
+    setLanguage,
+    connect,
+    disconnect,
+    toggleMute,
+    startSpeaking,
+    stopSpeaking,
+    downloadDebugAudio,
   };
 }

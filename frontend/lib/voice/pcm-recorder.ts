@@ -1,21 +1,25 @@
 /**
  * RAW PCM MICROPHONE RECORDER
  *
- * Microphone -> AudioWorklet -> 16-bit mono PCM -> onChunk()
+ * Microphone -> browser resampler -> AudioWorklet -> 16-bit mono PCM -> onChunk()
  *
  * Capture is deliberately left to the browser's platform audio stack for
  * echo cancellation, noise suppression, and gain control. This is much more
  * reliable on desktop devices than a hand-rolled noise gate.
  *
- * IMPORTANT: No sample-rate conversion is performed. Audio is captured at the
- * browser's native sample rate (usually 48 kHz) and sent as-is. The Gemini
- * Live API natively resamples when the MIME type declares the actual rate
- * (e.g., "audio/pcm;rate=48000"), so there is no need for a client-side
- * resampler. This eliminates interpolation artifacts and simplifies the code.
+ * Gemini Live expects 16-bit mono PCM at 16 kHz. Chrome's Web Audio engine
+ * performs the high-quality resampling when the MediaStream is attached to an
+ * AudioContext configured at 16 kHz. This is streaming DSP, not a lossy file
+ * conversion: it preserves the speech band while avoiding an ambiguous sample
+ * rate at the Live API boundary.
  */
 
+export const GEMINI_LIVE_INPUT_SAMPLE_RATE = 16_000;
+const DEFAULT_CHUNK_FRAMES = 640; // 40 ms at 16 kHz: responsive without packet spam.
+const DEV_WAV_MAX_SECONDS = 20;
+
 export interface PCMRecorderOptions {
-  /** @deprecated Not used — audio is sent at native sample rate. */
+  /** @deprecated Audio is always emitted at Gemini's required 16 kHz. */
   targetSampleRate?: number;
   bufferSize?: number;
   noiseGateThreshold?: number; // API compatibility; NOT USED
@@ -36,12 +40,16 @@ export class PCMRecorder {
   private isMuted = false;
   private isAssistantSpeaking = false;
   private options: PCMRecorderOptions;
-  /** The actual sample rate of the AudioContext (browser native). */
-  private nativeSampleRate: number = 48000;
+  /** The actual rate after Chrome's MediaStream-to-AudioContext resampling. */
+  private nativeSampleRate: number = GEMINI_LIVE_INPUT_SAMPLE_RATE;
+  private debugPcmChunks: Int16Array[] = [];
+  private debugPcmBytes = 0;
+  private debugClipCount = 0;
+  private debugLastReportAt = 0;
 
   constructor(options: PCMRecorderOptions) {
     this.options = {
-      bufferSize: 2048,
+      bufferSize: DEFAULT_CHUNK_FRAMES,
       ...options,
     };
   }
@@ -50,15 +58,30 @@ export class PCMRecorder {
     if (this.isRecording) return true;
 
     try {
-      // Use explicit constraints. `exact` for channelCount ensures mono.
-      // `ideal` for processing features is appropriate — the browser will
-      // enable them if the hardware/driver supports them.
-      const audioConstraints: MediaTrackConstraints = {
-        channelCount: { exact: 1 },
-        echoCancellation: { ideal: true },
-        noiseSuppression: { ideal: true },
-        autoGainControl: { ideal: true },
-      };
+      // Detect mobile / touch devices.
+      // On mobile devices, requesting echoCancellation forces Android into
+      // MODE_IN_COMMUNICATION (telephony call mode) and iOS into earpiece routing.
+      // Since VyaparSetu uses Push-To-Talk (Hold-To-Speak), the mic is muted
+      // during assistant playback, so avoiding hardware AEC on mobile keeps audio
+      // in standard media mode and routes output through the main loudspeaker.
+      const isMobile =
+        typeof navigator !== "undefined" &&
+        (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+          (Boolean(navigator.maxTouchPoints) && navigator.maxTouchPoints > 1));
+
+      const audioConstraints: MediaTrackConstraints = isMobile
+        ? {
+            channelCount: { ideal: 1 },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: true,
+          }
+        : {
+            channelCount: { exact: 1 },
+            echoCancellation: { ideal: true },
+            noiseSuppression: { ideal: true },
+            autoGainControl: { ideal: true },
+          };
 
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: audioConstraints,
@@ -88,15 +111,24 @@ export class PCMRecorder {
         throw new Error("Web Audio API is not supported in this browser.");
       }
 
-      this.audioContext = new AudioCtx();
+      // Chrome resamples the microphone stream into this context. Requesting
+      // 16 kHz here is safer and more predictable than asking Gemini to infer
+      // the source rate from arbitrary desktop hardware (typically 48 kHz).
+      this.audioContext = new AudioCtx({
+        sampleRate: GEMINI_LIVE_INPUT_SAMPLE_RATE,
+      });
 
       if (this.audioContext.state === "suspended") {
         await this.audioContext.resume();
       }
 
-      // Store the native sample rate — this is what Gemini needs in the MIME type.
       this.nativeSampleRate = this.audioContext.sampleRate;
       console.log("[PCMRecorder] AudioContext sample rate:", this.nativeSampleRate);
+      if (this.nativeSampleRate !== GEMINI_LIVE_INPUT_SAMPLE_RATE) {
+        throw new Error(
+          `Chrome did not provide the required ${GEMINI_LIVE_INPUT_SAMPLE_RATE} Hz audio context (received ${this.nativeSampleRate} Hz).`,
+        );
+      }
 
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -179,6 +211,7 @@ export class PCMRecorder {
 
         const float32Data = data.buffer as Float32Array;
         const pcm16Data = this.floatTo16BitPCM(float32Data);
+        this.inspectDevAudio(pcm16Data);
         const base64Chunk = this.arrayBufferToBase64(pcm16Data.buffer);
 
         if (base64Chunk) {
@@ -198,13 +231,15 @@ export class PCMRecorder {
       };
 
       // The graph must be connected to keep the worklet processing.
-      // Gain = 0 makes sure microphone audio is NOT played back through speakers.
+      // Route through a silent gain node into a dummy MediaStreamDestination
+      // rather than audioContext.destination to avoid locking hardware output in call mode.
       this.silentGainNode = this.audioContext.createGain();
       this.silentGainNode.gain.value = 0;
+      const dummyDestination = this.audioContext.createMediaStreamDestination();
 
       this.sourceNode.connect(this.workletNode);
       this.workletNode.connect(this.silentGainNode);
-      this.silentGainNode.connect(this.audioContext.destination);
+      this.silentGainNode.connect(dummyDestination);
 
       this.isRecording = true;
       return true;
@@ -221,8 +256,6 @@ export class PCMRecorder {
 
   /**
    * Flush any partial buffer remaining in the AudioWorklet.
-   *
-   * Call this when the user releases the hold-to-speak button so that the
    * last few milliseconds of audio are not silently discarded.  Without
    * this, up to `bufferSize` samples (~42 ms at 48 kHz with 2048) could be
    * lost at the tail of each utterance.
@@ -257,9 +290,7 @@ export class PCMRecorder {
   }
 
   /**
-   * Returns the native sample rate of the AudioContext.
-   * Use this to set the correct MIME type when sending to Gemini Live
-   * (e.g., `audio/pcm;rate=48000`).
+   * Returns the sample rate of the PCM stream sent to Gemini Live.
    */
   public getNativeSampleRate(): number {
     return this.nativeSampleRate;
@@ -288,6 +319,50 @@ export class PCMRecorder {
       noiseSuppression: settings.noiseSuppression ?? null,
       autoGainControl: settings.autoGainControl ?? null,
     };
+  }
+
+  /**
+   * Development-only local capture for diagnosing audio before it reaches
+   * Gemini. It never uploads or persists microphone data.
+   */
+  public downloadDebugWav(): boolean {
+    if (process.env.NODE_ENV !== "development" || !this.debugPcmChunks.length) {
+      return false;
+    }
+
+    const wav = new ArrayBuffer(44 + this.debugPcmBytes);
+    const view = new DataView(wav);
+    const bytes = new Uint8Array(wav);
+    const writeText = (offset: number, value: string) => {
+      for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
+    };
+    writeText(0, "RIFF");
+    view.setUint32(4, 36 + this.debugPcmBytes, true);
+    writeText(8, "WAVEfmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // mono
+    view.setUint32(24, GEMINI_LIVE_INPUT_SAMPLE_RATE, true);
+    view.setUint32(28, GEMINI_LIVE_INPUT_SAMPLE_RATE * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeText(36, "data");
+    view.setUint32(40, this.debugPcmBytes, true);
+
+    let offset = 44;
+    for (const chunk of this.debugPcmChunks) {
+      const chunkBytes = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+      bytes.set(chunkBytes, offset);
+      offset += chunkBytes.byteLength;
+    }
+
+    const url = URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "vyaparsetu-live-input-16khz.wav";
+    link.click();
+    URL.revokeObjectURL(url);
+    return true;
   }
 
   public stop(): void {
@@ -330,6 +405,36 @@ export class PCMRecorder {
     }
 
     return output;
+  }
+
+  private inspectDevAudio(pcm: Int16Array): void {
+    if (process.env.NODE_ENV !== "development") return;
+
+    const copy = pcm.slice();
+    this.debugPcmChunks.push(copy);
+    this.debugPcmBytes += copy.byteLength;
+    for (const sample of copy) {
+      if (Math.abs(sample) >= 32_700) this.debugClipCount++;
+    }
+
+    const maxBytes = GEMINI_LIVE_INPUT_SAMPLE_RATE * 2 * DEV_WAV_MAX_SECONDS;
+    while (this.debugPcmBytes > maxBytes && this.debugPcmChunks.length > 1) {
+      const oldest = this.debugPcmChunks.shift();
+      if (oldest) this.debugPcmBytes -= oldest.byteLength;
+    }
+
+    const now = performance.now();
+    if (now - this.debugLastReportAt < 1_000) return;
+    this.debugLastReportAt = now;
+    console.debug("[PCMRecorder diagnostic]", {
+      pcm: "signed 16-bit little-endian mono",
+      sampleRate: GEMINI_LIVE_INPUT_SAMPLE_RATE,
+      bytesPerSecond: GEMINI_LIVE_INPUT_SAMPLE_RATE * 2,
+      chunkFrames: pcm.length,
+      chunkMilliseconds: (pcm.length / GEMINI_LIVE_INPUT_SAMPLE_RATE) * 1_000,
+      retainedMilliseconds: (this.debugPcmBytes / 2 / GEMINI_LIVE_INPUT_SAMPLE_RATE) * 1_000,
+      clippedSamples: this.debugClipCount,
+    });
   }
 
   private arrayBufferToBase64(buffer: ArrayBufferLike): string {

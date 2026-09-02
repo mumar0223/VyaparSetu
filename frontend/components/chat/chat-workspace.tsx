@@ -364,14 +364,29 @@ export function ChatWorkspace({
           const data = await res.json();
           if (data.conversation) {
             setActiveChatId(data.conversation.id);
-            const loaded = (data.conversation.messages || []).map((m: any) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              thinking: m.thinking,
-              toolCalls: m.toolCalls,
-              createdAt: m.createdAt,
-            }));
+            const loaded = (data.conversation.messages || []).map((m: any) => {
+              let duration: number | undefined = undefined;
+              if (m.thinking) {
+                try {
+                  const parsed = JSON.parse(m.thinking);
+                  if (typeof parsed?.durationSeconds === "number") {
+                    duration = parsed.durationSeconds;
+                  }
+                } catch {
+                  const num = Number(m.thinking);
+                  if (!isNaN(num) && num > 0) duration = num;
+                }
+              }
+              return {
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                thinking: m.thinking,
+                toolCalls: m.toolCalls,
+                thoughtDurationSeconds: duration,
+                createdAt: m.createdAt,
+              };
+            });
             chatCache.current.set(data.conversation.id, loaded);
             setMessages(loaded);
           }
@@ -434,14 +449,29 @@ export function ChatWorkspace({
         if (res.ok) {
           const data = await res.json();
           if (data.conversation) {
-            const loaded = (data.conversation.messages || []).map((m: any) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              thinking: m.thinking,
-              toolCalls: m.toolCalls,
-              createdAt: m.createdAt,
-            }));
+            const loaded = (data.conversation.messages || []).map((m: any) => {
+              let duration: number | undefined = undefined;
+              if (m.thinking) {
+                try {
+                  const parsed = JSON.parse(m.thinking);
+                  if (typeof parsed?.durationSeconds === "number") {
+                    duration = parsed.durationSeconds;
+                  }
+                } catch {
+                  const num = Number(m.thinking);
+                  if (!isNaN(num) && num > 0) duration = num;
+                }
+              }
+              return {
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                thinking: m.thinking,
+                toolCalls: m.toolCalls,
+                thoughtDurationSeconds: duration,
+                createdAt: m.createdAt,
+              };
+            });
             chatCache.current.set(data.conversation.id, loaded);
             setMessages(loaded);
           }
@@ -780,13 +810,16 @@ export function ChatWorkspace({
               ),
             );
           } else if (eventType === "done") {
-            const elapsed = Math.max(
-              1,
-              Math.round(
-                (Date.now() - (newUserMessage.createdAt as any).getTime()) /
-                  1000,
-              ),
-            );
+            const elapsed =
+              typeof data?.thoughtDurationSeconds === "number"
+                ? data.thoughtDurationSeconds
+                : Math.max(
+                    1,
+                    Math.round(
+                      (Date.now() - (newUserMessage.createdAt as any).getTime()) /
+                        1000,
+                    ),
+                  );
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantMessageId
@@ -881,6 +914,7 @@ export function ChatWorkspace({
             activeToolName={liveAgent.activeToolName}
             activeArtifact={liveAgent.liveArtifact}
             onOpenArtifact={(art) => setActiveArtifact(art)}
+            onDownloadDebugAudio={liveAgent.downloadDebugAudio}
           />
         ) : isNewChatView ? (
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
@@ -962,7 +996,7 @@ export function ChatWorkspace({
                 <button
                   key={i}
                   onClick={() => handleSendMessage(chip.prompt)}
-                  className="p-3.5 rounded-2xl border border-sage/20 dark:border-border bg-white/40 dark:bg-card/40 hover:bg-white/65 dark:hover:bg-card/65 hover:border-mint transition-all shadow-xs hover:shadow-md text-left group flex items-start gap-3.5 cursor-pointer"
+                  className="p-3.5 rounded-2xl border border-sage/20 dark:border-border bg-white/40 dark:bg-card/40 hover:bg-white/65 dark:hover:bg-card/65 hover:border-mint backdrop-blur-md transition-all shadow-xs hover:shadow-md text-left group flex items-start gap-3.5 cursor-pointer"
                 >
                   <div className="size-9 rounded-xl bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint flex items-center justify-center shrink-0 group-hover:bg-mint group-hover:text-black transition-colors">
                     <chip.icon className="size-4" />

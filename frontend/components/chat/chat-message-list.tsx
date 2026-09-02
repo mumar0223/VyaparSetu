@@ -120,7 +120,7 @@ export function ChatMessageList({
                 <ThinkingAccordion
                   isStreaming={msg.isStreaming && !msg.content}
                   toolCalls={msg.toolCalls}
-                  completedDurationSeconds={msg.thoughtDurationSeconds || 2}
+                  completedDurationSeconds={msg.thoughtDurationSeconds}
                 />
 
                 {/* Sleek Claude-Style Interactive Artifact Pill */}

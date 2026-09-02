@@ -26,7 +26,11 @@ export function FloatingInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const displayPlaceholder =
-    placeholder || t("chat.placeholder", "Ask anything about mandi rates, mudra loans, or ledgers...");
+    placeholder ||
+    t(
+      "chat.placeholder",
+      "Ask anything about mandi rates, mudra loans, or ledgers...",
+    );
 
   // Auto-grow textarea height
   useEffect(() => {
@@ -34,7 +38,7 @@ export function FloatingInput({
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(
         textareaRef.current.scrollHeight,
-        180
+        180,
       )}px`;
     }
   }, [input]);
@@ -62,7 +66,7 @@ export function FloatingInput({
   return (
     <div className="w-full transition-all duration-300 ease-out z-20 font-sans">
       {/* Elevated Pill Container */}
-      <div className="relative rounded-2xl md:rounded-3xl border border-sage/25 dark:border-border bg-white/45 dark:bg-card/45 p-2 shadow-lg transition-all focus-within:border-mint focus-within:ring-1 focus-within:ring-mint/40 focus-within:bg-white/65 dark:focus-within:bg-card/65">
+      <div className="relative rounded-2xl md:rounded-3xl border border-sage/25 dark:border-border bg-white/45 dark:bg-card/45 backdrop-blur-md p-2 shadow-lg transition-all focus-within:border-mint focus-within:ring-1 focus-within:ring-mint/40 focus-within:bg-white/65 dark:focus-within:bg-card/65">
         <div className="flex flex-col">
           {/* Main Input Textarea */}
           <textarea
@@ -112,7 +116,7 @@ export function FloatingInput({
                   "size-8 rounded-full flex items-center justify-center transition-all cursor-pointer",
                   input.trim() && !isLoading
                     ? "bg-forest dark:bg-mint hover:bg-forest-deep dark:hover:bg-mint-light text-white dark:text-black shadow-md scale-100"
-                    : "bg-sage/20 dark:bg-muted text-muted-foreground cursor-not-allowed opacity-60"
+                    : "bg-sage/20 dark:bg-muted text-muted-foreground cursor-not-allowed opacity-60",
                 )}
               >
                 <ArrowUp className="size-4 stroke-[2.5]" />
@@ -124,7 +128,10 @@ export function FloatingInput({
 
       {/* Subtle Footer Disclaimer */}
       <p className="mt-2 text-center text-[11px] text-muted-foreground select-none">
-        {t("chat.disclaimer", "VyaparSetu AI can make mistakes. Verify important financial & trade decisions.")}
+        {t(
+          "chat.disclaimer",
+          "VyaparSetu AI can make mistakes. Verify important financial & trade decisions.",
+        )}
       </p>
     </div>
   );

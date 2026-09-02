@@ -277,6 +277,9 @@
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
   animation: thinking-shimmer 2s linear infinite;
+  overflow-y: visible !important;
+  line-height: 1.4 !important;
+  padding-bottom: 3px !important;
 }
 
 @keyframes float-soft {

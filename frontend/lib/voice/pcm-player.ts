@@ -24,6 +24,7 @@ export class PCMPlayer {
   }
 
   public async init(): Promise<void> {
+    this.ensureAudioSessionPlayback();
     const ctx = this.initAudioContext();
     if (ctx.state === "suspended") {
       try {
@@ -32,7 +33,21 @@ export class PCMPlayer {
     }
   }
 
+  /**
+   * Ensures mobile browsers (especially iOS Safari / WebKit) route audio
+   * through the device's main loudspeaker instead of defaulting to the
+   * earpiece receiver.
+   */
+  private ensureAudioSessionPlayback(): void {
+    if (typeof navigator !== "undefined" && "audioSession" in navigator) {
+      try {
+        (navigator as any).audioSession.type = "playback";
+      } catch (e) {}
+    }
+  }
+
   private initAudioContext(): AudioContext {
+    this.ensureAudioSessionPlayback();
     if (!this.audioContext || this.audioContext.state === "closed") {
       const AudioCtx =
         window.AudioContext || (window as any).webkitAudioContext;
@@ -58,6 +73,7 @@ export class PCMPlayer {
    * Queue and play incoming base64 PCM chunk
    */
   public playChunk(base64Data: string): void {
+    this.ensureAudioSessionPlayback();
     const ctx = this.initAudioContext();
     const float32Array = this.base64ToFloat32(base64Data);
 

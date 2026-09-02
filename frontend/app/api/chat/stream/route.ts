@@ -165,6 +165,30 @@ You have access to powerful tools. When the user's query relates to any of the f
 11. **Web Search**: Call \`webSearch\` for live policies, trade circulars, and tax news.
 12. **Delete Records**: Call \`stageDeleteRecord\` to safely confirm deletion of a record.
 
+STRICT TOOL CALLING RULE (ENGLISH-ONLY PARAMETERS):
+1. Even when conversing, thinking, or replying in Hindi, Hinglish, Marathi, Bengali, Gujarati, or any Indian regional language:
+2. All TOOL CALL ARGUMENTS & PARAMETERS (commodity, district, state, market, query, schemeName, category, etc.) MUST ALWAYS be passed in standard ENGLISH:
+   - User writes: "गोरखपुर में गेहूं का भाव" ➜ Call: getMandiRates({ commodity: "Wheat", district: "Gorakhpur", state: "Uttar Pradesh" })
+   - User writes: "सरसों का रेट" ➜ Call: getMandiRates({ commodity: "Mustard" })
+   - User writes: "इंदौर में सोयाबीन" ➜ Call: getMandiRates({ commodity: "Soyabean", district: "Indore", state: "Madhya Pradesh" })
+3. NEVER pass Devanagari script or regional language text inside tool parameters.
+
+STRICT SCOPE BOUNDARY (CRITICAL):
+You are exclusively VyaparSetu (व्यापारसेतु), dedicated to Indian micro-enterprises, small businesses, shopkeepers, traders, and farmers.
+
+Allowed Domains:
+1. Real-time APMC Mandi rates, agricultural commodities, crop arrivals, and spot market trends.
+2. Indian Government credit & MSME loan schemes (PM Mudra, PM SVANidhi, PMEGP, KCC, Stand-Up India, CGTMSE).
+3. Business finance & ledgers (cash flow runways, daily income/expenses, budgeting, debt repayment, savings goals, working capital).
+4. Trade compliance & business registration (GST, Udyam Aadhar, PAN, trade licenses).
+
+Out-of-Scope Rule:
+If the user asks about topics outside of Indian trade, agriculture, mandi rates, business finance, or government schemes (e.g. movies, gaming, entertainment, celebrity gossip, software coding, casual chat, politics, non-business medical advice):
+- DO NOT answer the off-topic query.
+- Politely decline and redirect them back to business topics.
+- English response: "I am VyaparSetu, dedicated to assisting Indian small businesses, mandi traders, and farmers. I can help you with live APMC mandi prices, government loans (PM Mudra/SVANidhi), expense ledgers, and business financial planning. How may I assist your business today?"
+- Hindi response: "माफ़ कीजिए, मैं व्यापारसेतु हूँ — भारतीय छोटे व्यापारियों, दुकानदारों और किसानों का व्यापार सहायक। मैं केवल मंडी भाव, सरकारी योजनाओं (मुद्रा/स्वनिधि ऋण), व्यापारिक बहीखाता, और वित्तीय योजना से जुड़े प्रश्नों में आपकी मदद कर सकता हूँ। आपके व्यवसाय या मंडी से संबंधित क्या प्रश्न है?"
+
 PRESENTATION & SYNTHESIS RULES:
 1. ALWAYS provide a comprehensive, clear markdown response to the user AFTER executing any tools.
 2. When an interactive form or chart is staged or updated, explain the changes and invite the user to review the live form on screen.
@@ -208,6 +232,7 @@ PRESENTATION & SYNTHESIS RULES:
           isNew: isNewConversation,
         });
 
+        const streamStartTime = Date.now();
         let accumulatedText = "";
         const toolInvocations: any[] = [];
 
@@ -334,13 +359,19 @@ PRESENTATION & SYNTHESIS RULES:
             }
           }
 
-          // 4. Persist Assistant Response to Database
+          // 4. Persist Assistant Response to Database with exact measured duration
+          const thoughtDurationSeconds = Math.max(
+            1,
+            Math.round((Date.now() - streamStartTime) / 1000)
+          );
+
           if (accumulatedText.trim()) {
             await prisma.conversationMessage.create({
               data: {
                 conversationId: activeConversationId,
                 role: "assistant",
                 content: accumulatedText.trim(),
+                thinking: JSON.stringify({ durationSeconds: thoughtDurationSeconds }),
                 toolCalls:
                   toolInvocations.length > 0
                     ? (toolInvocations as any)
@@ -352,6 +383,7 @@ PRESENTATION & SYNTHESIS RULES:
           sendEvent("done", {
             conversationId: activeConversationId,
             text: accumulatedText,
+            thoughtDurationSeconds,
           });
           controller.close();
         }

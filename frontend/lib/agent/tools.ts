@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateUserBusiness } from "@/lib/business-helper";
 import type { ToolContext } from "./types";
 
+import {
+  normalizeCommodity,
+  normalizeDistrictAndState,
+  searchLiveMandiWebRates,
+} from "./mandi-normalizer";
+
 /**
  * Zod Schemas for Tools
  */
@@ -11,23 +17,24 @@ import type { ToolContext } from "./types";
 const MandiRatesSchema = z.object({
   commodity: z
     .string()
+    .optional()
     .describe(
-      "Crop or commodity name, e.g. Onion, Wheat, Cotton, Mustard, Tomato, Soyabean, Gram, Potato",
+      "Crop or commodity name in English or Hindi, e.g. Wheat (गेहूं), Mustard (सरसों), Onion (प्याज), Paddy (धान), Potato (आलू), Soybean (सोयाबीन), Tomato (टमाटर), Gram (चना), Cotton (कपास), Sugarcane (गन्ना)",
     ),
   state: z
     .string()
     .optional()
     .describe(
-      "State filter, e.g. Maharashtra, Madhya Pradesh, Gujarat, Punjab, Uttar Pradesh, Tamil Nadu",
+      "State filter, e.g. Uttar Pradesh (UP), Madhya Pradesh (MP), Maharashtra, Gujarat, Punjab, Rajasthan, Haryana, Bihar",
     ),
   district: z
     .string()
     .optional()
-    .describe("District filter, e.g. Nashik, Indore, Pune, Rajkot"),
+    .describe("District or city filter, e.g. Gorakhpur, Varanasi, Indore, Nashik, Pune, Lucknow, Kanpur, Prayagraj, Patna, Jaipur"),
   market: z
     .string()
     .optional()
-    .describe("Specific APMC Mandi, e.g. Lasalgaon, Azadpur, Vashi"),
+    .describe("Specific APMC Mandi e.g. Gorakhpur Mandi, Lasalgaon, Azadpur, Indore APMC"),
 });
 
 const WebSearchSchema = z.object({
@@ -400,89 +407,88 @@ export function getAgentTools(ctx?: ToolContext) {
     // ─────────────────────────────────────────────────────────────
     getMandiRates: tool({
       description:
-        "Fetches live, real-time wholesale APMC market prices, daily arrivals, and modal rates from the official Ministry of Agriculture (data.gov.in / Agmarknet) registry.",
+        "Fetches live, real-time wholesale APMC market prices, daily arrivals, and modal rates from data.gov.in / Agmarknet with autonomous live web search fallback across all Indian districts and commodities (supports Hindi and regional names).",
       inputSchema: MandiRatesSchema,
-      execute: async ({ commodity, state, district, market }) => {
+      execute: async ({ commodity: rawCommodity, state: rawState, district: rawDistrict, market: rawMarket }) => {
         try {
+          const normLocation = normalizeDistrictAndState(rawDistrict, rawState, rawMarket);
+          const normalizedState = normLocation.state;
+          const normalizedDistrict = normLocation.district;
+          const normalizedMarket = normLocation.market;
+          const normalizedCommodity = rawCommodity ? normalizeCommodity(rawCommodity) : (normLocation.primaryCrops?.[0] || "Wheat");
+
           const apiKey =
             process.env.DATA_GOV_IN_API_KEY ||
             "579b464db66ec23bdd000001ddb36e098975438e5697e63e567a663c";
           const resourceId = "9ef84268-d588-465a-a308-a864a43d0070";
 
-          let normalizedState = state ? state.trim() : undefined;
-          if (normalizedState) {
-            const sLower = normalizedState.toLowerCase();
-            if (sLower.includes("delhi") || sLower === "nct") normalizedState = "NCT of Delhi";
-            else if (sLower.includes("maharashtra") || sLower === "mh") normalizedState = "Maharashtra";
-            else if (sLower.includes("madhya") || sLower === "mp") normalizedState = "Madhya Pradesh";
-            else if (sLower.includes("uttar") || sLower === "up") normalizedState = "Uttar Pradesh";
-            else if (sLower.includes("tamil") || sLower === "tn") normalizedState = "Tamil Nadu";
-            else if (sLower.includes("punjab")) normalizedState = "Punjab";
-            else if (sLower.includes("haryana")) normalizedState = "Haryana";
-            else if (sLower.includes("gujarat")) normalizedState = "Gujarat";
-            else if (sLower.includes("rajasthan")) normalizedState = "Rajasthan";
-            else if (sLower.includes("kerala")) normalizedState = "Keralam";
-          }
-
           let url = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=10`;
 
-          if (commodity) {
-            url += `&filters%5Bcommodity%5D=${encodeURIComponent(commodity.trim())}`;
+          if (normalizedCommodity) {
+            url += `&filters%5Bcommodity%5D=${encodeURIComponent(normalizedCommodity)}`;
           }
           if (normalizedState) {
             url += `&filters%5Bstate%5D=${encodeURIComponent(normalizedState)}`;
           }
-          if (district) {
-            url += `&filters%5Bdistrict%5D=${encodeURIComponent(district.trim())}`;
+          if (normalizedDistrict) {
+            url += `&filters%5Bdistrict%5D=${encodeURIComponent(normalizedDistrict)}`;
           }
-          if (market) {
-            url += `&filters%5Bmarket%5D=${encodeURIComponent(market.trim())}`;
+          if (normalizedMarket) {
+            url += `&filters%5Bmarket%5D=${encodeURIComponent(normalizedMarket)}`;
           }
 
-          const response = await fetch(url, {
-            signal: AbortSignal.timeout(12000),
+          let records: any[] = [];
+          try {
+            const response = await fetch(url, {
+              signal: AbortSignal.timeout(5000), // 5s timeout to keep real-time voice latency fast
+            });
+            if (response.ok) {
+              const data = await response.json();
+              records = data?.records || [];
+            }
+          } catch (apiErr: any) {
+            console.warn("[getMandiRates] data.gov.in slow or unreachable, triggering dynamic live search:", apiErr?.message);
+          }
+
+          // If official API returned records, format and return them
+          if (records.length > 0) {
+            const formattedRecords = records.map((r: any) => ({
+              state: r.state || normalizedState || "India",
+              district: r.district || normalizedDistrict || "District Yard",
+              market: r.market || normalizedMarket || "APMC Mandi",
+              commodity: r.commodity || normalizedCommodity,
+              variety: r.variety || "Standard",
+              arrivalDate: r.arrival_date || new Date().toLocaleDateString("en-IN"),
+              modalPricePerQuintal: `₹${r.modal_price}`,
+              priceRange: `₹${r.min_price} - ₹${r.max_price} / Quintal`,
+            }));
+
+            return {
+              success: true,
+              source:
+                "Ministry of Agriculture & Farmers Welfare (Agmarknet / data.gov.in)",
+              totalMarkets: records.length,
+              records: formattedRecords,
+            };
+          }
+
+          // If data.gov.in is slow, offline, or has 0 records today, seamlessly query Live Web / Exa
+          const liveWebResult = await searchLiveMandiWebRates({
+            commodity: normalizedCommodity,
+            district: normalizedDistrict,
+            state: normalizedState,
+            market: normalizedMarket,
           });
-          if (!response.ok) {
-            return {
-              success: false,
-              error: `Government Mandi API returned status ${response.status}.`,
-            };
-          }
 
-          const data = await response.json();
-          const records = data?.records || [];
-
-          if (records.length === 0) {
-            return {
-              success: false,
-              error: `No active wholesale arrivals recorded today for '${commodity}' in ${normalizedState || state || district || "the selected region"} on the official Ministry of Agriculture (Agmarknet) registry.`,
-            };
-          }
-
-          const formattedRecords = records.map((r: any) => ({
-            state: r.state,
-            district: r.district,
-            market: r.market,
-            commodity: r.commodity,
-            variety: r.variety || "Standard",
-            arrivalDate: r.arrival_date,
-            modalPricePerQuintal: `₹${r.modal_price}`,
-            priceRange: `₹${r.min_price} - ₹${r.max_price} / Quintal`,
-          }));
-
-          return {
-            success: true,
-            source:
-              "Ministry of Agriculture & Farmers Welfare (Agmarknet / data.gov.in)",
-            totalMarkets: records.length,
-            records: formattedRecords,
-          };
+          return liveWebResult;
         } catch (error: any) {
           console.error("[getMandiRates error]:", error?.message);
-          return {
-            success: false,
-            error: `Unable to fetch live Mandi records right now: ${error?.message || "Connection timed out"}.`,
-          };
+          return await searchLiveMandiWebRates({
+            commodity: rawCommodity ? normalizeCommodity(rawCommodity) : "Wheat",
+            district: rawDistrict,
+            state: rawState,
+            market: rawMarket,
+          });
         }
       },
     }),

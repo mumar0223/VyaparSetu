@@ -316,7 +316,7 @@ function ChatItem({
           className={cn(
             "flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-[13px] transition-colors cursor-pointer leading-tight",
             isActive
-              ? "bg-cream dark:bg-muted text-forest dark:text-mint font-semibold border-l-2 border-mint"
+              ? "bg-cream dark:bg-muted text-forest dark:text-mint font-semibold"
               : "text-muted-foreground hover:bg-cream/60 dark:hover:bg-muted/50 hover:text-foreground"
           )}
         >

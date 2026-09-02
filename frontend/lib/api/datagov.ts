@@ -91,6 +91,46 @@ const DISTRICT_ODOP_MAP: Record<string, { odop: string; keySectors: string[]; pr
     keySectors: ["Textile Weaving & Dyeing", "Diamond Cutting", "Food Retail", "Logistics"],
     primaryCrops: ["Sugarcane", "Paddy", "Banana", "Cotton"],
   },
+  gorakhpur: {
+    odop: "Terracotta Handicrafts & Ready-to-Eat Agro Food Processing",
+    keySectors: ["Terracotta & Pottery", "Agro-Processing", "Warehousing & Cold Storage", "Kirana & Wholesale"],
+    primaryCrops: ["Wheat", "Paddy", "Mustard", "Potato", "Sugarcane"],
+  },
+  prayagraj: {
+    odop: "Processed Food & Guava Processing (Allahabadi Surkha)",
+    keySectors: ["Food Processing", "Horticulture Cold Storage", "Religious Tourism & Hospitality", "Agro Trade"],
+    primaryCrops: ["Wheat", "Paddy", "Guava", "Mustard", "Potato"],
+  },
+  ayodhya: {
+    odop: "Jaggery & Agro-Processing Value Addition",
+    keySectors: ["Tourism & Hospitality Services", "Jaggery (Gud) Processing", "Agro Logistics", "Retail Trade"],
+    primaryCrops: ["Paddy", "Wheat", "Sugarcane", "Mustard", "Potato"],
+  },
+  kanpur: {
+    odop: "Leather Products, Footwear & Hosiery Textiles",
+    keySectors: ["Leather Goods & Footwear", "Textiles & Garments", "Chemicals & Detergents", "Agro Logistics"],
+    primaryCrops: ["Wheat", "Paddy", "Potato", "Mustard", "Pulses"],
+  },
+  agra: {
+    odop: "Leather Footwear & Petha Processing",
+    keySectors: ["Footwear Manufacturing", "Petha & Agro Processing", "Tourism Services", "Handicrafts"],
+    primaryCrops: ["Potato", "Mustard", "Wheat", "Bajra"],
+  },
+  meerut: {
+    odop: "Sports Goods & Musical Instruments",
+    keySectors: ["Sports Equipment", "Sugar & Jaggery Mills", "Auto Ancillaries", "Textiles"],
+    primaryCrops: ["Sugarcane", "Wheat", "Mustard", "Vegetables"],
+  },
+  kota: {
+    odop: "Kota Doria Saree Weaving & Soya Extraction",
+    keySectors: ["Textile Weaving", "Soybean Processing & Oil Mills", "Education Services", "Stone Quarrying"],
+    primaryCrops: ["Soybean", "Mustard", "Wheat", "Paddy", "Coriander"],
+  },
+  ludhiana: {
+    odop: "Woollen Knitwear, Hosiery & Cycle Parts",
+    keySectors: ["Textiles & Hosiery", "Bicycle & Auto Parts", "Agro Equipment", "Grain Trade"],
+    primaryCrops: ["Wheat", "Paddy", "Maize", "Potato", "Mustard"],
+  },
   coimbatore: {
     odop: "Textile Machinery & Wet Grinders",
     keySectors: ["Engineering", "Textiles", "Poultry & Dairy", "Motors & Pumps"],

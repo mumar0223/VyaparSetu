@@ -21,7 +21,7 @@ interface ThinkingAccordionProps {
 export function ThinkingAccordion({
   isStreaming = false,
   toolCalls = [],
-  completedDurationSeconds = 2,
+  completedDurationSeconds,
 }: ThinkingAccordionProps) {
   const [seconds, setSeconds] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -41,8 +41,8 @@ export function ThinkingAccordion({
   if (isStreaming && !hasTools) {
     const formattedDuration = seconds < 10 ? `0${seconds}` : `${seconds}`;
     return (
-      <div className="mb-2.5 py-0.5 select-none">
-        <span className="thinking-text text-[14.5px] font-medium text-forest dark:text-mint">
+      <div className="mb-2.5 select-none overflow-visible pt-0.5 pb-1.5">
+        <span className="thinking-text text-[14.5px] font-medium text-forest dark:text-mint leading-relaxed overflow-visible inline-block">
           Thinking... {seconds > 0 ? `(${formattedDuration}s)` : ""}
         </span>
       </div>
@@ -55,24 +55,27 @@ export function ThinkingAccordion({
   }
 
   // IF AT LEAST ONE TOOL WAS CALLED: Immediately render the accordion
-  const durationToShow = completedDurationSeconds || Math.max(seconds, 1);
+  const durationToShow =
+    completedDurationSeconds ?? (seconds > 0 ? seconds : undefined);
   const formattedDuration = seconds < 10 ? `0${seconds}` : `${seconds}`;
 
   const headerText = isStreaming
     ? `Thinking... ${seconds > 0 ? `(${formattedDuration}s)` : ""}`
-    : `Thought for ${durationToShow}s`;
+    : durationToShow !== undefined
+      ? `Thought for ${durationToShow}s`
+      : "Thought";
 
   return (
-    <div className="mb-3 select-none font-sans">
+    <div className="mb-3 select-none font-sans overflow-visible">
       {/* Borderless Header Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 text-[14.5px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5 group"
+        className="inline-flex items-center gap-1.5 text-[14.5px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer pt-0.5 pb-1.5 group overflow-visible"
       >
         <span
           className={cn(
-            "text-[14.5px] font-normal leading-none",
+            "text-[14.5px] font-normal leading-relaxed overflow-visible inline-block",
             isStreaming
               ? "thinking-text font-medium text-forest dark:text-mint"
               : "text-muted-foreground group-hover:text-foreground"
