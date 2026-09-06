@@ -637,7 +637,7 @@ RESPONSE RULES:
                 query: {
                   type: "STRING",
                   description:
-                    "Search query or specific business description e.g. 'restaurants near Kursi Road' or 'kirana store'",
+                    "Search query or specific business description or trade sector to search",
                 },
                 category: {
                   type: "STRING",

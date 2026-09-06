@@ -275,7 +275,7 @@ STRICT RELEVANCE & CATEGORY FILTERING RULES:
    - If target is Kirana / Grocery: return provision stores, general stores, supermarkets. NEVER include restaurants or hardware.
    - For ANY other category: strictly match shops competing directly for the exact same customer requirement.
 2. DEDUPLICATION RULE:
-   - If multiple search entries refer to the same physical shop under slightly different names (e.g. "Al Hadi", "Al-Hadi Restaurant", "Al Hadi Dhaba"), MERGE THEM into a single canonical entry with its most accurate landmark and realistic distance.
+   - If multiple search entries refer to the same physical establishment under slight spelling variations or alternate listings, MERGE THEM into a single canonical entry with its most accurate landmark and realistic distance.
 3. DUAL PERSONA ADVICE:
    - Provide genuine competitor names, distances from "${resolvedLocation}" (e.g. "150m", "400m", "1.2km"), landmarks, specialities, price ranges (e.g. "₹100 - ₹250 per person"), and threat levels (High, Medium, Low).
    - Rate threat levels based on proximity, customer volume, and competitive pricing.

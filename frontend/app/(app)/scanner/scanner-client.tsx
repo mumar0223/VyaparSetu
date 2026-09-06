@@ -156,7 +156,7 @@ export function ScannerClient({
     };
   }, [selectedState, selectedDistrict]);
 
-  // Scan Results state (Loaded from Prisma if available)
+  // Scan Results state (Loaded from Prisma if available, otherwise null until scanned)
   const [scanResult, setScanResult] = useState<{
     strengths: string[];
     weaknesses: string[];
@@ -166,71 +166,22 @@ export function ScannerClient({
     score: number;
     dataSource: string;
     actionPlan: { time: string; action: string; impact: string }[];
-  }>({
-    strengths: initialSwotData?.swotData?.strengths || [
-      `High recurring footfall in ${selectedDistrict} with 84% repeat customer loyalty`,
-      "Direct distributor tie-up reduces supplier intermediary margin loss by 4.2%",
-      "Verified digital ledger & UPI turnover provides clean credit underwriting proof",
-      "Prime location within 1.5km of central transport stand and APMC market access",
-    ],
-    weaknesses: initialSwotData?.swotData?.weaknesses || [
-      "Seasonal working capital contraction during monsoon months (18% turnover dip)",
-      "Informal uncollateralized credit extended to village customers slows cash receivables",
-      "Manual stock replenishment causes occasional stockouts on high-demand FMCG staples",
-    ],
-    opportunities: initialSwotData?.swotData?.opportunities || [
-      "Pre-qualified for PM Mudra Yojana (Tarun) up to ₹10 Lakhs at 8.5% p.a. subsidy rate",
-      `High unmet demand for packaged organic pulses and regional grains in ${selectedDistrict}`,
-      "Forming bulk purchase cluster with 4 nearby merchants can unlock 12% wholesale rebate",
-      "Linking with ONDC Network expands B2B supply beyond municipal limits",
-    ],
-    threats: initialSwotData?.swotData?.threats || [
-      "Wholesale Mandi price volatility on edible oils, pulses, and packaged dairy items",
-      "Expansion of regional quick-commerce warehouse hubs in sub-district radius",
-      "Seasonal logistics freight surge during peak agricultural harvest periods",
-    ],
-    competitors: initialSwotData?.swotData?.competitors || [
-      {
-        name: "Al-Hadi Restaurant",
-        distance: "140m",
-        landmark: "Opposite Integral University Gate, Kursi Road",
-        speciality: "Mughlai, Biryani & Dhaba Dining",
-        priceRange: "₹100 - ₹250",
-        threatLevel: "High",
-        differentiator: "Established student footfall and quick dining service",
-      },
-      {
-        name: "Royal Biryani",
-        distance: "280m",
-        landmark: "Near PNB ATM, Kursi Road",
-        speciality: "Dum Biryani & Non-Veg",
-        priceRange: "₹90 - ₹180",
-        threatLevel: "Medium",
-        differentiator: "High volume sales and affordable student price point",
-      },
-    ],
-    score: initialSwotData?.score || 86,
-    dataSource:
-      initialSwotData?.dataSource ||
-      `Geographic Heuristics & Trade Register for ${selectedDistrict}, ${selectedState} (${radiusKm}km radius)`,
-    actionPlan: initialSwotData?.actionPlan || [
-      {
-        time: "Next 7 Days",
-        action: "Digitalize customer udhaar ledgers and set automated WhatsApp payment reminders",
-        impact: "Recovers ₹25,000+ in delayed receivables",
-      },
-      {
-        time: "Next 30 Days",
-        action: "Submit PM Mudra working capital application via pre-filled bank statement",
-        impact: "Secures ₹5 Lakhs low-interest liquidity cushion",
-      },
-      {
-        time: "Next 90 Days",
-        action: "Partner with regional supplier cluster for bulk edible oil procurement",
-        impact: "Boosts store gross margin by 3.8%",
-      },
-    ],
-  });
+  } | null>(
+    initialSwotData
+      ? {
+          strengths: initialSwotData.swotData?.strengths || [],
+          weaknesses: initialSwotData.swotData?.weaknesses || [],
+          opportunities: initialSwotData.swotData?.opportunities || [],
+          threats: initialSwotData.swotData?.threats || [],
+          competitors: initialSwotData.swotData?.competitors || [],
+          score: initialSwotData.score || 88,
+          dataSource:
+            initialSwotData.dataSource ||
+            `Geographic Heuristics for ${selectedDistrict}, ${selectedState}`,
+          actionPlan: initialSwotData.actionPlan || [],
+        }
+      : null
+  );
 
   // Reusable GPS Fetch Logic
   const fetchGpsLocation = useCallback((options?: { silent?: boolean }) => {
@@ -402,11 +353,11 @@ export function ScannerClient({
                   {t("scanner.marketFeasibilityScore", "Market Feasibility Score")}
                 </span>
                 <span className="font-serif font-bold text-xl sm:text-2xl text-forest dark:text-mint">
-                  {scanResult.score} / 100
+                  {scanResult ? `${scanResult.score} / 100` : "--"}
                 </span>
               </div>
               <div className="size-10 rounded-xl bg-mint-pale dark:bg-mint/20 text-forest dark:text-mint flex items-center justify-center font-bold text-sm">
-                A+
+                {scanResult ? (scanResult.score >= 80 ? "A+" : scanResult.score >= 60 ? "B" : "C") : "--"}
               </div>
             </div>
           </div>
@@ -648,7 +599,7 @@ export function ScannerClient({
         )}
 
         {/* SWOT Matrix 4-Quadrant Grid */}
-        {!isScanning && (
+        {!isScanning && scanResult && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
@@ -824,6 +775,30 @@ export function ScannerClient({
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Empty State when no scan has been performed yet */}
+        {!isScanning && !scanResult && (
+          <div className="p-8 sm:p-12 rounded-2xl bg-white/40 dark:bg-card/40 border border-sage/30 dark:border-border text-center flex flex-col items-center justify-center space-y-4 shadow-xs">
+            <div className="size-16 rounded-2xl bg-mint-pale dark:bg-mint/20 text-forest dark:text-mint flex items-center justify-center shadow-xs">
+              <ScanSearch className="size-8" />
+            </div>
+            <div className="max-w-md space-y-1.5">
+              <h3 className="font-serif font-bold text-lg text-foreground">
+                No Feasibility Scan on Record
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                Select your target district and catchment radius above, then click &quot;Run Deep Market Scan&quot; to fetch live APMC Mandi rates, UDYAM registration saturation, and verified local competitors.
+              </p>
+            </div>
+            <button
+              onClick={handleRunFeasibilityScan}
+              className="bg-orange hover:bg-orange-hover text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <ScanSearch className="size-4" />
+              <span>Run Deep Market Scan ({radiusKm}km Radius)</span>
+            </button>
           </div>
         )}
       </div>

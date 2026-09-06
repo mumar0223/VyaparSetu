@@ -58,7 +58,7 @@ const SearchCompetitorsSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Optional query or description of the business, e.g. 'Biryani shops near Kursi Road' or 'Kirana stores'",
+      "Optional query or description of the target business or trade sector to search",
     ),
   category: z
     .string()
