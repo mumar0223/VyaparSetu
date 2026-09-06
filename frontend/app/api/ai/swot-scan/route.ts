@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserBusinessFullContext } from "@/lib/business-helper";
 import { fetchDistrictMandiRates, getUdyamDistrictIntelligence } from "@/lib/api/datagov";
 import { getLanguageModel } from "@/lib/agent/ai-provider";
+import { searchCompetitorsIntelligence } from "@/lib/agent/competitor-service";
 import { generateText } from "ai";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +23,24 @@ export async function POST(req: NextRequest) {
     const radiusKm = Number(body.radiusKm || 10);
     const category = body.category || dbContext?.category || "General Store / Kirana";
     const businessName = body.businessName || dbContext?.businessName || "My Enterprise";
+    const lat = body.lat !== undefined ? Number(body.lat) : undefined;
+    const lng = body.lng !== undefined ? Number(body.lng) : undefined;
 
-    // 1. Fetch live Mandi rates and Udyam MSME data
-    const mandiRecords = await fetchDistrictMandiRates(state, district, 8);
+    // 1. Fetch live Mandi rates, Udyam MSME data, and Nearby Competitors
+    const [mandiRecords, competitorData] = await Promise.all([
+      fetchDistrictMandiRates(state, district, 8),
+      searchCompetitorsIntelligence({
+        category,
+        radiusKm,
+        location: `${district}, ${state}`,
+        lat,
+        lng,
+        userId: user?.id,
+        businessName,
+      }),
+    ]);
     const udyamStats = getUdyamDistrictIntelligence(district, state);
+    const competitors = competitorData?.competitors || [];
 
     // 2. Prepare Prompt for Vertex AI Gemini 3.7 Flash
     const systemInstruction = `You are VyaparSetu's Geospatial Market & SWOT Intelligence Analyst for Indian Micro/Small Enterprises.
@@ -33,13 +48,28 @@ You analyze live APMC Mandi rates from data.gov.in, UDYAM registration saturatio
 
 Return ONLY pure valid JSON with no markdown wrapping.`;
 
+    const competitorSummary =
+      competitors.length > 0
+        ? competitors
+            .map(
+              (c) =>
+                `${c.name} (Distance: ${c.distance}, Landmark: ${c.landmark}, Speciality: ${c.speciality}, Threat Level: ${c.threatLevel})`
+            )
+            .join("; ")
+        : "Standard local retail shops in the catchment area";
+
     const userPrompt = `Generate a deep SWOT Market Feasibility Scan for:
 - Enterprise: ${businessName} (${category})
 - Geographic Location: ${district}, ${state}
 - Analysis Radius: ${radiusKm} km Catchment Area
 - ODOP Product: ${udyamStats.odopProduct || "Regional Produce"}
 - UDYAM Sector Saturation: ${udyamStats.topSectors.map((s) => `${s.sector}: ${s.saturationLevel}`).join(", ")}
+- Verified Nearby Competitor Shops (${category}): ${competitorSummary}
 - Live Mandi Commodity Rates (data.gov.in): ${mandiRecords.map((m) => `${m.commodity} (Modal: ₹${m.modalPrice}/qtl)`).join("; ") || "Standard regional wholesale prices"}
+
+CRITICAL COMPETITOR INTELLIGENCE INSTRUCTION:
+In the "threats" array, explicitly cite at least 1-2 of the real competitor names listed above (e.g. citing physical proximity, menu/pricing pressure, or customer share).
+In the "opportunities" array, specify concrete operational actions to capture market share or differentiate from these specific rivals.
 
 Provide JSON in this EXACT schema:
 {
@@ -186,6 +216,7 @@ Provide JSON in this EXACT schema:
               weaknesses: parsed.weaknesses,
               opportunities: parsed.opportunities,
               threats: parsed.threats,
+              competitors: competitors as any,
             },
             actionPlan: parsed.actionPlan,
             dataSource: parsed.dataSource || `Live Trade Register for ${district}`,
@@ -200,6 +231,7 @@ Provide JSON in this EXACT schema:
               weaknesses: parsed.weaknesses,
               opportunities: parsed.opportunities,
               threats: parsed.threats,
+              competitors: competitors as any,
             },
             actionPlan: parsed.actionPlan,
             dataSource: parsed.dataSource || `Live Trade Register for ${district}`,
@@ -212,6 +244,7 @@ Provide JSON in this EXACT schema:
       success: true,
       mandiRecords,
       udyamStats,
+      competitors,
       ...parsed,
     });
   } catch (error: any) {
@@ -240,6 +273,7 @@ export async function GET(req: NextRequest) {
           weaknesses: swot?.weaknesses || [],
           opportunities: swot?.opportunities || [],
           threats: swot?.threats || [],
+          competitors: swot?.competitors || [],
           actionPlan: saved.actionPlan || [],
           savedInDb: true,
         });

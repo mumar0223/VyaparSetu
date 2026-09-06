@@ -12,8 +12,14 @@ import {
   Bell,
   Save,
   ChevronDown,
+  Fingerprint,
+  Trash2,
+  ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { startRegistration } from "@simplewebauthn/browser";
+import { useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -47,8 +53,100 @@ export interface SettingsData {
 export function SettingsClient({ initialSettings }: { initialSettings: SettingsData }) {
   const { theme, setTheme } = useTheme();
   const [saving, setSaving] = useState(false);
+  const [passkeys, setPasskeys] = useState<
+    Array<{ id: string; deviceName: string; createdAt: string; lastUsedAt?: string }>
+  >([]);
+  const [loadingPasskeys, setLoadingPasskeys] = useState(false);
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
 
   const [form, setForm] = useState<SettingsData>(initialSettings);
+
+  const fetchPasskeys = async () => {
+    try {
+      setLoadingPasskeys(true);
+      const res = await fetch("/api/auth/passkey");
+      if (res.ok) {
+        const data = await res.json();
+        setPasskeys(data.passkeys || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingPasskeys(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPasskeys();
+  }, []);
+
+  const handleAddPasskey = async () => {
+    // Hardware sensor availability check
+    if (
+      typeof window === "undefined" ||
+      !window.PublicKeyCredential ||
+      !PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable
+    ) {
+      toast.error("Fingerprint sensor not found on this device.");
+      return;
+    }
+
+    try {
+      const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isAvailable) {
+        toast.error("Fingerprint sensor not found on this device.");
+        return;
+      }
+    } catch {
+      toast.error("Fingerprint sensor not found on this device.");
+      return;
+    }
+
+    setRegisteringPasskey(true);
+    try {
+      const optionsRes = await fetch("/api/auth/passkey/register-options", { method: "POST" });
+      if (!optionsRes.ok) throw new Error("Failed to initialize registration");
+      const options = await optionsRes.json();
+
+      const regResp = await startRegistration({ optionsJSON: options });
+      const verifyRes = await fetch("/api/auth/passkey/register-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(regResp),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.verified) {
+        throw new Error(verifyData.error || "Failed to register fingerprint");
+      }
+
+      toast.success("Fingerprint registered successfully!");
+      fetchPasskeys();
+    } catch (e: any) {
+      const msg = e instanceof Error ? e.message : "Registration cancelled";
+      if (e?.name === "NotAllowedError" || msg.includes("cancelled") || msg.includes("timed out")) {
+        console.log("[passkey] cancelled");
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setRegisteringPasskey(false);
+    }
+  };
+
+  const handleDeletePasskey = async (id: string) => {
+    try {
+      const res = await fetch(`/api/auth/passkey?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Fingerprint removed");
+        setPasskeys((prev) => prev.filter((p) => p.id !== id));
+      } else {
+        toast.error("Failed to remove fingerprint");
+      }
+    } catch {
+      toast.error("Failed to remove fingerprint");
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,6 +315,85 @@ export function SettingsClient({ initialSettings }: { initialSettings: SettingsD
                 </label>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Biometric & Fingerprint Security Card */}
+        <div className="bg-white dark:bg-card rounded-2xl border border-sage/30 dark:border-border p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-mint-pale dark:bg-mint/15 text-forest dark:text-mint flex items-center justify-center shrink-0">
+                <Fingerprint className="size-5 text-mint" />
+              </div>
+              <div>
+                <h3 className="font-serif font-bold text-base text-forest dark:text-foreground">
+                  Fingerprint &amp; Biometric Login
+                </h3>
+                <p className="text-xs text-ink-muted dark:text-muted-foreground mt-0.5">
+                  Sign in with 1 tap using your device&apos;s biometric sensor without typing passwords.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddPasskey}
+              disabled={registeringPasskey}
+              className="px-4 py-2 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-semibold shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-70 shrink-0 self-start sm:self-auto"
+            >
+              {registeringPasskey ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin text-mint" /> Registering...
+                </>
+              ) : (
+                <>
+                  <Fingerprint className="size-3.5 text-mint" /> Add Fingerprint
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="border-t border-sage/20 dark:border-border/60 pt-3">
+            {loadingPasskeys ? (
+              <p className="text-xs text-ink-muted dark:text-muted-foreground italic py-1">
+                Loading registered credentials...
+              </p>
+            ) : passkeys.length === 0 ? (
+              <p className="text-xs text-ink-muted dark:text-muted-foreground italic py-1">
+                No fingerprint devices registered yet. Click &quot;Add Fingerprint&quot; to enable 1-tap sign-in on this device.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {passkeys.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-cream/60 dark:bg-muted/30 border border-sage/30 dark:border-border/60"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ShieldCheck className="size-4 text-mint" />
+                      <div>
+                        <p className="text-xs font-semibold text-forest dark:text-foreground">
+                          {p.deviceName || "Biometric Device"}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Added {new Date(p.createdAt).toLocaleDateString()}
+                          {p.lastUsedAt && ` • Last used ${new Date(p.lastUsedAt).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePasskey(p.id)}
+                      className="p-1.5 rounded-lg text-ink-muted hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      title="Remove passkey"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </form>

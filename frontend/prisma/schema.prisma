@@ -29,6 +29,7 @@ model User {
   settings           Settings?
   privacyConsent     PrivacyConsent?
   notifications      Notification[]
+  passkeys           Passkey[]       @relation("UserPasskeys")
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
@@ -338,6 +339,44 @@ model StrategicActionPlaybook {
   enterpriseSummary String?  @db.Text
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model OndcMarketIntelligence {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  category  String
+  location  String?
+  data      Json
+  summary   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CompetitorMarketIntelligence {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  category  String
+  location  String?
+  data      Json
+  summary   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation("UserPasskeys", fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique
+  publicKey    String
+  counter      BigInt    @default(0)
+  deviceName   String?
+  transports   String[]  @default([])
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+  @@index([credentialId])
 }
 
 

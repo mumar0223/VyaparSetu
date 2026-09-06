@@ -90,23 +90,16 @@ async function handleVoiceSession(req: NextRequest) {
 
     let languageInstruction = "";
     if (isHinglish) {
-      languageInstruction = `\nUSER SELECTED LANGUAGE: Hinglish (Conversational Hindi + English)
-LANGUAGE & SPOKEN STYLE RULES (STRICT & HIGHEST PRIORITY):
-1. The user selected "Hinglish". Speak and respond in natural conversational HINGLISH (spoken Hindi mixed with common English trade & business terms).
-2. For text transcripts, use clean Romanized/English script rather than heavy Devanagari script.
-3. Keep spoken replies concise, friendly, and natural.`;
+      languageInstruction = `\nPREFERRED CONVERSATIONAL DIALECT: Hinglish (Conversational Hindi + English)
+1. Speak and respond in natural conversational HINGLISH (spoken Hindi mixed with common English trade & business terms).
+2. Keep spoken replies concise, friendly, and natural.`;
     } else if (isRegional) {
-      languageInstruction = `\nUSER SELECTED LANGUAGE: ${targetLang.name} (${targetLang.native})
-LANGUAGE & DYNAMIC SCRIPT / SPOKEN STYLE RULES (CRITICAL):
-1. The user selected "${targetLang.name}" in their settings. Speak and respond primarily in ${targetLang.name}.
-2. DYNAMIC TRANSLITERATION & SCRIPT OBSERVATION:
-   - If the user writes or speaks in Romanized text / Latin alphabet (e.g. "Mera naam ye hai", "Mandi bhav batao", "Kasa ahes"): Speak and formulate outputs in natural conversational ${targetLang.name}, and in text transcripts use the Roman/English alphabet instead of forcing heavy native script.
-   - If the user uses pure native script or pure formal regional dialect: Respond in pure ${targetLang.name}.
-   - Always match the user's natural conversational flow, script, and tone.`;
+      languageInstruction = `\nPREFERRED CONVERSATIONAL LANGUAGE: ${targetLang.name} (${targetLang.native})
+1. The user's preferred language setting is ${targetLang.name}. When appropriate or when the user speaks in ${targetLang.name}, speak and respond primarily in ${targetLang.name}.
+2. Always match the user's natural conversational flow and tone.`;
     } else {
-      languageInstruction = `\nLANGUAGE & SCRIPT RULES:
-1. Speak in clear, natural, professional English, or adapt to the user's spoken dialect (Hindi, Hinglish, Marathi, Gujarati, etc.) based on their input.
-2. Match the user's conversational pattern naturally.`;
+      languageInstruction = `\nCONVERSATIONAL LANGUAGE:
+1. You are an adaptive multilingual Indian assistant. Automatically detect the user's spoken language (Hindi, Hinglish, English, or regional languages) and respond naturally in that same language.`;
     }
 
     const modelId = (LIVE_VOICE_AGENT_CONFIG.model || "gemini-live-2.5-flash")
@@ -124,11 +117,34 @@ MALE PERSONA & GRAMMAR RULES:
 1. You are strictly a male persona. In all Indian languages (Hindi, Marathi, Bengali, Punjabi, Gujarati, etc.), always use masculine self-referential verb inflections, pronouns, and adjectives (e.g. in Hindi: "मैं करूँगा", "बता सकता हूँ", "मैं समझता हूँ", never use feminine forms like "करूँगी" or "सकती हूँ").
 2. In English, maintain a warm, confident, professional male advisor tone.
 
-MULTILINGUAL SUPPORT (10 Indian Languages):
-1. You natively understand and speak: Hindi (हिन्दी), English (India), Bengali (বাংলা), Marathi (मराठी), Telugu (తెలుగు), Tamil (தமிழ்), Gujarati (ગુજરાતી), Kannada (ಕನ್ನಡ), Malayalam (മലയാളം), and Punjabi (ਪੰਜਾਬੀ), including Hinglish and colloquial regional business terminology.
-2. Always respond directly in the language spoken by the user (or the language the user asks for).
-3. Keep spoken replies concise, clear, natural, and respectful — 1 to 3 short spoken sentences.
-4. Never read out hidden reasoning or tool schema details.
+LANGUAGE MATCHING & TRANSCRIPTION MATRIX (MANDATORY — MIRROR THE USER'S EXACT LANGUAGE):
+Detect the language of the speaker dynamically on every single utterance and strictly adhere to this matrix:
+
+1. IF ENGLISH:
+   • User Input Transcript (inputAudioTranscription): Output clean, accurate English text.
+   • Spoken AI Response: Speak back in clear, natural, professional English.
+
+2. IF HINDI:
+   • User Input Transcript (inputAudioTranscription): Output authentic Hindi in Devanagari script (e.g. "नमस्ते भाई, मुझे एसबीआई मुद्रा लोन का फॉर्म चाहिए", "मंडी भाव बताओ").
+   • STRICT ANTI-CORRUPTION RULE: Under NO circumstances should you force Hindi speech into English words or syllables!
+     - NEVER transcribe "भाई" as "VI".
+     - NEVER transcribe "आवेदन" as "order".
+     - NEVER transcribe "लोन" as "alone".
+     - NEVER distort Hindi sounds into phonetically similar English words.
+   • Spoken AI Response: Speak back in polite, respectful, natural Hindi.
+
+3. IF HINGLISH (Conversational Hindi + English):
+   • User Input Transcript (inputAudioTranscription): Output in natural conversational Hinglish (e.g. "Mera SBI loan form bana do", "Aaj ka mandi bhav check karo").
+   • Spoken AI Response: Speak back in friendly, natural conversational Hinglish.
+
+4. IF OTHER REGIONAL LANGUAGES (Marathi, Gujarati, Bengali, Tamil, Telugu, Punjabi, Kannada, Malayalam):
+   • User Input Transcript (inputAudioTranscription): Output in that specific regional language and native script (मराठी, ગુજરાતી, বাংলা, etc.).
+   • Spoken AI Response: Speak back in that same regional language.
+
+NEVER TRANSLATE USER INPUT:
+- When writing the user transcript (inputAudioTranscription), transcribe what was actually spoken in its native language/script. Never translate Hindi to English, and never phonetically convert Hindi words into English vocabulary.
+- Keep spoken replies concise, clear, natural, and respectful — 1 to 3 short spoken sentences.
+- Never read out hidden reasoning or tool schema details.
 
 CAPABILITIES & TOOL USAGE (CRITICAL — YOU MUST USE TOOLS WHEN RELEVANT):
 You have access to powerful tools. When the user's query relates to any of the following, you MUST call the appropriate tool immediately — do NOT say "I can't do that" or "I don't have access":
@@ -146,6 +162,8 @@ You have access to powerful tools. When the user's query relates to any of the f
 10. **Web Search** (trade news, policies, RBI circulars, market updates) → Call webSearch with the search query.
 11. **Dynamic Interactive Forms & Applications** → Call stageForm when user asks for any form (loan application, subsidy registration, supplier KYC, survey, registration) with rich sections and fields.
 12. **Delete Records** → Call stageDeleteRecord when the user wants to remove a budget, expense, goal, or debt.
+13. **Local Competitors & Market Feasibility** → Call searchCompetitors when user asks about starting/opening a shop, local business feasibility, market competition, rival businesses, or customer footfall in their area.
+14. **ONDC Digital Commerce & Wholesale Sourcing** → Call getOndcIntelligence when user asks about reducing inventory cost, wholesale buying on ONDC B2B, selling online without paying 25-30% aggregator commission, onboarding on ONDC, or e-commerce expansion.
 
 STRICT TOOL CALLING RULE (ENGLISH-ONLY PARAMETERS):
 1. Even when conversing, speaking, or chatting with the user in Hindi, Hinglish, Marathi, Bengali, Gujarati, or any Indian regional language:
@@ -173,10 +191,19 @@ If the user asks about topics outside of Indian trade, agriculture, mandi rates,
 - English response: "I am VyaparSetu, dedicated to assisting Indian small businesses, mandi traders, and farmers. I can help you with live APMC mandi prices, government loans (PM Mudra/SVANidhi), expense ledgers, and business financial planning. How may I assist your business today?"
 - Hindi response: "माफ़ कीजिए, मैं व्यापारसेतु हूँ — भारतीय छोटे व्यापारियों, दुकानदारों और किसानों का व्यापार सहायक। मैं केवल मंडी भाव, सरकारी योजनाओं (मुद्रा/स्वनिधि ऋण), व्यापारिक बहीखाता, और वित्तीय योजना से जुड़े प्रश्नों में आपकी मदद कर सकता हूँ। आपके व्यवसाय या मंडी से संबंधित क्या प्रश्न है?"
 
+CRITICAL TOOL EXECUTION ORDER (STRICT & HIGHEST PRIORITY):
+1. TOOL FIRST, AUDIO SECOND: When the user asks to create, view, or update ANY form, chart, graph, mandi rate, budget, or expense, YOU MUST DISPATCH THE RELEVANT TOOL CALL FIRST BEFORE SPEAKING A SINGLE WORD.
+2. SPOKEN WORDS CANNOT RENDER UI: Spoken voice alone CANNOT put anything on the user's screen. Only executing tools (stageForm, stageChart, stageBudget, stageExpense, getMandiRates) renders interactive cards and data on screen.
+3. NEVER PREDICT OR FAKE COMPLETION: YOU ARE STRICTLY FORBIDDEN from saying "मैंने स्क्रीन पर बना दिया है", "स्क्रीन पर देख सकते हैं", "I have created the form/chart", or "Here is the form" UNLESS you actually executed the tool in this exact turn.
+4. ON-DEMAND VERIFICATION ("WHERE IS IT? / FORM NAHI DIKH RAHA"): If the user asks "फॉर्म कहाँ है?", "मुझे नहीं दिख रहा", "Did you make the form?", or asks to make it again:
+   - NEVER say "यह तो पहले से बना हुआ है" / "It is already done".
+   - If the user says they do not see it, it means NO tool was called or the screen is empty.
+   - You MUST IMMEDIATELY call stageForm, stageChart, or the requested tool in this turn without arguing!
+
 RESPONSE RULES:
-1. After executing a tool, speak the key findings naturally and concisely in the user's language.
+1. After executing a tool, speak the key findings naturally and concisely in the user's language (1 to 2 short spoken sentences).
 2. Confirm key prices, rates, amounts, or loan figures clearly.
-3. For staging tools (stageForm, stageBudget, stageExpense, stageChart, etc.), confirm that an interactive draft card has been created or updated for the user to review and edit on screen.`;
+3. For staging tools (stageForm, stageBudget, stageExpense, stageChart), confirm that the interactive draft card has been created for the user to review and edit on screen.`;
 
 
     if (conversationId) {
@@ -302,11 +329,15 @@ RESPONSE RULES:
           {
             name: "stageBudget",
             description:
-              "Stages an interactive draft budget plan with category allocations for user review.",
+              "Stages an interactive draft budget plan with category allocations for user review. Call this tool when the user wants to create or plan a budget.",
             parameters: {
               type: "OBJECT",
               properties: {
                 name: { type: "STRING", description: "Budget title" },
+                query: {
+                  type: "STRING",
+                  description: "Full user budget request, purpose, and amount details",
+                },
                 period: {
                   type: "STRING",
                   description: "Monthly, Quarterly, Annual, Weekly",
@@ -318,7 +349,7 @@ RESPONSE RULES:
                 items: {
                   type: "ARRAY",
                   description:
-                    "List of allocations with category and allocatedAmount",
+                    "Optional list of allocations with category and allocatedAmount",
                   items: {
                     type: "OBJECT",
                     properties: {
@@ -329,7 +360,7 @@ RESPONSE RULES:
                   },
                 },
               },
-              required: ["name", "totalAmount", "items"],
+              required: ["name"],
             },
           },
           {
@@ -455,19 +486,23 @@ RESPONSE RULES:
           {
             name: "stageChart",
             description:
-              "Generates or updates an interactive visual chart (bar, line, area, pie) as an artifact. Pass 'targetArtifactId' to edit an existing chart in place.",
+              "Generates or updates an interactive visual chart (bar, line, area, pie) as an artifact on screen. Call this tool whenever the user asks for a chart, graph, visual comparison, or price trend.",
             parameters: {
               type: "OBJECT",
               properties: {
                 targetArtifactId: {
                   type: "STRING",
-                  description: "Optional ID or index (e.g. 'art_1' or '1') of an existing chart to update in place",
+                  description: "Optional ID or index of an existing chart to update in place",
                 },
                 chartType: {
                   type: "STRING",
                   description: "bar, line, area, or pie",
                 },
                 title: { type: "STRING", description: "Title of the chart" },
+                query: {
+                  type: "STRING",
+                  description: "Specific metric or trend to visualize e.g. 'Last 6 months onion modal price trend in Nashik'",
+                },
                 description: {
                   type: "STRING",
                   description: "Brief description of the chart metrics",
@@ -479,7 +514,7 @@ RESPONSE RULES:
                 data: {
                   type: "ARRAY",
                   description:
-                    "Array of data point objects with key-values, e.g. [{'name': 'Jan', 'amount': 15000}, {'name': 'Feb', 'amount': 18000}]",
+                    "Optional array of data point objects with key-values",
                   items: {
                     type: "OBJECT",
                   },
@@ -487,7 +522,7 @@ RESPONSE RULES:
                 series: {
                   type: "ARRAY",
                   description:
-                    "Array of series objects with dataKey, name, color",
+                    "Optional array of series objects with dataKey, name, color",
                   items: {
                     type: "OBJECT",
                     properties: {
@@ -499,23 +534,27 @@ RESPONSE RULES:
                   },
                 },
               },
-              required: ["chartType", "title", "data"],
+              required: ["title", "chartType"],
             },
           },
           {
             name: "stageForm",
             description:
-              "Generates or updates a dynamic interactive multi-field form artifact (loan applications, subsidy forms, vendor KYC, registration). Pass 'targetArtifactId' to edit an existing form in place.",
+              "Generates or updates a dynamic interactive multi-field form artifact on screen (loan applications, subsidy forms, vendor KYC, registration). Call this tool whenever the user asks to create, show, or edit any form.",
             parameters: {
               type: "OBJECT",
               properties: {
                 targetArtifactId: {
                   type: "STRING",
-                  description: "Optional ID or index (e.g. 'art_1' or '1') of an existing form to update in place",
+                  description: "Optional ID or index of an existing form to update in place",
                 },
                 title: {
                   type: "STRING",
-                  description: "Title of the form",
+                  description: "Title of the form (e.g. 'SBI MSME Loan Application Form')",
+                },
+                query: {
+                  type: "STRING",
+                  description: "Specific form request, applicant details, business type, loan amount, or requested fields",
                 },
                 description: {
                   type: "STRING",
@@ -527,11 +566,11 @@ RESPONSE RULES:
                 },
                 formType: {
                   type: "STRING",
-                  description: "Form category e.g. loan_application",
+                  description: "Form category e.g. loan_application, subsidy, vendor_kyc, registration",
                 },
                 sections: {
                   type: "ARRAY",
-                  description: "List of form sections containing fields",
+                  description: "Optional list of form sections containing fields",
                   items: {
                     type: "OBJECT",
                     properties: {
@@ -565,7 +604,7 @@ RESPONSE RULES:
                   },
                 },
               },
-              required: ["title", "sections"],
+              required: ["title"],
             },
           },
           {
@@ -586,6 +625,88 @@ RESPONSE RULES:
                 },
               },
               required: ["entityType", "entityId", "entityName"],
+            },
+          },
+          {
+            name: "searchCompetitors",
+            description:
+              "Searches for nearby competitor shops, rival outlets, or businesses for any commercial category within a catchment radius to analyze local competition and market feasibility.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                query: {
+                  type: "STRING",
+                  description:
+                    "Search query or specific business description e.g. 'restaurants near Kursi Road' or 'kirana store'",
+                },
+                category: {
+                  type: "STRING",
+                  description:
+                    "Business sector e.g. Biryani & Food, Kirana, Garments, Mobile Repair, Hardware",
+                },
+                radiusKm: {
+                  type: "NUMBER",
+                  description: "Search radius in km e.g. 1, 2, 5",
+                },
+                location: {
+                  type: "STRING",
+                  description: "Specific city, area, or landmark if specified by user",
+                },
+              },
+            },
+          },
+          {
+            name: "getOndcIntelligence",
+            description:
+              "Discovers ONDC (Open Network for Digital Commerce) opportunities including B2B wholesale procurement at 8-12% discounts, B2C digital seller apps (Mystore, Magicpin) at 3% commission, and hyper-local delivery partners for any enterprise.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                query: {
+                  type: "STRING",
+                  description:
+                    "Specific ONDC inquiry e.g. 'How to sell on ONDC' or 'Wholesale procurement'",
+                },
+                category: {
+                  type: "STRING",
+                  description:
+                    "Business sector e.g. Biryani & Food, Kirana, Garments, Mobile Repair, Hardware",
+                },
+                location: {
+                  type: "STRING",
+                  description: "Specific city, area, or state",
+                },
+                intent: {
+                  type: "STRING",
+                  description: "Focus: procure, sell, logistics, or general",
+                },
+              },
+            },
+          },
+          {
+            name: "predictDistrictBusinesses",
+            description:
+              "Researches and predicts the Top 4 high-ROI, low-saturation business opportunities in any Indian district for a given budget using live web search, APMC Mandi trends, and Udyam MSME subsidies (PMEGP 35%, PMFME, Mudra).",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                district: {
+                  type: "STRING",
+                  description: "District or city name (e.g. Lucknow, Varanasi, Pune, Kanpur, Indore)",
+                },
+                state: {
+                  type: "STRING",
+                  description: "State name (e.g. Uttar Pradesh, Maharashtra, Madhya Pradesh)",
+                },
+                budget: {
+                  type: "NUMBER",
+                  description: "Capital investment budget in INR (e.g. 200000, 500000)",
+                },
+                category: {
+                  type: "STRING",
+                  description: "Sector of interest (e.g. Food Processing, Packaging, Manufacturing, Retail)",
+                },
+              },
             },
           },
         ],

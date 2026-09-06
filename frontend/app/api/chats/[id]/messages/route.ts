@@ -16,7 +16,7 @@ export async function POST(
 
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
-    const { userTranscript, assistantTranscript, toolCalls } = body;
+    const { userTranscript, assistantTranscript, toolCalls, thinking } = body;
 
     const conversation = await prisma.conversation.findFirst({
       where: { id, userId: user.id },
@@ -41,6 +41,7 @@ export async function POST(
         conversationId: id,
         role: "assistant",
         content: assistantTranscript.trim(),
+        thinking: typeof thinking === "string" ? thinking : undefined,
         toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
       });
     }

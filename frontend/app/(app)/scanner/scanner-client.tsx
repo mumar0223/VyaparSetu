@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Layers,
   ChevronDown,
+  Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +43,16 @@ export interface ScannerBusinessProfile {
   monthlyExpenses?: number | null;
 }
 
+export interface CompetitorItem {
+  name: string;
+  distance: string;
+  landmark: string;
+  speciality: string;
+  priceRange: string;
+  threatLevel: "High" | "Medium" | "Low";
+  differentiator?: string;
+}
+
 export interface InitialSwotData {
   district: string;
   state: string;
@@ -52,6 +63,7 @@ export interface InitialSwotData {
     weaknesses: string[];
     opportunities: string[];
     threats: string[];
+    competitors?: CompetitorItem[];
   };
   actionPlan: { time: string; action: string; impact: string }[];
   dataSource: string;
@@ -150,6 +162,7 @@ export function ScannerClient({
     weaknesses: string[];
     opportunities: string[];
     threats: string[];
+    competitors?: CompetitorItem[];
     score: number;
     dataSource: string;
     actionPlan: { time: string; action: string; impact: string }[];
@@ -175,6 +188,26 @@ export function ScannerClient({
       "Wholesale Mandi price volatility on edible oils, pulses, and packaged dairy items",
       "Expansion of regional quick-commerce warehouse hubs in sub-district radius",
       "Seasonal logistics freight surge during peak agricultural harvest periods",
+    ],
+    competitors: initialSwotData?.swotData?.competitors || [
+      {
+        name: "Al-Hadi Restaurant",
+        distance: "140m",
+        landmark: "Opposite Integral University Gate, Kursi Road",
+        speciality: "Mughlai, Biryani & Dhaba Dining",
+        priceRange: "₹100 - ₹250",
+        threatLevel: "High",
+        differentiator: "Established student footfall and quick dining service",
+      },
+      {
+        name: "Royal Biryani",
+        distance: "280m",
+        landmark: "Near PNB ATM, Kursi Road",
+        speciality: "Dum Biryani & Non-Veg",
+        priceRange: "₹90 - ₹180",
+        threatLevel: "Medium",
+        differentiator: "High volume sales and affordable student price point",
+      },
     ],
     score: initialSwotData?.score || 86,
     dataSource:
@@ -289,6 +322,7 @@ export function ScannerClient({
           weaknesses: data.weaknesses || [],
           opportunities: data.opportunities || [],
           threats: data.threats || [],
+          competitors: data.competitors || [],
           score: data.score || 88,
           dataSource: data.dataSource || `Live Trade Register for ${selectedDistrict}`,
           actionPlan: data.actionPlan || [],
@@ -694,6 +728,70 @@ export function ScannerClient({
                 </ul>
               </div>
             </div>
+
+            {/* Hyper-Local Competitor Benchmark Grid */}
+            {scanResult.competitors && scanResult.competitors.length > 0 && (
+              <div className="bg-white/40 dark:bg-card/40 rounded-2xl border border-sage/20 dark:border-border p-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                  <div>
+                    <h3 className="font-serif font-bold text-lg text-forest dark:text-foreground flex items-center gap-2">
+                      <Store className="size-5 text-mint" /> Hyper-Local Competitor Landscape
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Verified rival businesses competing in {profile?.category || "this sector"} within {radiusKm}km catchment radius
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-bold text-forest dark:text-mint bg-mint-pale dark:bg-mint/20 px-3 py-1 rounded-full border border-mint/20 self-start sm:self-auto">
+                    {scanResult.competitors.length} Rivals Mapped
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {scanResult.competitors.map((comp, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-xl bg-white/70 dark:bg-muted/30 border border-sage/30 dark:border-border flex flex-col justify-between space-y-3"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <h5 className="text-xs sm:text-sm font-bold text-foreground line-clamp-1">
+                            {comp.name}
+                          </h5>
+                          <span
+                            className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-md shrink-0 ${
+                              comp.threatLevel === "High"
+                                ? "bg-red-100 dark:bg-red-950/50 text-destructive border border-red-200 dark:border-red-900/30"
+                                : comp.threatLevel === "Medium"
+                                ? "bg-orange/10 text-orange border border-orange/20"
+                                : "bg-mint-pale dark:bg-mint/20 text-forest dark:text-mint border border-mint/20"
+                            }`}
+                          >
+                            {comp.threatLevel} Threat
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-2">
+                          <MapPin className="size-3 text-mint shrink-0" />
+                          <span className="line-clamp-1">{comp.distance} • {comp.landmark}</span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 text-[10px]">
+                          <span className="bg-sage/20 dark:bg-muted px-2 py-0.5 rounded text-foreground font-medium">
+                            {comp.speciality}
+                          </span>
+                          <span className="bg-sage/20 dark:bg-muted px-2 py-0.5 rounded text-foreground font-medium">
+                            {comp.priceRange}
+                          </span>
+                        </div>
+                      </div>
+                      {comp.differentiator && (
+                        <p className="text-[11px] text-ink-muted dark:text-muted-foreground pt-2 border-t border-sage/20 dark:border-border/60 italic leading-snug">
+                          {comp.differentiator}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Actionable Strategic Roadmap */}
             <div className="bg-white/40 dark:bg-card/40 rounded-2xl border border-sage/20 dark:border-border p-6 shadow-xs">

@@ -13,17 +13,99 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Fingerprint,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/brand-icons";
+import { startAuthentication } from "@simplewebauthn/browser";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // 1-Tap Biometric / Fingerprint Login Handler
+  const handleFingerprintLogin = async () => {
+    setError(null);
+
+    // Hardware sensor availability check
+    if (
+      typeof window === "undefined" ||
+      !window.PublicKeyCredential ||
+      !PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable
+    ) {
+      toast.error("Fingerprint sensor not found on this device.");
+      return;
+    }
+
+    try {
+      const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isAvailable) {
+        toast.error("Fingerprint sensor not found on this device.");
+        return;
+      }
+    } catch {
+      toast.error("Fingerprint sensor not found on this device.");
+      return;
+    }
+
+    setBiometricLoading(true);
+
+    try {
+      // 1. Fetch challenge options
+      const optionsRes = await fetch("/api/auth/passkey/login-options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() || undefined }),
+      });
+
+      if (!optionsRes.ok) {
+        throw new Error("Failed to initialize fingerprint authentication.");
+      }
+
+      const options = await optionsRes.json();
+
+      // 2. Open native device biometric prompt
+      const authResp = await startAuthentication({ optionsJSON: options });
+
+      // 3. Verify assertion with server and issue standard session
+      const verifyRes = await fetch("/api/auth/passkey/login-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(authResp),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        throw new Error(verifyData.error || "Biometric verification failed.");
+      }
+
+      toast.success("Signed in with Fingerprint successfully!");
+      router.push("/dashboard");
+      router.refresh();
+    } catch (e: any) {
+      const msg = e instanceof Error ? e.message : "Authentication failed";
+      if (
+        e?.name === "NotAllowedError" ||
+        msg.includes("cancelled") ||
+        msg.includes("timed out") ||
+        msg.includes("abort")
+      ) {
+        // User closed or dismissed the biometric modal
+        console.log("[passkey] Biometric prompt dismissed");
+      } else if (msg.includes("not recognized") || msg.includes("inactive")) {
+        toast.error("Fingerprint not recognized. Sign in with password first to register this device.");
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +212,47 @@ export default function LoginPage() {
                 <p className="font-medium">{error}</p>
               </div>
             )}
+
+            {/* Windows Hello-style Biometric Authentication Card */}
+            <div className="mb-5 p-4 rounded-2xl border border-mint/40 bg-white/70 backdrop-blur-md flex flex-col items-center text-center shadow-xs transition-all hover:border-mint group">
+              <div className="size-11 rounded-2xl bg-mint-pale text-forest flex items-center justify-center mb-2 shadow-2xs group-hover:scale-105 transition-transform">
+                <Fingerprint className="size-6 text-mint animate-pulse" />
+              </div>
+              <h3 className="text-sm font-serif font-bold text-forest mb-0.5">
+                Quick Fingerprint Sign-in
+              </h3>
+              <p className="text-xs text-ink-muted mb-3 max-w-xs leading-snug">
+                Touch your device&apos;s biometric sensor for instant 1-tap sign-in without typing passwords.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleFingerprintLogin}
+                disabled={biometricLoading || loading}
+                className="w-full bg-forest hover:bg-forest-light text-white font-medium text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-xs transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {biometricLoading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin text-mint" />
+                    Checking Biometrics...
+                  </>
+                ) : (
+                  <>
+                    <Fingerprint className="size-4 text-mint" />
+                    Touch Fingerprint to Sign In
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="relative my-4 flex items-center justify-center">
+              <div className="border-t border-sage/40 w-full" />
+              <span className="bg-cream px-3 text-[10.5px] font-semibold tracking-wider text-ink-muted uppercase shrink-0">
+                or with email &amp; password
+              </span>
+              <div className="border-t border-sage/40 w-full" />
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">

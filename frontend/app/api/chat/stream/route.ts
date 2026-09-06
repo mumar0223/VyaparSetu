@@ -164,6 +164,12 @@ You have access to powerful tools. When the user's query relates to any of the f
 10. **Debts & Loans**: Call \`getDebts\` to query active liabilities, or \`stageDebt\` / \`stageForm\` for loan applications.
 11. **Web Search**: Call \`webSearch\` for live policies, trade circulars, and tax news.
 12. **Delete Records**: Call \`stageDeleteRecord\` to safely confirm deletion of a record.
+13. **Local Competitors & Market Feasibility**: Call \`searchCompetitors\` whenever the user asks about starting/opening a shop, commercial viability, local competition, rival businesses, or customer footfall in an area.
+    - Cites real competitor shop names, distances, landmarks, and price ranges.
+    - Works dynamically for ANY business category (Biryani, Kirana, Clothes, Hardware, Repair, etc.).
+    - If the tool reports location is missing, politely ask the user to turn on their device location (GPS) or tell you the specific area/city.
+14. **ONDC Digital Commerce & Wholesale Sourcing**: Call \`getOndcIntelligence\` whenever the user asks about reducing inventory or supply costs, wholesale buying on ONDC B2B, selling online without paying 25-30% aggregator commission, onboarding on ONDC, or e-commerce expansion.
+15. **Predict Top District Businesses & High-ROI Opportunities**: Call \`predictDistrictBusinesses\` whenever the user asks which business to start or open in their district/city, what are profitable business opportunities for a given budget (e.g. ₹2-5 Lakh), or which industries have low saturation and high government subsidies (PMEGP/Mudra).
 
 STRICT TOOL CALLING RULE (ENGLISH-ONLY PARAMETERS):
 1. Even when conversing, thinking, or replying in Hindi, Hinglish, Marathi, Bengali, Gujarati, or any Indian regional language:

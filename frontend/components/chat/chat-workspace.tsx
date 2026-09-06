@@ -5,6 +5,7 @@ import {
   useEffect,
   useLayoutEffect,
   useCallback,
+  useMemo,
   useRef,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -18,6 +19,9 @@ import {
   FileSpreadsheet,
   Coins,
   ArrowDown,
+  Store,
+  PackageCheck,
+  ShoppingBag,
 } from "lucide-react";
 import { FloatingInput } from "./floating-input";
 import { HistorySidebar } from "./history-sidebar";
@@ -143,6 +147,8 @@ export function ChatWorkspace({
             id: `asst_${Date.now()}`,
             role: "assistant",
             content: turn.assistantTranscript,
+            thinking: turn.thinking,
+            thoughtDurationSeconds: turn.thoughtDurationSeconds,
             toolCalls: turn.toolCalls,
             createdAt: new Date(),
           });
@@ -153,10 +159,9 @@ export function ChatWorkspace({
     },
   });
 
-  // Sync liveAgent voice language with dropdown language
+  // Sync liveAgent voice language with dropdown language (only when an explicit regional language is selected)
   useEffect(() => {
     const codeMap: Record<string, any> = {
-      en: "en-IN",
       hi: "hi-IN",
       mr: "mr-IN",
       bn: "bn-IN",
@@ -167,8 +172,11 @@ export function ChatWorkspace({
       kn: "kn-IN",
       ml: "ml-IN",
     };
-    const voiceLang = codeMap[language] || "en-IN";
-    liveAgent.setLanguage(voiceLang);
+    // If user switches UI to a regional Indian language, sync it to voice agent.
+    // Otherwise keep voice agent in auto-detecting Hindi/multilingual default without forcing English.
+    if (language && codeMap[language]) {
+      liveAgent.setLanguage(codeMap[language]);
+    }
   }, [language, liveAgent]);
 
   const chatCache = useRef<Map<string, ChatMessage[]>>(new Map());
@@ -413,6 +421,7 @@ export function ChatWorkspace({
       }
       setIsVoiceMode(false);
     }
+    liveAgent.setLiveArtifact(null);
     setActiveChatId(null);
     setMessages([]);
     setIsInitialLoading(false);
@@ -431,6 +440,7 @@ export function ChatWorkspace({
         }
         setIsVoiceMode(false);
       }
+      liveAgent.setLiveArtifact(null);
 
       setActiveChatId(id);
       window.history.pushState(null, "", `/ai-saathi/c/${id}`);
@@ -816,7 +826,8 @@ export function ChatWorkspace({
                 : Math.max(
                     1,
                     Math.round(
-                      (Date.now() - (newUserMessage.createdAt as any).getTime()) /
+                      (Date.now() -
+                        (newUserMessage.createdAt as any).getTime()) /
                         1000,
                     ),
                   );
@@ -863,6 +874,35 @@ export function ChatWorkspace({
 
   const isNewChatView = !activeChatId && messages.length === 0;
   const activeConversation = conversations.find((c) => c.id === activeChatId);
+
+  // Derive artifact strictly scoped to the current active chat
+  const currentChatArtifact = useMemo(() => {
+    // If an artifact was generated live in this voice turn, show it
+    if (liveAgent.liveArtifact) return liveAgent.liveArtifact;
+    // Otherwise, find the latest artifact from the CURRENT chat's messages
+    if (activeChatId && messages.length > 0) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role === "assistant" && msg.toolCalls) {
+          for (const tc of msg.toolCalls) {
+            const res = tc.result as any;
+            if (res?.isArtifact && res?.artifactType && res?.data) {
+              return {
+                artifactId: res.artifactId || res.data?.artifactId,
+                targetArtifactId: res.targetArtifactId,
+                isUpdated: res.isUpdated,
+                artifactType: res.artifactType,
+                title: res.title,
+                summary: res.summary,
+                data: res.data,
+              } as ArtifactPayload;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }, [liveAgent.liveArtifact, activeChatId, messages]);
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-transparent text-foreground font-sans">
@@ -912,7 +952,7 @@ export function ChatWorkspace({
             liveTranscript={liveAgent.liveUserTranscript}
             assistantTranscript={liveAgent.liveAssistantTranscript}
             activeToolName={liveAgent.activeToolName}
-            activeArtifact={liveAgent.liveArtifact}
+            activeArtifact={currentChatArtifact}
             onOpenArtifact={(art) => setActiveArtifact(art)}
             onDownloadDebugAudio={liveAgent.downloadDebugAudio}
           />
@@ -942,8 +982,44 @@ export function ChatWorkspace({
             </div>
 
             {/* Suggested Quick Prompt Chips */}
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-3xl px-4 md:px-6">
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 w-full max-w-4xl px-4 md:px-6">
               {[
+                {
+                  label: t("chat.promptCompetitorsTitle", "Hyper-Local Competitors"),
+                  desc: t(
+                    "chat.promptCompetitorsDesc",
+                    "Scan nearby rival businesses, prices & threat ratings",
+                  ),
+                  icon: Store,
+                  prompt: t(
+                    "chat.promptCompetitorsPrompt",
+                    "Scan and analyze real nearby competitors, pricing, and market saturation for my business in my area.",
+                  ),
+                },
+                {
+                  label: t("chat.promptOndcWholesaleTitle", "ONDC Wholesale Sourcing"),
+                  desc: t(
+                    "chat.promptOndcWholesaleDesc",
+                    "Source inventory & raw materials 8-12% cheaper on B2B",
+                  ),
+                  icon: PackageCheck,
+                  prompt: t(
+                    "chat.promptOndcWholesalePrompt",
+                    "How can I use ONDC B2B to source wholesale inventory and materials 8-12% cheaper for my business?",
+                  ),
+                },
+                {
+                  label: t("chat.promptOndcSellTitle", "ONDC Digital Selling"),
+                  desc: t(
+                    "chat.promptOndcSellDesc",
+                    "Sell online at 3% commission vs 25% on legacy apps",
+                  ),
+                  icon: ShoppingBag,
+                  prompt: t(
+                    "chat.promptOndcSellPrompt",
+                    "How can I list my shop on ONDC via Mystore or Magicpin to sell online with only 3% commission compared to legacy aggregators?",
+                  ),
+                },
                 {
                   label: t("chat.prompt1Title", "Live APMC Mandi Rates"),
                   desc: t(
@@ -978,18 +1054,6 @@ export function ChatWorkspace({
                   prompt: t(
                     "chat.prompt3Prompt",
                     "Give me advice on optimizing my micro-enterprise working capital and inventory buffer.",
-                  ),
-                },
-                {
-                  label: t("chat.prompt4Title", "GST & Trade Compliance"),
-                  desc: t(
-                    "chat.prompt4Desc",
-                    "Udyam Aadhar & balance sheet checklist",
-                  ),
-                  icon: FileSpreadsheet,
-                  prompt: t(
-                    "chat.prompt4Prompt",
-                    "What is the compliance checklist for Udyam Aadhar and micro-enterprise ledger audit?",
                   ),
                 },
               ].map((chip, i) => (

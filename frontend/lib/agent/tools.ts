@@ -9,6 +9,9 @@ import {
   normalizeDistrictAndState,
   searchLiveMandiWebRates,
 } from "./mandi-normalizer";
+import { searchCompetitorsIntelligence } from "./competitor-service";
+import { getOndcIntelligence } from "./ondc-service";
+import { predictDistrictBusinessesIntelligence } from "./district-predictor-service";
 
 /**
  * Zod Schemas for Tools
@@ -48,6 +51,87 @@ const WebSearchSchema = z.object({
     .optional()
     .default(5)
     .describe("Number of search results to return"),
+});
+
+const SearchCompetitorsSchema = z.object({
+  query: z
+    .string()
+    .optional()
+    .describe(
+      "Optional query or description of the business, e.g. 'Biryani shops near Kursi Road' or 'Kirana stores'",
+    ),
+  category: z
+    .string()
+    .optional()
+    .describe(
+      "Business sector or category, e.g. 'Biryani & Food Outlets', 'Kirana / Grocery', 'Automobile Parts', 'Textiles'",
+    ),
+  radiusKm: z
+    .number()
+    .optional()
+    .default(5)
+    .describe("Catchment radius in kilometers to scan (e.g. 1, 2, 5, 10)"),
+  location: z
+    .string()
+    .optional()
+    .describe("Specific street, area, market yard, or city if provided by user"),
+  lat: z.number().optional().describe("Latitude coordinate if available"),
+  lon: z.number().optional().describe("Longitude coordinate if available"),
+  bypassCache: z.boolean().optional().default(false).describe("Whether to bypass DB cache"),
+});
+
+const OndcIntelligenceSchema = z.object({
+  query: z
+    .string()
+    .optional()
+    .describe("Specific ONDC inquiry e.g. 'How to sell on ONDC' or 'Wholesale procurement'"),
+  category: z
+    .string()
+    .optional()
+    .describe("Business trade category e.g. 'Biryani & Food Outlets', 'Kirana', 'Apparel'"),
+  location: z
+    .string()
+    .optional()
+    .describe("City or state location"),
+  intent: z
+    .enum(["procure", "sell", "logistics", "general"])
+    .optional()
+    .default("general")
+    .describe("Focus area: procure (buy cheaper), sell (list catalog), logistics, or general"),
+  bypassCache: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Whether to force a fresh re-evaluation bypassing DB cache"),
+});
+
+const PredictDistrictBusinessesSchema = z.object({
+  district: z
+    .string()
+    .optional()
+    .describe("District or city to evaluate (e.g. Lucknow, Varanasi, Pune, Indore, Kanpur)"),
+  state: z
+    .string()
+    .optional()
+    .describe("State name (e.g. Uttar Pradesh, Maharashtra, Madhya Pradesh, Gujarat)"),
+  budget: z
+    .number()
+    .optional()
+    .describe("Capital investment budget in INR (e.g. 150000, 300000, 500000)"),
+  category: z
+    .string()
+    .optional()
+    .describe("Specific sector or trade interest (e.g. Food Processing, Packaging, Manufacturing, Retail, Technical Services)"),
+  riskLevel: z
+    .enum(["Low", "Moderate", "High"])
+    .optional()
+    .default("Moderate")
+    .describe("Risk tolerance for the venture"),
+  bypassCache: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Whether to force fresh live web search and bypass DB cache"),
 });
 
 const StageChartSchema = z.object({
@@ -555,6 +639,55 @@ export function getAgentTools(ctx?: ToolContext) {
             error: "Web search service is momentarily unreachable.",
           };
         }
+      },
+    }),
+
+    searchCompetitors: tool({
+      description:
+        "Discovers, deduplicates, and analyzes real nearby competitor shops, rival outlets, or businesses for any commercial category using live web grounding, hyper-local landmarks, and Udyam MSME saturation data.",
+      inputSchema: SearchCompetitorsSchema,
+      execute: async ({ query, category, radiusKm, location, lat, lon, bypassCache }) => {
+        return await searchCompetitorsIntelligence({
+          category: category || query,
+          radiusKm,
+          location,
+          lat,
+          lon,
+          userId,
+          bypassCache,
+        });
+      },
+    }),
+
+    getOndcIntelligence: tool({
+      description:
+        "Discovers ONDC (Open Network for Digital Commerce) opportunities including B2B wholesale procurement at 8-12% discounts, B2C digital seller apps (Mystore, Magicpin) at 3% commission, and hyper-local delivery partners for any enterprise.",
+      inputSchema: OndcIntelligenceSchema,
+      execute: async ({ query, category, location, intent, bypassCache }) => {
+        return await getOndcIntelligence({
+          category,
+          location,
+          intent,
+          userId,
+          bypassCache,
+        });
+      },
+    }),
+
+    predictDistrictBusinesses: tool({
+      description:
+        "Researches and predicts the Top 4 high-ROI, low-saturation business opportunities in any Indian district for a given budget using autonomous live web search, APMC Mandi trends, and Udyam MSME subsidies (PMEGP 35%, PMFME, Mudra).",
+      inputSchema: PredictDistrictBusinessesSchema,
+      execute: async ({ district, state, budget, category, riskLevel, bypassCache }) => {
+        return await predictDistrictBusinessesIntelligence({
+          district,
+          state,
+          budget,
+          category,
+          riskLevel,
+          userId,
+          bypassCache,
+        });
       },
     }),
 
@@ -1074,7 +1207,7 @@ export function getAgentTools(ctx?: ToolContext) {
             isUpdated: Boolean(targetArtifactId),
             artifactType: "expense",
             title: `Draft Expense: ₹${amount.toLocaleString("en-IN")} (${category})`,
-            summary: `Log ₹${amount.toLocaleString("en-IN")} for ${category} paid via ${paymentMethod}`,
+            summary: `Log ₹${amount.toLocaleString("en-IN")} for ${category}${paymentMethod ? ` paid via ${paymentMethod}` : ""}`,
             data: {
               artifactId: artId,
               targetArtifactId: targetArtifactId || undefined,
@@ -1084,7 +1217,7 @@ export function getAgentTools(ctx?: ToolContext) {
               date,
               vendor: vendor || "",
               description: description || "",
-              paymentMethod,
+              paymentMethod: paymentMethod || "CASH",
               notes: notes || "",
             },
           };
@@ -1393,5 +1526,32 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
     icon: "landmark",
     formatSummary: (args) =>
       `Prepared delete confirmation for ${args?.entityName || "record"}`,
+  },
+  searchCompetitors: {
+    name: "searchCompetitors",
+    icon: "search",
+    formatSummary: (args, result) => {
+      if (result?.needsLocation) {
+        return "Requested device location to scan local competitors...";
+      }
+      const count = result?.competitors?.length || 0;
+      return `Identified ${count} competitor businesses in ${result?.locationSummary || "target area"}`;
+    },
+  },
+  getOndcIntelligence: {
+    name: "getOndcIntelligence",
+    icon: "globe",
+    formatSummary: (args, result) => {
+      const src = result?.fromCache ? " (Cached)" : "";
+      return `Loaded ONDC Digital Commerce roadmap for ${result?.category || "business"}${src}`;
+    },
+  },
+  predictDistrictBusinesses: {
+    name: "predictDistrictBusinesses",
+    icon: "landmark",
+    formatSummary: (args, result) => {
+      const src = result?.fromCache ? " (Cached)" : "";
+      return `Researched top 4 business opportunities in ${result?.district || args?.district || "district"}${src}`;
+    },
   },
 };

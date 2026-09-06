@@ -15,6 +15,8 @@ export interface LiveAgentOptions {
     userTranscript: string;
     assistantTranscript: string;
     toolCalls?: ToolCallItem[];
+    thoughtDurationSeconds?: number;
+    thinking?: string;
   }) => void;
   onError?: (error: Error) => void;
   onArtifactAction?: (artifact: ArtifactPayload) => void;
@@ -129,8 +131,10 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
   const assistantTranscriptRef = useRef("");
   const assistantUsesOutputTranscriptRef = useRef(false);
   const toolCallsRef = useRef<ToolCallItem[]>([]);
+  const isExecutingToolRef = useRef(false);
   const turnCompleteRef = useRef(false);
   const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const turnStartTimeRef = useRef<number>(0);
 
   const pendingMicVolumeRef = useRef(0);
   const displayedMicVolumeRef = useRef(0);
@@ -139,6 +143,8 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
 
   useEffect(() => {
     activeChatIdRef.current = options.activeChatId || null;
+    // Clear live artifact when activeChatId changes so artifacts never leak across chats
+    setLiveArtifact(null);
   }, [options.activeChatId]);
 
   const clearFlushTimer = useCallback(() => {
@@ -166,34 +172,24 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       userTranscript = userTranscript.trim();
       assistantTranscript = assistantTranscript.trim();
 
-      // If tools were called but assistant transcript is short, summarize tool execution
-      if (toolCalls.length > 0 && assistantTranscript.length < 20) {
-        const summaries = toolCalls
-          .filter((tc) => tc.status === "completed")
-          .map((tc) => {
-            const r = tc.result as any;
-            if (r?.isArtifact) return `[${r.title || tc.toolName}]`;
-            return `[${tc.toolName}]`;
-          });
-        if (summaries.length > 0) {
-          assistantTranscript = assistantTranscript
-            ? `${assistantTranscript}\n\n${summaries.join(", ")}`
-            : summaries.join(", ");
-        }
-      }
-
-      // We need at least userTranscript or assistantTranscript to persist a turn
+      // We need at least userTranscript or assistantTranscript or toolCalls to persist a turn
       if (!userTranscript && !assistantTranscript && toolCalls.length === 0) return;
 
       // Ensure userTranscript is not blank if the assistant responded
-      if (!userTranscript && assistantTranscript) {
+      if (!userTranscript && (assistantTranscript || toolCalls.length > 0)) {
         userTranscript = "Voice query";
       }
+
+      const turnDuration = turnStartTimeRef.current
+        ? Math.max(1, Math.round((Date.now() - turnStartTimeRef.current) / 1000))
+        : 1;
+      const thinkingPayload = JSON.stringify({ durationSeconds: turnDuration });
 
       console.log("[voice] Persisting turn snapshot to DB & chat list:", {
         userTranscript,
         assistantTranscript,
         toolsCount: toolCalls.length,
+        thoughtDurationSeconds: turnDuration,
       });
 
       try {
@@ -201,6 +197,8 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
           userTranscript,
           assistantTranscript,
           toolCalls,
+          thoughtDurationSeconds: turnDuration,
+          thinking: thinkingPayload,
         });
         const chatId = activeChatIdRef.current;
         if (chatId) {
@@ -211,10 +209,12 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
               userTranscript,
               assistantTranscript,
               toolCalls,
+              thinking: thinkingPayload,
             }),
           });
           if (!response.ok) throw new Error("The voice turn could not be saved.");
         }
+        turnStartTimeRef.current = 0;
       } catch (error) {
         console.error("[voice] persistence failed", error);
         optionsRef.current.onError?.(
@@ -227,6 +227,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
 
   const flushAndPersistActiveTurn = useCallback(() => {
     clearFlushTimer();
+    if (isExecutingToolRef.current) return;
     const vertexUser = userTranscriptRef.current.trim();
     const browserUser = nativeCaptionFinalRef.current.trim();
     const userTranscript =
@@ -243,6 +244,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     assistantUsesOutputTranscriptRef.current = false;
     toolCallsRef.current = [];
     turnCompleteRef.current = false;
+    isExecutingToolRef.current = false;
 
     // Safely persist with the captured immutable strings
     void persistTurnSnapshot({
@@ -252,15 +254,18 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     });
   }, [clearFlushTimer, persistTurnSnapshot]);
 
-  const schedulePersistence = useCallback(() => {
-    clearFlushTimer();
-    // Vertex sends outputTranscription fragments as audio streams.
-    // Wait for the fragments to finish streaming before auto-persisting.
-    flushTimerRef.current = setTimeout(() => {
-      flushTimerRef.current = null;
-      flushAndPersistActiveTurn();
-    }, 1500);
-  }, [clearFlushTimer, flushAndPersistActiveTurn]);
+  const schedulePersistence = useCallback(
+    (delayMs = 1500) => {
+      clearFlushTimer();
+      // Vertex sends outputTranscription fragments as audio streams.
+      // Wait for the fragments to finish streaming before auto-persisting.
+      flushTimerRef.current = setTimeout(() => {
+        flushTimerRef.current = null;
+        flushAndPersistActiveTurn();
+      }, delayMs);
+    },
+    [clearFlushTimer, flushAndPersistActiveTurn],
+  );
 
   const startSpeaking = useCallback(() => {
     if (mutedRef.current || !connectedRef.current) return;
@@ -275,6 +280,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
 
     // 3. Persist previous turn NOW before wiping state for the new turn.
     clearThinkingTimeout();
+    turnStartTimeRef.current = 0;
     flushAndPersistActiveTurn();
 
     // 4. Reset UI captions for new turn.
@@ -323,6 +329,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       }
       if (connectedRef.current && !assistantSpeakingRef.current) {
         setStatus("thinking");
+        turnStartTimeRef.current = Date.now();
         clearThinkingTimeout();
         thinkingTimeoutRef.current = setTimeout(() => {
           thinkingTimeoutRef.current = null;
@@ -422,6 +429,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             body: JSON.stringify({
               toolName: call.name,
               args: call.args || {},
+              conversationId: activeChatIdRef.current || undefined,
             }),
           });
           if (!response.ok) throw new Error("Tool request failed");
@@ -469,6 +477,15 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       if (socket.readyState === WebSocket.OPEN && functionResponses.length) {
         socket.send(JSON.stringify({ toolResponse: { functionResponses } }));
       }
+      // Safety fallback: if Gemini does not stream back a response after toolResponse within 6s, release flag
+      setTimeout(() => {
+        if (isExecutingToolRef.current) {
+          isExecutingToolRef.current = false;
+          if (turnCompleteRef.current && !playbackActiveRef.current) {
+            schedulePersistence(500);
+          }
+        }
+      }, 6000);
     },
     [],
   );
@@ -515,6 +532,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     setLiveUserTranscript("");
     setLiveAssistantTranscript("");
     setActiveToolName(null);
+    setLiveArtifact(null);
   }, [clearThinkingTimeout, flushAndPersistActiveTurn]);
 
   useEffect(() => disconnect, [disconnect]);
@@ -656,6 +674,9 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
 
             if (serverContent) {
               clearThinkingTimeout();
+              if (!turnStartTimeRef.current) {
+                turnStartTimeRef.current = Date.now();
+              }
             }
 
             if (serverContent?.inputTranscription?.text) {
@@ -671,6 +692,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             }
 
             if (serverContent?.outputTranscription?.text) {
+              isExecutingToolRef.current = false;
               if (!assistantUsesOutputTranscriptRef.current) {
                 assistantUsesOutputTranscriptRef.current = true;
                 assistantTranscriptRef.current = "";
@@ -684,10 +706,12 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
 
             for (const part of serverContent?.modelTurn?.parts || []) {
               if (part.inlineData?.data) {
+                isExecutingToolRef.current = false;
                 if (isHoldingRef.current) continue;
                 playerRef.current?.playChunk(part.inlineData.data);
               }
               if (part.text && !assistantUsesOutputTranscriptRef.current) {
+                isExecutingToolRef.current = false;
                 assistantTranscriptRef.current = mergeTranscript(
                   assistantTranscriptRef.current,
                   part.text,
@@ -704,16 +728,6 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
               turnCompleteRef.current = true;
             }
 
-            if (serverContent?.turnComplete) {
-              turnCompleteRef.current = true;
-              if (!playbackActiveRef.current) {
-                setAssistantSpeaking(false);
-                flushAndPersistActiveTurn();
-              } else {
-                schedulePersistence();
-              }
-            }
-
             const calls: VertexFunctionCall[] = [
               ...((message.toolCall?.functionCalls ||
                 []) as VertexFunctionCall[]),
@@ -722,7 +736,24 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                 .map((p: any) => p.functionCall) as VertexFunctionCall[]),
             ];
             if (calls.length) {
+              isExecutingToolRef.current = true;
+              clearFlushTimer();
               await handleToolCalls(calls, socket);
+            }
+
+            if (serverContent?.turnComplete) {
+              turnCompleteRef.current = true;
+              // If tools are executing or being called, this is an intermediate yield from Gemini Live.
+              // Do not persist yet; wait for tool execution and assistant verbal speech!
+              if (!calls.length && !isExecutingToolRef.current) {
+                if (!playbackActiveRef.current) {
+                  setAssistantSpeaking(false);
+                  // Allow in-flight inputTranscription packets to settle before flushing
+                  schedulePersistence(userTranscriptRef.current ? 300 : 800);
+                } else {
+                  schedulePersistence(1500);
+                }
+              }
             }
           } catch (error) {
             console.error("[voice] message processing failed", error);
@@ -813,6 +844,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     liveAssistantTranscript,
     activeToolName,
     liveArtifact,
+    setLiveArtifact,
     activeArtifact: liveArtifact,
     selectedLanguage,
     setLanguage,
