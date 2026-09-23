@@ -386,10 +386,11 @@ export function ChatWorkspace({
   // ── End Live Voice Session (Auto-Delete Empty Voice Sessions) ──
   const handleEndVoiceSession = useCallback(async () => {
     setIsEndingVoiceSession(true);
-    liveAgent.disconnect();
+    await liveAgent.disconnect();
 
     const currentChatId = activeChatId;
-    if (currentChatId && messages.length === 0) {
+    const hasAnyVoiceTurns = voiceTurnsRef.current.length > 0;
+    if (currentChatId && messages.length === 0 && !hasAnyVoiceTurns) {
       try {
         chatCache.current.delete(currentChatId);
         await fetch(`/api/chats/${currentChatId}`, { method: "DELETE" });
@@ -431,6 +432,21 @@ export function ChatWorkspace({
             );
         }
       }
+
+      // Re-fetch persisted messages from DB so the captured images show up immediately without page reload
+      try {
+        const res = await fetch(`/api/chats/${currentChatId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.conversation?.messages) {
+            setMessages(data.conversation.messages);
+            chatCache.current.set(currentChatId, data.conversation.messages);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to refresh messages after voice session:", err);
+      }
+
       window.history.replaceState(null, "", `/ai-saathi/c/${currentChatId}`);
     } else {
       window.history.replaceState(null, "", "/ai-saathi");

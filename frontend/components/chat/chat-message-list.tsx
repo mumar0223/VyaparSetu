@@ -108,14 +108,22 @@ function getParsedAttachments(msg: ChatMessage): {
   // 3. Check tool calls (captured document scans)
   if (Array.isArray(msg.toolCalls)) {
     for (const tc of msg.toolCalls as any[]) {
-      if (
-        (tc?.type === "captured_document" || tc?.toolName === "captured_document") &&
-        tc?.url
-      ) {
-        if (!seenUrls.has(tc.url)) {
-          seenUrls.add(tc.url);
+      const isDoc =
+        tc?.type === "captured_document" ||
+        tc?.toolName === "captured_document" ||
+        tc?.toolName === "captureDocument" ||
+        tc?.name === "captureDocument";
+      const docUrl =
+        tc?.url ||
+        tc?.result?.url ||
+        tc?.result?.savedImageUrl ||
+        (typeof tc?.result === "object" && tc?.result?.savedImageUrl);
+
+      if (isDoc && docUrl && typeof docUrl === "string") {
+        if (!seenUrls.has(docUrl)) {
+          seenUrls.add(docUrl);
           images.push({
-            url: tc.url,
+            url: docUrl,
             uploadedName: "Document Scan",
           });
         }
@@ -214,7 +222,7 @@ export function ChatMessageList({
           );
         }
 
-        // Extract attachments (images & documents)
+        // Extract attachments (images & documents) directly from DB records
         const { images, files } = getParsedAttachments(msg);
         let userDisplayText = msg.content;
         if (typeof userDisplayText === "string") {
@@ -433,6 +441,8 @@ export function ChatMessageList({
                     ))}
                   </div>
                 )}
+
+
 
                 {/* Rich Markdown Message Content (LaTeX, GFM Tables, Code) */}
                 {msg.content && (

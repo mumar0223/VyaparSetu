@@ -1,6 +1,8 @@
 export interface ToolCallItem {
   toolName: string;
   toolCallId?: string;
+  type?: string;
+  url?: string;
   icon?: string;
   summary?: string;
   status?: "calling" | "completed" | "error";

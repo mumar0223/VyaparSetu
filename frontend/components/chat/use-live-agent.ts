@@ -301,7 +301,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     [],
   );
 
-  const flushAndPersistActiveTurn = useCallback(() => {
+  const flushAndPersistActiveTurn = useCallback(async () => {
     clearFlushTimer();
     if (isExecutingToolRef.current) return;
     const vertexUser = userTranscriptRef.current.trim();
@@ -326,7 +326,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     isExecutingToolRef.current = false;
 
     // Safely persist with the captured immutable strings
-    void persistTurnSnapshot({
+    await persistTurnSnapshot({
       userTranscript: userTranscript || (files.length > 0 ? "Document Scan" : ""),
       assistantTranscript,
       files,
@@ -993,7 +993,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
         return;
       const captureStartTime = Date.now();
       const burst = await cameraManagerRef.current.captureBestFrameBlob();
-      if (!burst) return;
+      if (!burst || !burst.blob) return;
 
       const query =
         overrideQuery ||
@@ -1081,22 +1081,28 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
               turnFilesRef.current.push(subResult.savedImageUrl);
             }
 
-            // 3. Push real sub-agent tool calls
+            // 3. Always push the captureDocument tool call with photo URL so it renders in the chat UI
+            const captureToolCall: ToolCallItem = {
+              toolName: "captureDocument",
+              type: "captured_document",
+              args: call.args,
+              url: subResult.savedImageUrl || undefined,
+              result: {
+                status: "completed",
+                findings: subResult.finalAssistant,
+                url: subResult.savedImageUrl,
+                savedImageUrl: subResult.savedImageUrl,
+              },
+              status: "completed",
+            };
+            toolCallsRef.current.push(captureToolCall);
+
+            // 4. Push any real sub-agent tool calls (e.g. stageForm)
             if (subResult.toolCalls && subResult.toolCalls.length > 0) {
               toolCallsRef.current.push(...subResult.toolCalls);
-            } else {
-              toolCallsRef.current.push({
-                toolName: call.name,
-                args: call.args,
-                result: {
-                  status: "completed",
-                  findings: subResult.finalAssistant,
-                },
-                status: "completed",
-              });
             }
 
-            // 4. Return native toolResponse to Gemini Live
+            // 5. Return native toolResponse to Gemini Live
             functionResponses.push({
               id: call.id,
               name: call.name,
@@ -1252,23 +1258,15 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
         }
       }
       setActiveToolName(null);
+      isExecutingToolRef.current = false;
       if (socket.readyState === WebSocket.OPEN && functionResponses.length) {
         socket.send(JSON.stringify({ toolResponse: { functionResponses } }));
       }
-      // Safety fallback: if Gemini does not stream back a response after toolResponse within 6s, release flag
-      setTimeout(() => {
-        if (isExecutingToolRef.current) {
-          isExecutingToolRef.current = false;
-          if (turnCompleteRef.current && !playbackActiveRef.current) {
-            schedulePersistence(500);
-          }
-        }
-      }, 6000);
     },
     [launchBackgroundScreenTask],
   );
 
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback(async () => {
     connectedRef.current = false;
     assistantSpeakingRef.current = false;
     playbackActiveRef.current = false;
@@ -1281,7 +1279,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     }
 
     // Flush and persist any pending unsaved turn before closing
-    flushAndPersistActiveTurn();
+    await flushAndPersistActiveTurn();
 
     stopCameraPreviewLoop();
     cameraManagerRef.current?.stop();
@@ -1325,7 +1323,11 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     setBackgroundTask({ status: "idle" });
   }, [clearThinkingTimeout, flushAndPersistActiveTurn]);
 
-  useEffect(() => disconnect, [disconnect]);
+  useEffect(() => {
+    return () => {
+      void disconnect();
+    };
+  }, [disconnect]);
 
   const connect = useCallback(
     async (
@@ -1590,9 +1592,10 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                   setAssistantSpeaking(false);
                   // Allow in-flight inputTranscription packets to settle before flushing
                   schedulePersistence(userTranscriptRef.current ? 300 : 800);
-                } else {
-                  schedulePersistence(1500);
                 }
+                // If playbackActiveRef.current is true, assistant is actively speaking.
+                // Do not schedule a premature 1500ms flush that truncates or clears turnFiles early!
+                // onPlaybackStateChange(false) will cleanly flush and persist when speech ends.
               }
             }
           } catch (error) {
