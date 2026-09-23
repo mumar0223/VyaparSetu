@@ -4,7 +4,6 @@ import { getAgentTools, TOOL_DEFINITIONS } from "@/lib/agent/tools";
 import { getLanguageModel } from "@/lib/agent/ai-provider";
 import { DASHBOARD_CHAT_CONFIG } from "@/lib/agent/chat-config";
 import { streamText, isStepCount } from "ai";
-import { prisma } from "@/lib/prisma";
 import path from "path";
 import fs from "fs";
 
@@ -82,30 +81,6 @@ export async function POST(req: NextRequest) {
         const filePath = path.join(uploadDir, fileName);
         await fs.promises.writeFile(filePath, imageBuffer);
         savedImageUrl = `/uploads/captured-documents/${fileName}`;
-
-        // Save to Database: Link to ConversationMessage in Prisma if conversationId is valid
-        if (conversationId) {
-          try {
-            await prisma.conversationMessage.create({
-              data: {
-                conversationId,
-                role: "user",
-                content: `[Captured Document Image: ${query || "Document Scan"}]`,
-                files: [savedImageUrl],
-                toolCalls: [
-                  {
-                    type: "captured_document",
-                    url: savedImageUrl,
-                    sharpnessScore,
-                    timestamp: new Date().toISOString(),
-                  },
-                ],
-              },
-            });
-          } catch (dbErr) {
-            console.warn("[voice/subagent-stream] Failed to save document to conversationMessage:", dbErr);
-          }
-        }
       } catch (fsErr) {
         console.warn("[voice/subagent-stream] Failed to save image to disk:", fsErr);
       }
@@ -194,8 +169,18 @@ AUTONOMOUS EXECUTION PROTOCOL FOR REQUESTS WITHOUT IMAGES:
 7. GENERAL RESEARCH & SEARCH INQUIRIES:
    • When the user asks to search the web or research information (e.g. 'search SBI Mudra loan eligibility', 'search mandi rates', 'check guidelines'):
    • Call 'webSearch' (or 'getMandiRates') to fetch authentic, verified details.
-   • Provide a clear, structured textual response highlighting key numbers, rates, and eligibility criteria so the live voice agent can explain it orally to the user.
+   • Provide a clear, concise spoken summary so the live voice agent can explain it orally to the user.
    • If the search results warrant an official table or form, call 'stageDocument' or 'stageForm' to display it on screen simultaneously.
+
+CRITICAL POST-TOOL CONCISENESS RULE (MANDATORY 15 TO 40 WORDS MAXIMUM):
+- Once you call 'stageForm', 'stageDocument', or 'stageChart':
+- The visual interface is ALREADY rendered directly on the user's screen!
+- Your final text response MUST be ONLY 1 single short spoken confirmation sentence (strictly 15 to 40 words maximum) in the user's spoken conversational language (e.g. "मैंने आपके दस्तावेज़ के आधार पर लोन एप्लीकेशन फॉर्म स्क्रीन पर तैयार कर दिया है। आप इसे देख सकते हैं।").
+- NEVER output multi-paragraph markdown lists, section outlines, or field breakdowns in text, because the visual form is already visible on screen and the live voice agent must speak your confirmation immediately without delay.
+
+CRITICAL FORM STAGING & IN-PLACE EDITING MANDATE:
+- If the user asks to update, fill, or set details, BUT no active form exists on screen yet (or 'getArtifacts' returns 0 forms): You MUST CREATE the digital form using 'stageForm' with those details populated! You are STRICTLY FORBIDDEN from generating text claiming a form was updated unless 'stageForm' has actually executed in this turn!
+- If the user asks to "Make digital form" / "Digital form banao" / "Iska digital version banao": You MUST invoke 'stageForm' to create the interactive digital form on the user's screen. Explaining it in text without calling 'stageForm' is strictly prohibited!
 
 STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
 1. VyaparSetu exclusively serves legitimate Indian micro-enterprises, small businesses, and legal trade.
@@ -437,31 +422,6 @@ STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
             1,
             Math.round((Date.now() - streamStartTime) / 1000),
           );
-
-          // Persist assistant message in DB if conversation exists
-          if (conversationId && (fullGeneratedText.trim() || executedToolCalls.length > 0)) {
-            try {
-              await prisma.conversationMessage.create({
-                data: {
-                  conversationId,
-                  role: "assistant",
-                  content:
-                    fullGeneratedText.trim() ||
-                    "Maine aapka document process kar diya hai aur form screen par khol diya hai.",
-                  thinking: JSON.stringify({
-                    durationSeconds: thoughtDurationSeconds,
-                  }),
-                  toolCalls: executedToolCalls.length > 0 ? (executedToolCalls as any) : undefined,
-                },
-              });
-              await prisma.conversation.update({
-                where: { id: conversationId },
-                data: { updatedAt: new Date() },
-              });
-            } catch (dbErr) {
-              console.warn("[voice/subagent-stream] Failed to save assistant message:", dbErr);
-            }
-          }
 
           const finalAssistantText =
             fullGeneratedText.trim() ||

@@ -152,21 +152,25 @@ export function ChatWorkspace({
       setMessages((prev) => {
         const next: ChatMessage[] = [...prev];
         const trimmedUser = turn.userTranscript.trim();
+        const turnFiles: string[] = (turn as any).files || [];
 
-        if (trimmedUser) {
+        if (trimmedUser || turnFiles.length > 0) {
           // If the last message is already a user message and no assistant response intervened,
           // merge the continuation rather than creating duplicate consecutive user bubbles
           const lastMsg = next[next.length - 1];
           if (lastMsg && lastMsg.role === "user") {
-            if (!lastMsg.content.includes(trimmedUser)) {
+            if (trimmedUser && !lastMsg.content.includes(trimmedUser)) {
               lastMsg.content = `${lastMsg.content} ${trimmedUser}`.trim();
+            }
+            if (turnFiles.length > 0) {
+              lastMsg.files = Array.from(new Set([...(lastMsg.files || []), ...turnFiles]));
             }
           } else {
             next.push({
               id: `user_${Date.now()}`,
               role: "user",
               content: trimmedUser,
-              files: (turn as any).files || [],
+              files: turnFiles,
               createdAt: new Date(),
             });
           }

@@ -205,6 +205,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
   const assistantTranscriptRef = useRef("");
   const assistantUsesOutputTranscriptRef = useRef(false);
   const toolCallsRef = useRef<ToolCallItem[]>([]);
+  const turnFilesRef = useRef<string[]>([]);
   const isExecutingToolRef = useRef(false);
   const turnTaskTriggeredRef = useRef(false);
   const turnCompleteRef = useRef(false);
@@ -242,14 +243,15 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     async (snapshot: {
       userTranscript: string;
       assistantTranscript: string;
+      files?: string[];
       toolCalls: ToolCallItem[];
     }) => {
-      let { userTranscript, assistantTranscript, toolCalls } = snapshot;
+      let { userTranscript, assistantTranscript, files, toolCalls } = snapshot;
       userTranscript = userTranscript.trim();
       assistantTranscript = assistantTranscript.trim();
 
-      // We need at least userTranscript or assistantTranscript or toolCalls to persist a turn
-      if (!userTranscript && !assistantTranscript && toolCalls.length === 0) return;
+      // We need at least userTranscript or assistantTranscript or toolCalls or files to persist a turn
+      if (!userTranscript && !assistantTranscript && toolCalls.length === 0 && (!files || files.length === 0)) return;
 
       const turnDuration = turnStartTimeRef.current
         ? Math.max(1, Math.round((Date.now() - turnStartTimeRef.current) / 1000))
@@ -259,6 +261,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       console.log("[voice] Persisting turn snapshot to DB & chat list:", {
         userTranscript,
         assistantTranscript,
+        filesCount: files?.length || 0,
         toolsCount: toolCalls.length,
         thoughtDurationSeconds: turnDuration,
       });
@@ -267,6 +270,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
         optionsRef.current.onTurnComplete?.({
           userTranscript,
           assistantTranscript,
+          files,
           toolCalls,
           thoughtDurationSeconds: turnDuration,
           thinking: thinkingPayload,
@@ -279,6 +283,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             body: JSON.stringify({
               userTranscript,
               assistantTranscript,
+              files,
               toolCalls,
               thinking: thinkingPayload,
             }),
@@ -305,8 +310,9 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       vertexUser.length >= browserUser.length ? vertexUser : browserUser;
     const assistantTranscript = assistantTranscriptRef.current.trim();
     const toolCalls = [...toolCallsRef.current];
+    const files = [...turnFilesRef.current];
 
-    if (!userTranscript && !assistantTranscript && toolCalls.length === 0) return;
+    if (!userTranscript && !assistantTranscript && toolCalls.length === 0 && files.length === 0) return;
 
     // Reset active refs immediately for the next turn
     userTranscriptRef.current = "";
@@ -314,14 +320,16 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     assistantTranscriptRef.current = "";
     assistantUsesOutputTranscriptRef.current = false;
     toolCallsRef.current = [];
+    turnFilesRef.current = [];
     turnCompleteRef.current = false;
     turnTaskTriggeredRef.current = false;
     isExecutingToolRef.current = false;
 
     // Safely persist with the captured immutable strings
     void persistTurnSnapshot({
-      userTranscript,
+      userTranscript: userTranscript || (files.length > 0 ? "Document Scan" : ""),
       assistantTranscript,
+      files,
       toolCalls,
     });
   }, [clearFlushTimer, persistTurnSnapshot]);
@@ -355,7 +363,8 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     turnTaskTriggeredRef.current = false;
     const hasAssistantResponse =
       Boolean(assistantTranscriptRef.current.trim()) ||
-      toolCallsRef.current.length > 0;
+      toolCallsRef.current.length > 0 ||
+      turnFilesRef.current.length > 0;
 
     if (hasAssistantResponse) {
       flushAndPersistActiveTurn();
@@ -746,7 +755,12 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                 try {
                   const data = JSON.parse(dataStr);
                   if (event === "document_captured") {
-                    if (data.url) capturedImageUrl = data.url;
+                    if (data.url) {
+                      capturedImageUrl = data.url;
+                      if (!turnFilesRef.current.includes(data.url)) {
+                        turnFilesRef.current.push(data.url);
+                      }
+                    }
                   } else if (event === "status") {
                     const cur = activeTasksRef.current.get(taskId);
                     if (cur) {
@@ -849,8 +863,12 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                       collectedToolCalls.push(artifactToolCall);
                     }
                   } else if (event === "done") {
-                    if (data.savedImageUrl)
+                    if (data.savedImageUrl) {
                       capturedImageUrl = data.savedImageUrl;
+                      if (!turnFilesRef.current.includes(data.savedImageUrl)) {
+                        turnFilesRef.current.push(data.savedImageUrl);
+                      }
+                    }
                     if (
                       Array.isArray(data.toolCalls) &&
                       data.toolCalls.length > 0
@@ -995,17 +1013,15 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
         Math.max(1, Math.round((Date.now() - captureStartTime) / 1000));
 
       // If manual capture triggered outside of voice tool call, persist the result
-      optionsRef.current.onTurnComplete?.({
+      void persistTurnSnapshot({
         userTranscript: query,
         assistantTranscript: subResult.finalAssistant,
         files: subResult.savedImageUrl ? [subResult.savedImageUrl] : undefined,
         toolCalls:
-          subResult.toolCalls.length > 0 ? subResult.toolCalls : undefined,
-        thoughtDurationSeconds: elapsedSeconds,
-        thinking: JSON.stringify({ durationSeconds: elapsedSeconds }),
+          subResult.toolCalls.length > 0 ? subResult.toolCalls : [],
       });
     },
-    [launchBackgroundScreenTask],
+    [launchBackgroundScreenTask, persistTurnSnapshot],
   );
 
   const handleToolCalls = useCallback(
@@ -1058,6 +1074,13 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
               burst?.sharpnessScore,
             );
 
+            if (
+              subResult.savedImageUrl &&
+              !turnFilesRef.current.includes(subResult.savedImageUrl)
+            ) {
+              turnFilesRef.current.push(subResult.savedImageUrl);
+            }
+
             // 3. Push real sub-agent tool calls
             if (subResult.toolCalls && subResult.toolCalls.length > 0) {
               toolCallsRef.current.push(...subResult.toolCalls);
@@ -1098,6 +1121,13 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
           turnTaskTriggeredRef.current = true;
           // Await autonomous subagent execution (web search, data extraction, forms/tables)
           const subResult = await launchBackgroundScreenTask(call.args, audioBase64);
+
+          if (
+            subResult.savedImageUrl &&
+            !turnFilesRef.current.includes(subResult.savedImageUrl)
+          ) {
+            turnFilesRef.current.push(subResult.savedImageUrl);
+          }
 
           // Push real sub-agent tool calls
           if (subResult.toolCalls && subResult.toolCalls.length > 0) {
