@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   MessageSquare,
   Plus,
@@ -52,9 +53,14 @@ export function HistorySidebar({
   onTogglePin,
 }: HistorySidebarProps) {
   const { t } = useTranslation();
+  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const startRename = (conv: ConversationSummary, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -240,20 +246,24 @@ export function HistorySidebar({
       </aside>
 
       {/* ── Mobile & Tablet Slide-Over Sheet (< 1024px) ── */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden font-sans select-none animate-in fade-in-0 duration-200">
-          {/* Frosted Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity cursor-pointer"
-            onClick={onToggle}
-          />
+      {isOpen &&
+        mounted &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-50 lg:hidden font-sans select-none animate-in fade-in-0 duration-200">
+            {/* Frosted Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity cursor-pointer"
+              onClick={onToggle}
+            />
 
-          {/* Sliding Sheet Drawer */}
-          <aside className="absolute inset-y-0 right-0 w-[280px] max-w-[85vw] bg-white dark:bg-zinc-950 border-l border-sage/30 dark:border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-250 z-10">
-            {renderContent(true)}
-          </aside>
-        </div>
-      )}
+            {/* Sliding Sheet Drawer */}
+            <aside className="absolute inset-y-0 right-0 w-[300px] max-w-[85vw] h-full h-[100dvh] bg-white dark:bg-zinc-950 border-l border-sage/30 dark:border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-250 z-10">
+              {renderContent(true)}
+            </aside>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

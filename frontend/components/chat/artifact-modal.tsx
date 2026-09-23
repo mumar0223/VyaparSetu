@@ -30,6 +30,12 @@ import {
   Download,
   ClipboardList,
   ChevronDown,
+  Printer,
+  Copy,
+  FileText,
+  FileSpreadsheet,
+  LayoutTemplate,
+  Pencil,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +62,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { MarkdownMessage } from "./markdown-message";
 
 export interface ArtifactPayload {
   artifactId?: string;
@@ -69,7 +76,8 @@ export interface ArtifactPayload {
     | "debt"
     | "delete_record"
     | "chart"
-    | "form";
+    | "form"
+    | "document";
   title?: string;
   summary?: string;
   data: any;
@@ -87,6 +95,95 @@ interface ArtifactModalProps {
   isHoldingToSpeak?: boolean;
 }
 
+export function convertFormToMarkdown(formData: any): string {
+  let md = `# ${formData.title || "Official Registration Form"}\n\n`;
+  if (formData.documentBadge) {
+    md += `**Document Code:** \`${formData.documentBadge}\`\n\n`;
+  }
+  if (formData.description) {
+    md += `> ${formData.description}\n\n`;
+  }
+
+  for (const sec of formData.sections || []) {
+    md += `### ${sec.title || "Section Details"}\n\n`;
+    if (sec.description) md += `*${sec.description}*\n\n`;
+
+    if (sec.table && sec.table.headers?.length) {
+      md += `| ${sec.table.headers.join(" | ")} |\n`;
+      md += `| ${sec.table.headers.map(() => "---").join(" | ")} |\n`;
+      for (const row of sec.table.rows || []) {
+        md += `| ${row.join(" | ")} |\n`;
+      }
+      md += "\n";
+    }
+
+    const allRows: any[] = [];
+    if (sec.rows?.length) {
+      allRows.push(...sec.rows);
+    } else if (sec.fields?.length) {
+      for (let i = 0; i < sec.fields.length; i += 2) {
+        allRows.push({ fields: sec.fields.slice(i, i + 2) });
+      }
+    }
+
+    if (allRows.length > 0) {
+      md += `| Field / विवरण | Value / प्रविष्टि |\n| :--- | :--- |\n`;
+      for (const r of allRows) {
+        for (const f of r.fields || []) {
+          const val =
+            formData.values?.[f.id] !== undefined
+              ? formData.values[f.id]
+              : (f.defaultValue ?? "");
+          md += `| **${f.label || f.id}** | ${String(val || "-")} |\n`;
+        }
+      }
+      md += "\n";
+    }
+  }
+
+  return md;
+}
+
+export function chunkFieldsIntoRows(fields: any[]): Array<{ fields: any[] }> {
+  const rows: Array<{ fields: any[] }> = [];
+  let currentRow: any[] = [];
+
+  for (const f of fields) {
+    const isFullWidth =
+      f.colSpan === 2 ||
+      f.colSpan === 3 ||
+      f.type === "textarea" ||
+      f.type === "checkbox" ||
+      f.id?.toLowerCase().includes("address") ||
+      f.id?.toLowerCase().includes("notes") ||
+      f.id?.toLowerCase().includes("purpose") ||
+      f.id?.toLowerCase().includes("declaration") ||
+      f.id?.toLowerCase().includes("certif") ||
+      f.id?.toLowerCase().includes("undertaking") ||
+      f.id?.toLowerCase().includes("description");
+
+    if (isFullWidth) {
+      if (currentRow.length > 0) {
+        rows.push({ fields: currentRow });
+        currentRow = [];
+      }
+      rows.push({ fields: [f] });
+    } else {
+      currentRow.push(f);
+      if (currentRow.length === 2) {
+        rows.push({ fields: currentRow });
+        currentRow = [];
+      }
+    }
+  }
+
+  if (currentRow.length > 0) {
+    rows.push({ fields: currentRow });
+  }
+
+  return rows;
+}
+
 export function ArtifactModal({
   isOpen,
   onClose,
@@ -101,6 +198,9 @@ export function ArtifactModal({
   const [formData, setFormData] = useState<any>({});
   const [activeChartType, setActiveChartType] = useState<"bar" | "line" | "area" | "pie">("bar");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formViewMode, setFormViewMode] = useState<"paper" | "classic">("paper");
+  const [inlineEditingFieldId, setInlineEditingFieldId] = useState<string | null>(null);
+  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 
   useEffect(() => {
     if (artifact?.data) {
@@ -108,10 +208,16 @@ export function ArtifactModal({
       if (artifact.artifactType === "form" && cloned.sections) {
         const initialVals: Record<string, any> = cloned.values || {};
         for (const sec of cloned.sections) {
-          for (const f of sec.fields || []) {
+          const allFields = [
+            ...(sec.fields || []),
+            ...(sec.rows?.flatMap((r: any) => r.fields || []) || []),
+          ];
+          for (const f of allFields) {
             if (f.id && initialVals[f.id] === undefined) {
               initialVals[f.id] =
-                f.defaultValue !== undefined ? f.defaultValue : "";
+                f.value !== undefined
+                  ? f.value
+                  : (f.defaultValue !== undefined ? f.defaultValue : "");
             }
           }
         }
@@ -125,6 +231,25 @@ export function ArtifactModal({
   }, [artifact]);
 
   if (!artifact) return null;
+
+  const handleCopyMarkdown = () => {
+    let md = "";
+    if (artifact.artifactType === "document") {
+      md = formData.content || "";
+    } else if (artifact.artifactType === "form") {
+      md = convertFormToMarkdown(formData);
+    }
+    if (md) {
+      void navigator.clipboard.writeText(md);
+      setCopiedMarkdown(true);
+      toast.success("Copied markdown to clipboard!");
+      setTimeout(() => setCopiedMarkdown(false), 2000);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const handleFieldChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
@@ -163,8 +288,12 @@ export function ArtifactModal({
   };
 
   const handleApprove = async () => {
-    if (artifact.artifactType === "chart") {
-      toast.success("Visual chart view saved!");
+    if (artifact.artifactType === "chart" || artifact.artifactType === "document") {
+      toast.success(
+        artifact.artifactType === "chart"
+          ? "Visual chart view saved!"
+          : "Document reviewed!"
+      );
       onClose();
       return;
     }
@@ -203,9 +332,176 @@ export function ArtifactModal({
     );
   };
 
+  const renderPaperFieldValue = (field: any) => {
+    const fieldVal =
+      formData.values?.[field.id] !== undefined
+        ? formData.values[field.id]
+        : (field.defaultValue !== undefined ? field.defaultValue : "");
+
+    const isEditing = inlineEditingFieldId === field.id;
+
+    if (isEditing) {
+      if (field.type === "select") {
+        return (
+          <DropdownMenu
+            open={inlineEditingFieldId === field.id}
+            onOpenChange={(open) => {
+              if (!open) setInlineEditingFieldId(null);
+            }}
+          >
+            <DropdownMenuTrigger className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-mint text-xs text-foreground font-semibold flex items-center justify-between focus:outline-hidden cursor-pointer shadow-xs">
+              <span className="truncate">{fieldVal || field.placeholder || "Select option"}</span>
+              <ChevronDown className="size-3.5 text-muted-foreground shrink-0 opacity-70 ml-1" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
+            >
+              {(field.options || []).map((opt: string) => (
+                <DropdownMenuItem
+                  key={opt}
+                  onClick={() => {
+                    handleDynamicFieldChange(field.id, opt);
+                    setInlineEditingFieldId(null);
+                  }}
+                  className="cursor-pointer text-xs rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
+                >
+                  {opt}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+
+      if (field.type === "checkbox") {
+        return (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              autoFocus
+              checked={Boolean(fieldVal)}
+              onChange={(e) => handleDynamicFieldChange(field.id, e.target.checked)}
+              onBlur={() => setInlineEditingFieldId(null)}
+              className="size-4 rounded accent-forest dark:accent-mint"
+            />
+            <span className="text-xs font-semibold text-foreground">
+              {fieldVal ? "Yes / हाँ" : "No / नहीं"}
+            </span>
+          </label>
+        );
+      }
+
+      if (field.type === "number") {
+        return (
+          <input
+            type="number"
+            autoFocus
+            value={fieldVal}
+            onChange={(e) =>
+              handleDynamicFieldChange(
+                field.id,
+                e.target.value === "" ? "" : Number(e.target.value)
+              )
+            }
+            onBlur={() => setInlineEditingFieldId(null)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setInlineEditingFieldId(null);
+            }}
+            placeholder={field.placeholder || "0"}
+            className="w-full text-xs bg-white dark:bg-zinc-900 border border-mint rounded-lg px-2 py-1 text-foreground font-semibold focus:outline-hidden"
+          />
+        );
+      }
+
+      if (field.type === "date") {
+        return (
+          <input
+            type="date"
+            autoFocus
+            value={fieldVal || ""}
+            onChange={(e) => handleDynamicFieldChange(field.id, e.target.value)}
+            onBlur={() => setInlineEditingFieldId(null)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setInlineEditingFieldId(null);
+            }}
+            className="w-full text-xs bg-white dark:bg-zinc-900 border border-mint rounded-lg px-2 py-1 text-foreground font-semibold focus:outline-hidden"
+          />
+        );
+      }
+
+      // Auto word-wrap & auto-height expanding textarea for text/textarea inputs
+      return (
+        <textarea
+          autoFocus
+          rows={1}
+          value={fieldVal || ""}
+          ref={(el) => {
+            if (el) {
+              el.style.height = "auto";
+              el.style.height = `${Math.max(el.scrollHeight, 28)}px`;
+            }
+          }}
+          onChange={(e) => {
+            handleDynamicFieldChange(field.id, e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = `${Math.max(e.target.scrollHeight, 28)}px`;
+          }}
+          onBlur={() => setInlineEditingFieldId(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              setInlineEditingFieldId(null);
+            }
+          }}
+          placeholder={field.placeholder || ""}
+          className="w-full text-xs bg-white dark:bg-zinc-900 border border-mint rounded-lg px-2 py-1 text-foreground font-semibold focus:outline-hidden resize-none overflow-hidden break-words whitespace-pre-wrap leading-relaxed"
+        />
+      );
+    }
+
+    return (
+      <div
+        onClick={() => setInlineEditingFieldId(field.id)}
+        className="flex items-center justify-between w-full gap-2 select-none min-h-[24px]"
+        title="Click to edit value"
+      >
+        {field.displayVariant === "char_boxes" || field.displayVariant === "character_boxes" ? (
+          <div className="flex items-center gap-1 flex-wrap">
+            {(String(fieldVal || "").padEnd(field.charCount || 8, " "))
+              .split("")
+              .map((c, i) => (
+                <span
+                  key={i}
+                  className="size-5 sm:size-5.5 border border-sage/50 dark:border-border rounded-xs bg-cream/30 dark:bg-muted/40 flex items-center justify-center font-mono font-bold text-[11px] text-foreground uppercase shadow-2xs"
+                >
+                  {c.trim() || "\u00A0"}
+                </span>
+              ))}
+          </div>
+        ) : field.type === "checkbox" ? (
+          <span className="font-semibold text-xs text-foreground">
+            {fieldVal ? "✓ Yes / हाँ" : "✕ No / नहीं"}
+          </span>
+        ) : (
+          <span className="font-semibold text-xs text-foreground break-words whitespace-pre-wrap leading-relaxed">
+            {fieldVal !== undefined && fieldVal !== "" ? (
+              String(fieldVal)
+            ) : (
+              <span className="text-muted-foreground/40 italic font-normal">Click to fill</span>
+            )}
+            {field.suffix && <span className="ml-1 text-muted-foreground font-normal">{field.suffix}</span>}
+          </span>
+        )}
+
+        <Pencil className="size-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1" />
+      </div>
+    );
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[92vh] overflow-y-auto p-5 sm:p-7 md:p-8 rounded-3xl bg-white dark:bg-card border border-sage/30 dark:border-border text-foreground font-sans shadow-2xl">
+      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[92vh] overflow-y-auto p-5 sm:p-7 md:p-8 rounded-3xl bg-white dark:bg-[#0c0e12] border border-sage/30 dark:border-zinc-800 text-foreground font-sans shadow-2xl z-50 transform-gpu will-change-[transform,opacity]">
         <DialogHeader className="pr-8">
           <div className="flex items-start gap-3 mb-1">
             <span className="p-2.5 rounded-2xl bg-mint-pale dark:bg-mint/15 text-forest dark:text-mint shrink-0 mt-0.5">
@@ -216,6 +512,7 @@ export function ArtifactModal({
               {artifact.artifactType === "saving_goal" && <Target className="size-5" />}
               {artifact.artifactType === "debt" && <Landmark className="size-5" />}
               {artifact.artifactType === "form" && <ClipboardList className="size-5" />}
+              {artifact.artifactType === "document" && <FileSpreadsheet className="size-5" />}
               {artifact.artifactType === "delete_record" && <AlertTriangle className="size-5 text-rose-500" />}
             </span>
             <div className="min-w-0 flex-1">
@@ -227,6 +524,101 @@ export function ArtifactModal({
               </DialogDescription>
             </div>
           </div>
+
+          {/* Top Controls Toolbar for Forms and Documents */}
+          {artifact.artifactType === "form" && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-sage/20 dark:border-border/40 mt-3">
+              <div className="flex items-center gap-2">
+                {formData.documentBadge && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-forest/10 dark:bg-mint/20 text-forest dark:text-mint border border-forest/20">
+                    {formData.documentBadge}
+                  </span>
+                )}
+                <div className="inline-flex p-0.5 rounded-xl bg-cream/70 dark:bg-muted/40 border border-sage/30 dark:border-border">
+                  <button
+                    type="button"
+                    onClick={() => setFormViewMode("paper")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer",
+                      formViewMode === "paper"
+                        ? "bg-forest dark:bg-mint text-white dark:text-black shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <FileText className="size-3.5" />
+                    <span>Official Paper</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormViewMode("classic")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer",
+                      formViewMode === "classic"
+                        ? "bg-forest dark:bg-mint text-white dark:text-black shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <LayoutTemplate className="size-3.5" />
+                    <span>Classic Inputs</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 ml-auto">
+                <button
+                  type="button"
+                  onClick={handleCopyMarkdown}
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium border border-sage/30 dark:border-border bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Copy form data as Markdown"
+                >
+                  {copiedMarkdown ? <Check className="size-3.5 text-mint" /> : <Copy className="size-3.5" />}
+                  <span>{copiedMarkdown ? "Copied" : "Copy MD"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium border border-sage/30 dark:border-border bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Print document or Save as PDF"
+                >
+                  <Printer className="size-3.5" />
+                  <span>Print</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {artifact.artifactType === "document" && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-sage/20 dark:border-border/40 mt-3">
+              <div className="flex items-center gap-2">
+                {formData.badge && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-forest/10 dark:bg-mint/20 text-forest dark:text-mint border border-forest/20">
+                    {formData.badge}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 ml-auto">
+                <button
+                  type="button"
+                  onClick={handleCopyMarkdown}
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium border border-sage/30 dark:border-border bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Copy Markdown"
+                >
+                  {copiedMarkdown ? <Check className="size-3.5 text-mint" /> : <Copy className="size-3.5" />}
+                  <span>{copiedMarkdown ? "Copied" : "Copy MD"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium border border-sage/30 dark:border-border bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Print document or Save as PDF"
+                >
+                  <Printer className="size-3.5" />
+                  <span>Print</span>
+                </button>
+              </div>
+            </div>
+          )}
         </DialogHeader>
 
         {/* ── Dynamic Form Based on Artifact Type ── */}
@@ -654,155 +1046,478 @@ export function ArtifactModal({
             </div>
           )}
 
-          {/* 6. DYNAMIC MULTI-SECTION MULTI-FIELD FORM ARTIFACT */}
-          {artifact.artifactType === "form" && (
-            <div className="space-y-5">
+          {/* 6. DYNAMIC RICH MARKDOWN DOCUMENT ARTIFACT */}
+          {artifact.artifactType === "document" && (
+            <div className="space-y-4">
               {formData.description && (
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed -mt-1">
                   {formData.description}
                 </p>
               )}
 
-              {(formData.sections || []).map((section: any, sIdx: number) => (
+              <div
+                className="p-5 sm:p-7 rounded-2xl border border-sage/30 dark:border-border shadow-xs overflow-x-auto print:border-none print:shadow-none print:p-0 bg-white dark:bg-card/60"
+                style={{
+                  backgroundColor: formData.theme?.pageBg || undefined,
+                  color: formData.theme?.textColor || undefined,
+                  borderColor: formData.theme?.borderColor || undefined,
+                }}
+              >
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <MarkdownMessage content={formData.content || ""} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 7. DYNAMIC MULTI-SECTION FORM ARTIFACT (OFFICIAL PAPER & CLASSIC VIEWS) */}
+          {artifact.artifactType === "form" && (
+            <div>
+              {formViewMode === "paper" ? (
+                /* OFFICIAL PAPER VIEW (Matching Authentic Government / Institutional Registration Slips) */
                 <div
-                  key={sIdx}
-                  className="p-4 sm:p-5 rounded-2xl bg-cream/35 dark:bg-muted/15 border border-sage/30 dark:border-border/60 space-y-3.5 shadow-2xs"
+                  className="p-4 sm:p-6 rounded-2xl border border-sage/40 dark:border-zinc-800 bg-white dark:bg-[#10141d] shadow-xs space-y-4 print:border-none print:shadow-none print:p-0"
+                  style={{
+                    backgroundColor: formData.theme?.paperBg || undefined,
+                    color: formData.theme?.textColor || undefined,
+                  }}
                 >
-                  {section.title && (
-                    <div className="border-b border-sage/20 dark:border-border/40 pb-2">
-                      <h3 className="font-serif font-bold text-sm sm:text-base text-forest dark:text-mint">
-                        {section.title}
-                      </h3>
-                      {section.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {section.description}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {/* Header Banner */}
+                  <div className="text-center pb-3 border-b-2 border-sage/40 dark:border-zinc-800">
+                    {formData.documentBadge && (
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-forest dark:text-mint block mb-1">
+                        {formData.documentBadge}
+                      </span>
+                    )}
+                    <h2 className="font-serif font-bold text-base sm:text-xl text-forest dark:text-foreground">
+                      {artifact.title || "आधिकारिक आवेदन प्रपत्र / Official Form"}
+                    </h2>
+                    {formData.description && (
+                      <p className="text-xs text-muted-foreground mt-1 max-w-xl mx-auto">
+                        {formData.description}
+                      </p>
+                    )}
+                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {(section.fields || []).map((field: any) => {
-                      const fieldVal =
-                        formData.values?.[field.id] !== undefined
-                          ? formData.values[field.id]
-                          : (field.defaultValue !== undefined ? field.defaultValue : "");
-                      const isFullWidth =
-                        field.type === "textarea" ||
-                        field.id?.toLowerCase().includes("address") ||
-                        field.id?.toLowerCase().includes("notes") ||
-                        field.id?.toLowerCase().includes("purpose") ||
-                        field.id?.toLowerCase().includes("description");
+                  {/* Sections */}
+                  {(formData.sections || []).map((section: any, sIdx: number) => {
+                    const sectionRows =
+                      section.rows && section.rows.length > 0
+                        ? section.rows
+                        : chunkFieldsIntoRows(section.fields || []);
 
-                      return (
-                        <div
-                          key={field.id}
-                          className={cn(
-                            "space-y-1.5",
-                            isFullWidth ? "sm:col-span-2" : "col-span-1"
-                          )}
-                        >
-                          <label className="text-xs font-semibold text-foreground/90 block">
-                            {field.label || field.id}
-                            {field.required && (
-                              <span className="text-rose-500 ml-1 font-bold">*</span>
-                            )}
-                          </label>
+                    const cleanSectionTitle = (section.title || "")
+                      .replace(/^[#*—\-\|\s\[>~]+/, "")
+                      .replace(/[#*—\-\|\s\]>~]+$/, "")
+                      .trim();
 
-                          {field.type === "select" ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger className="w-full h-9.5 px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground flex items-center justify-between focus:outline-hidden focus:border-mint transition-colors cursor-pointer">
-                                <span className="truncate">
-                                  {fieldVal || field.placeholder || "Select option"}
+                    return (
+                      <div key={sIdx} className={cn("space-y-3", sIdx > 0 && "pt-2")}>
+                        {/* Clean official section header: single underline strictly below with comfortable gap */}
+                        {cleanSectionTitle && (
+                          <div className="pb-2 border-b border-sage/30 dark:border-zinc-800">
+                            <div className="flex items-center gap-2.5">
+                              <span className="size-2 rounded-full bg-forest dark:bg-mint shrink-0" />
+                              <h3 className="font-serif font-bold text-xs sm:text-sm text-forest dark:text-mint tracking-wide">
+                                {cleanSectionTitle}
+                              </h3>
+                              {section.description && (
+                                <span className="text-[11px] text-muted-foreground ml-auto hidden sm:inline-block">
+                                  {section.description}
                                 </span>
-                                <ChevronDown className="size-4 text-muted-foreground shrink-0 opacity-70" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="start"
-                                className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
-                              >
-                                {(field.options || []).map((opt: string) => (
-                                  <DropdownMenuItem
-                                    key={opt}
-                                    onClick={() =>
-                                      handleDynamicFieldChange(field.id, opt)
-                                    }
-                                    className="cursor-pointer text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
-                                  >
-                                    {opt}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : field.type === "textarea" ? (
-                            <textarea
-                              rows={3}
-                              value={fieldVal || ""}
-                              onChange={(e) =>
-                                handleDynamicFieldChange(field.id, e.target.value)
-                              }
-                              placeholder={field.placeholder || ""}
-                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint resize-y"
-                            />
-                          ) : field.type === "checkbox" ? (
-                            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={Boolean(fieldVal)}
-                                onChange={(e) =>
-                                  handleDynamicFieldChange(field.id, e.target.checked)
-                                }
-                                className="size-4 rounded-md accent-forest dark:accent-mint cursor-pointer"
-                              />
-                              <span className="text-xs sm:text-sm text-foreground">
-                                {field.placeholder || field.label}
-                              </span>
-                            </label>
-                          ) : field.type === "date" ? (
-                            <input
-                              type="date"
-                              value={fieldVal || ""}
-                              onChange={(e) =>
-                                handleDynamicFieldChange(field.id, e.target.value)
-                              }
-                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint"
-                            />
-                          ) : field.type === "number" ? (
-                            <input
-                              type="number"
-                              value={fieldVal}
-                              onChange={(e) =>
-                                handleDynamicFieldChange(
-                                  field.id,
-                                  e.target.value === "" ? "" : Number(e.target.value)
-                                )
-                              }
-                              placeholder={field.placeholder || "0"}
-                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm font-semibold text-foreground focus:outline-hidden focus:border-mint"
-                            />
-                          ) : (
-                            <input
-                              type="text"
-                              value={fieldVal || ""}
-                              onChange={(e) =>
-                                handleDynamicFieldChange(field.id, e.target.value)
-                              }
-                              placeholder={field.placeholder || ""}
-                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-card border border-sage/30 dark:border-border text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint"
-                            />
-                          )}
+                              )}
+                            </div>
+                          </div>
+                        )}
 
-                          {field.helpText && (
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {field.helpText}
-                            </p>
+                        {/* Section row grid with optional right-side passport photo box */}
+                        <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                          {/* Main Form Fields Grid */}
+                          <div className="flex-1 min-w-0 border border-sage/40 dark:border-border/80 rounded-lg overflow-hidden divide-y divide-sage/30 dark:divide-border/60 bg-white dark:bg-card">
+                            {sectionRows.map((row: any, rIdx: number) => {
+                              const fields = row.fields || [];
+                              const fieldCount = fields.length;
+
+                              if (fieldCount === 1) {
+                                const f = fields[0];
+                                return (
+                                  <div
+                                    key={f.id || rIdx}
+                                    className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-sage/30 dark:divide-border/60"
+                                  >
+                                    <div className="sm:col-span-1 bg-cream/50 dark:bg-muted/30 px-3 py-2 text-xs font-semibold text-forest dark:text-mint flex items-center">
+                                      <span>{f.label || f.id}</span>
+                                      {f.required && <span className="text-rose-500 ml-1 font-bold">*</span>}
+                                    </div>
+                                    <div className="sm:col-span-3 bg-white dark:bg-zinc-900/40 px-3 py-2 text-xs text-foreground flex items-center justify-between group cursor-pointer hover:bg-mint-pale/15 transition-colors">
+                                      {renderPaperFieldValue(f)}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              if (fieldCount === 2) {
+                                const [f1, f2] = fields;
+                                return (
+                                  <div
+                                    key={rIdx}
+                                    className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-sage/30 dark:divide-border/60"
+                                  >
+                                    {/* Field 1 */}
+                                    <div className="sm:col-span-1 bg-cream/50 dark:bg-muted/30 px-3 py-2 text-xs font-semibold text-forest dark:text-mint flex items-center">
+                                      <span className="truncate">{f1.label || f1.id}</span>
+                                      {f1.required && <span className="text-rose-500 ml-1 font-bold">*</span>}
+                                    </div>
+                                    <div className="sm:col-span-1 bg-white dark:bg-zinc-900/40 px-3 py-2 text-xs text-foreground flex items-center justify-between group cursor-pointer hover:bg-mint-pale/15 transition-colors">
+                                      {renderPaperFieldValue(f1)}
+                                    </div>
+
+                                    {/* Field 2 */}
+                                    <div className="sm:col-span-1 bg-cream/50 dark:bg-muted/30 px-3 py-2 text-xs font-semibold text-forest dark:text-mint flex items-center">
+                                      <span className="truncate">{f2.label || f2.id}</span>
+                                      {f2.required && <span className="text-rose-500 ml-1 font-bold">*</span>}
+                                    </div>
+                                    <div className="sm:col-span-1 bg-white dark:bg-zinc-900/40 px-3 py-2 text-xs text-foreground flex items-center justify-between group cursor-pointer hover:bg-mint-pale/15 transition-colors">
+                                      {renderPaperFieldValue(f2)}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // 3 or more fields per row
+                              return (
+                                <div
+                                  key={rIdx}
+                                  className="grid grid-cols-1 sm:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-sage/30 dark:divide-border/60"
+                                >
+                                  {fields.map((f: any, fIdx: number) => (
+                                    <React.Fragment key={f.id || fIdx}>
+                                      <div className="sm:col-span-1 bg-cream/50 dark:bg-muted/30 px-2.5 py-2 text-[11px] font-semibold text-forest dark:text-mint flex items-center">
+                                        <span className="truncate">{f.label || f.id}</span>
+                                        {f.required && <span className="text-rose-500 ml-0.5 font-bold">*</span>}
+                                      </div>
+                                      <div className="sm:col-span-1 bg-white dark:bg-zinc-900/40 px-2.5 py-2 text-xs text-foreground flex items-center justify-between group cursor-pointer hover:bg-mint-pale/15 transition-colors">
+                                        {renderPaperFieldValue(f)}
+                                      </div>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Optional Passport Photo Box */}
+                          {section.photoBox && (
+                            <div className="w-full sm:w-32 border border-sage/40 dark:border-border rounded-lg bg-cream/20 dark:bg-muted/20 flex flex-col items-center justify-center p-3 text-center shrink-0">
+                              {section.photoBox.url ? (
+                                <img
+                                  src={section.photoBox.url}
+                                  alt={section.photoBox.label || "Passport Photo"}
+                                  className="w-full h-auto max-h-36 object-cover rounded border border-sage/30 shadow-2xs"
+                                />
+                              ) : (
+                                <div className="flex flex-col items-center justify-center gap-2 py-4 text-muted-foreground">
+                                  <div className="w-16 h-20 border-2 border-dashed border-sage/50 dark:border-border rounded flex items-center justify-center bg-white/70 dark:bg-black/30">
+                                    <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase text-center px-1">
+                                      PHOTO
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] font-medium leading-tight text-foreground/80">
+                                    {section.photoBox.label || "Passport Photo / फ़ोटो"}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
-                      );
-                    })}
+
+                        {/* Embedded Sub-Table (e.g. Qualification / Marksheet Table) */}
+                        {section.table && section.table.headers && section.table.headers.length > 0 && (
+                          <div className="overflow-x-auto border border-sage/40 dark:border-border rounded-lg mt-3">
+                            <table className="w-full text-xs text-left border-collapse">
+                              <thead className="bg-cream/60 dark:bg-muted/50 border-b border-sage/40 dark:border-border text-forest dark:text-mint font-bold">
+                                <tr>
+                                  {section.table.headers.map((h: string, hIdx: number) => (
+                                    <th
+                                      key={hIdx}
+                                      className="px-3 py-2 border-r last:border-r-0 border-sage/30 dark:border-border whitespace-nowrap"
+                                    >
+                                      {h}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-sage/30 dark:divide-border bg-white dark:bg-card">
+                                {(section.table.rows || []).map((tRow: string[], trIdx: number) => (
+                                  <tr key={trIdx} className="hover:bg-cream/20 dark:hover:bg-muted/20 transition-colors">
+                                    {tRow.map((cell: string, tcIdx: number) => (
+                                      <td
+                                        key={tcIdx}
+                                        className="px-3 py-2 border-r last:border-r-0 border-sage/30 dark:border-border font-medium text-foreground whitespace-nowrap"
+                                      >
+                                        {cell}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Official Declaration & Signature Footer */}
+                  <div className="pt-4 mt-4 border-t border-sage/30 dark:border-border flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 text-xs text-muted-foreground">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-foreground">घोषणा / Declaration:</p>
+                      <p className="text-[11px] leading-relaxed max-w-md">
+                        प्रमाणित किया जाता है कि उपरोक्त विवरण मेरे द्वारा सत्यापित है तथा सत्य है।
+                        <br />
+                        Certified that the particulars given above are true, accurate, and verified.
+                      </p>
+                    </div>
+                    <div className="w-40 text-center border-t border-dashed border-sage/60 dark:border-border pt-2 self-end">
+                      <span className="text-[10px] font-semibold text-foreground/80 block">
+                        हस्ताक्षर / Candidate Signature
+                      </span>
+                    </div>
                   </div>
                 </div>
-              ))}
+              ) : (
+                /* CLASSIC INPUTS VIEW (Interactive form controls with full rows resolution) */
+                <div className="space-y-5">
+                  {formData.description && (
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed -mt-1">
+                      {formData.description}
+                    </p>
+                  )}
+
+                  {(formData.sections || []).map((section: any, sIdx: number) => {
+                    const cleanSectionTitle = (section.title || "")
+                      .replace(/^[#*—\-\|\s\[>~]+/, "")
+                      .replace(/[#*—\-\|\s\]>~]+$/, "")
+                      .trim();
+                    // Resolve rows dynamically so 1-field rows and single-column sections span full width
+                    const sectionRows: Array<{ fields: any[] }> =
+                      section.rows && section.rows.length > 0
+                        ? section.rows
+                        : section.columns === 1 || (section.fields && section.fields.length === 1)
+                        ? (section.fields || []).map((f: any) => ({ fields: [f] }))
+                        : chunkFieldsIntoRows(section.fields || []);
+
+                    return (
+                      <div
+                        key={sIdx}
+                        className="p-4 sm:p-5 rounded-2xl bg-cream/40 dark:bg-[#141822] border border-sage/30 dark:border-zinc-800 space-y-3.5 shadow-xs"
+                      >
+                        {cleanSectionTitle && (
+                          <div className="border-b border-sage/20 dark:border-zinc-800 pb-2 flex items-center gap-2">
+                            <span className="size-2 rounded-full bg-forest dark:bg-mint shrink-0" />
+                            <h3 className="font-serif font-bold text-sm sm:text-base text-forest dark:text-mint">
+                              {cleanSectionTitle}
+                            </h3>
+                            {section.description && (
+                              <p className="text-xs text-muted-foreground ml-auto hidden sm:block">
+                                {section.description}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="space-y-3.5">
+                          {sectionRows.map((row: any, rIdx: number) => {
+                            const rFields = row.fields || [];
+                            const count = rFields.length;
+                            const gridCls =
+                              count === 1
+                                ? "grid grid-cols-1"
+                                : count === 2
+                                ? "grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+                                : "grid grid-cols-1 sm:grid-cols-3 gap-3.5";
+
+                            return (
+                              <div key={rIdx} className={gridCls}>
+                                {rFields.map((field: any) => {
+                                  const fieldVal =
+                                    formData.values?.[field.id] !== undefined
+                                      ? formData.values[field.id]
+                                      : (field.defaultValue !== undefined ? field.defaultValue : "");
+
+                                  if (field.type === "checkbox") {
+                                    return (
+                                      <div key={field.id} className="w-full space-y-1">
+                                        <label className="flex items-start sm:items-center gap-3 p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-sage/30 dark:border-zinc-800 cursor-pointer select-none hover:border-mint transition-colors w-full shadow-2xs">
+                                          <input
+                                            type="checkbox"
+                                            checked={Boolean(fieldVal)}
+                                            onChange={(e) =>
+                                              handleDynamicFieldChange(field.id, e.target.checked)
+                                            }
+                                            className="size-4 rounded-md accent-forest dark:accent-mint cursor-pointer mt-0.5 sm:mt-0 shrink-0"
+                                          />
+                                          <span className="text-xs sm:text-sm text-foreground leading-relaxed">
+                                            {field.label || field.placeholder}
+                                            {field.required && (
+                                              <span className="text-rose-500 ml-1 font-bold">*</span>
+                                            )}
+                                          </span>
+                                        </label>
+                                        {field.helpText && (
+                                          <p className="text-[11px] text-muted-foreground ml-1">
+                                            {field.helpText}
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div key={field.id} className="space-y-1.5 w-full">
+                                      <label className="text-xs font-semibold text-foreground/90 block">
+                                        {field.label || field.id}
+                                        {field.required && (
+                                          <span className="text-rose-500 ml-1 font-bold">*</span>
+                                        )}
+                                      </label>
+
+                                      {field.type === "select" ? (
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger className="w-full h-9.5 px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-sage/30 dark:border-zinc-800 text-xs sm:text-sm text-foreground flex items-center justify-between focus:outline-hidden focus:border-mint transition-colors cursor-pointer">
+                                            <span className="truncate">
+                                              {fieldVal || field.placeholder || "Select option"}
+                                            </span>
+                                            <ChevronDown className="size-4 text-muted-foreground shrink-0 opacity-70" />
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent
+                                            align="start"
+                                            className="w-(--anchor-width) min-w-[180px] bg-white dark:bg-[#18181b] border border-sage/30 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1"
+                                          >
+                                            {(field.options || []).map((opt: string) => (
+                                              <DropdownMenuItem
+                                                key={opt}
+                                                onClick={() =>
+                                                  handleDynamicFieldChange(field.id, opt)
+                                                }
+                                                className="cursor-pointer text-xs sm:text-sm rounded-lg px-2.5 py-1.5 focus:bg-cream dark:focus:bg-muted"
+                                              >
+                                                {opt}
+                                              </DropdownMenuItem>
+                                            ))}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      ) : field.type === "textarea" ? (
+                                        <textarea
+                                          rows={3}
+                                          value={fieldVal || ""}
+                                          ref={(el) => {
+                                            if (el) {
+                                              el.style.height = "auto";
+                                              el.style.height = `${Math.max(el.scrollHeight, 72)}px`;
+                                            }
+                                          }}
+                                          onChange={(e) => {
+                                            handleDynamicFieldChange(field.id, e.target.value);
+                                            e.target.style.height = "auto";
+                                            e.target.style.height = `${Math.max(e.target.scrollHeight, 72)}px`;
+                                          }}
+                                          placeholder={field.placeholder || ""}
+                                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-sage/30 dark:border-zinc-800 text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint resize-none overflow-hidden break-words whitespace-pre-wrap leading-relaxed"
+                                        />
+                                      ) : field.type === "date" ? (
+                                        <input
+                                          type="date"
+                                          value={fieldVal || ""}
+                                          onChange={(e) =>
+                                            handleDynamicFieldChange(field.id, e.target.value)
+                                          }
+                                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-sage/30 dark:border-zinc-800 text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint"
+                                        />
+                                      ) : field.type === "number" ? (
+                                        <input
+                                          type="number"
+                                          value={fieldVal}
+                                          onChange={(e) =>
+                                            handleDynamicFieldChange(
+                                              field.id,
+                                              e.target.value === "" ? "" : Number(e.target.value)
+                                            )
+                                          }
+                                          placeholder={field.placeholder || "0"}
+                                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-sage/30 dark:border-zinc-800 text-xs sm:text-sm font-semibold text-foreground focus:outline-hidden focus:border-mint"
+                                        />
+                                      ) : (
+                                        <textarea
+                                          rows={1}
+                                          value={fieldVal || ""}
+                                          ref={(el) => {
+                                            if (el) {
+                                              el.style.height = "auto";
+                                              el.style.height = `${Math.min(Math.max(el.scrollHeight, 38), 160)}px`;
+                                            }
+                                          }}
+                                          onChange={(e) => {
+                                            handleDynamicFieldChange(field.id, e.target.value);
+                                            e.target.style.height = "auto";
+                                            e.target.style.height = `${Math.min(Math.max(e.target.scrollHeight, 38), 160)}px`;
+                                          }}
+                                          placeholder={field.placeholder || ""}
+                                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-sage/30 dark:border-zinc-800 text-xs sm:text-sm text-foreground focus:outline-hidden focus:border-mint resize-none overflow-hidden break-words whitespace-pre-wrap leading-relaxed"
+                                        />
+                                      )}
+
+                                      {field.helpText && (
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                                          {field.helpText}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Embedded Sub-Table in Classic View */}
+                        {section.table && section.table.headers && section.table.headers.length > 0 && (
+                          <div className="overflow-x-auto border border-sage/30 dark:border-zinc-800 rounded-xl mt-3">
+                            <table className="w-full text-xs text-left border-collapse">
+                              <thead className="bg-cream/60 dark:bg-zinc-900 border-b border-sage/30 dark:border-zinc-800 text-forest dark:text-mint font-bold">
+                                <tr>
+                                  {section.table.headers.map((h: string, hIdx: number) => (
+                                    <th
+                                      key={hIdx}
+                                      className="px-3 py-2 border-r last:border-r-0 border-sage/30 dark:border-zinc-800 whitespace-nowrap"
+                                    >
+                                      {h}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-sage/20 dark:divide-zinc-800 bg-white dark:bg-zinc-950">
+                                {(section.table.rows || []).map((tRow: string[], trIdx: number) => (
+                                  <tr key={trIdx} className="hover:bg-cream/20 dark:hover:bg-zinc-900/40 transition-colors">
+                                    {tRow.map((cell: string, tcIdx: number) => (
+                                      <td
+                                        key={tcIdx}
+                                        className="px-3 py-2 border-r last:border-r-0 border-sage/30 dark:border-zinc-800 font-medium text-foreground whitespace-nowrap"
+                                      >
+                                        {cell}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1025,7 +1740,7 @@ export function ArtifactModal({
             disabled={isSubmitting}
             className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-cream dark:hover:bg-muted transition-colors cursor-pointer"
           >
-            {artifact.artifactType === "chart" ? "Close" : "Discard"}
+            {artifact.artifactType === "chart" || artifact.artifactType === "document" ? "Close" : "Discard"}
           </button>
           <button
             type="button"
@@ -1040,7 +1755,7 @@ export function ArtifactModal({
           >
             <Check className="size-4 stroke-[2.5]" />
             <span>
-              {artifact.artifactType === "chart"
+              {artifact.artifactType === "chart" || artifact.artifactType === "document"
                 ? "Done"
                 : isSubmitting
                   ? "Saving..."

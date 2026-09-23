@@ -8,15 +8,23 @@ import { FloatingBotButton } from "@/components/floating-bot-button";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-serif",
+});
 
 export const metadata: Metadata = {
-  title: "VyaparSetu — AI Hyper-Local Business Advisory & Financial Structuring",
+  title:
+    "VyaparSetu — AI Hyper-Local Business Advisory & Financial Structuring",
   description:
     "AI-driven hyper-local business advisory and financial structuring assistant for rural micro-entrepreneurs. Transform grassroots commerce with intelligent credit structuring, scheme matching, and local market advisory.",
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
   colorScheme: "dark",
   themeColor: "#000000",
 };
@@ -28,7 +36,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${playfair.variable} font-sans antialiased text-foreground bg-background`}>
+      <body
+        className={`${inter.variable} ${playfair.variable} font-sans antialiased text-foreground bg-background`}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -36,9 +46,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <LanguageProvider>
-            <AuthProvider>
-              {children}
-            </AuthProvider>
+            <AuthProvider>{children}</AuthProvider>
           </LanguageProvider>
           <FloatingBotButton />
           <Toaster position="bottom-right" />

@@ -64,6 +64,13 @@ async function handleVoiceSession(req: NextRequest) {
       body.conversationId ||
       new URL(req.url).searchParams.get("conversationId") ||
       undefined;
+    const activeArtifactOverview = body.activeArtifactOverview as
+      | {
+          type?: string;
+          title?: string;
+          summary?: string;
+        }
+      | undefined;
     const rawLang =
       body.language ||
       new URL(req.url).searchParams.get("language") ||
@@ -113,6 +120,29 @@ async function handleVoiceSession(req: NextRequest) {
     let systemInstruction = `You are VyaparSetu Voice (व्यापारसेतु), a male AI business advisor and trade partner for Indian micro-enterprises, shopkeepers, traders, and farmers.
 ${languageInstruction}
 
+======================================================================
+SUPREME TOOL-FIRST EXECUTION LAW (CRITICAL MANDATE - READ FIRST):
+======================================================================
+1. Whenever the user's utterance in ANY language requests ANY operational action, task, or information retrieval:
+   - Converting, scanning, or digitizing a document, paper, or screen.
+   - Inspecting, auditing, or reading anything visible via camera.
+   - Searching mandi prices, government loan schemes, or business records.
+   - Setting, modifying, updating, or generating any form, field, table, or chart.
+2. The VERY FIRST TOKEN emitted in your response turn MUST be the appropriate function call ('captureDocument' or 'triggerScreenAction').
+3. STRICT PROHIBITION ON SPOKEN ACTION PREAMBLES:
+   - You are STRICTLY FORBIDDEN from outputting spoken verbal announcements of intent (such as "मैं बदल रहा हूँ", "कर रहा हूँ", "प्रक्रिया शुरू कर रहा हूँ", "कृपया प्रतीक्षा करें", "I am converting", "Let me do that") WITHOUT emitting the function call.
+   - If you speak an action acknowledgment instead of calling the function, the client-side system cannot execute the task.
+   - You must call the tool silently FIRST. Spoken speech is ONLY permitted after the tool has returned its findings.
+
+TOOL ALLOCATION RULES:
+1. 'captureDocument({ query })':
+   - MANDATORY whenever the user refers to anything visible in the camera or on screen (e.g. "Ye jo dikh raha hai isko digital form banao", "Is form ko digitize karo", "Convert this document", "Passbook check karo", "Scan this bill").
+   - You MUST NOT attempt to transcribe or convert the camera visual yourself in conversation. Always emit 'captureDocument({ query })' so the high-resolution burst pipeline can OCR and stage the interactive artifact.
+2. 'triggerScreenAction({ query })':
+   - MANDATORY for digital-only tasks not involving a camera document (e.g. "SBI loan form bana do", "Onion mandi bhav chart dikhao", "Company name ABC update karo").
+3. 'checkScreenActionStatus()':
+   - For user inquiries about progress while a task is underway ("Kahan tak hua?", "Ban gaya kya?").
+
 MALE PERSONA & GRAMMAR RULES:
 1. You are strictly a male persona. In all Indian languages (Hindi, Marathi, Bengali, Punjabi, Gujarati, etc.), always use masculine self-referential verb inflections, pronouns, and adjectives (e.g. in Hindi: "मैं करूँगा", "बता सकता हूँ", "मैं समझता हूँ", never use feminine forms like "करूँगी" or "सकती हूँ").
 2. In English, maintain a warm, confident, professional male advisor tone.
@@ -146,65 +176,106 @@ NEVER TRANSLATE USER INPUT:
 - Keep spoken replies concise, clear, natural, and respectful — 1 to 3 short spoken sentences.
 - Never read out hidden reasoning or tool schema details.
 
-CAPABILITIES & TOOL USAGE (CRITICAL — YOU MUST USE TOOLS WHEN RELEVANT):
-You have access to powerful tools. When the user's query relates to any of the following, you MUST call the appropriate tool immediately — do NOT say "I can't do that" or "I don't have access":
+UNIVERSAL SEMANTIC INTENT PROTOCOL (LANGUAGE & DIALECT AGNOSTIC):
+You are an intelligent AI Orchestrator with direct control over the user's screen. You understand colloquial expressions across Hindi, Hinglish, English, Marathi, Gujarati, Bengali, Tamil, Telugu, Punjabi, and any regional dialect.
 
-0. **Inspect & In-Place Edit Forms & Artifacts** → Call getArtifacts to inspect previously staged forms/charts (#1, #2...). When the user asks to modify or change an existing form/chart, retrieve it via getArtifacts, modify the requested fields, and pass targetArtifactId to stageForm or other staging tools to update it in place.
-1. **APMC Mandi Commodity Prices** → Call getMandiRates with the commodity name (Onion, Wheat, Cotton, Tomato, Soyabean, Mustard, Potato, Gram, etc.) and optional state/district/market filters.
-2. **Budgets** (view, create) → Call getBudgets to retrieve active budgets, or stageBudget to create/update a budget plan.
-3. **Expenses** (view, log) → Call getExpenses to retrieve logged expenses, or stageExpense to log/update an expense entry.
-4. **Transactions** (view, add) → Call getTransactions to retrieve ledger transactions, or stageTransaction to add/update a ledger entry.
-5. **Savings Goals** (view, create) → Call getSavingsGoals to retrieve goals, or stageSavingsGoal to create/update a savings target.
-6. **Debts & Loans** (view, add) → Call getDebts to retrieve loan liabilities, or stageDebt to record/update a loan/liability.
-7. **Business Profile** → Call getBusinessProfile to retrieve enterprise details, category, location, and turnover.
-8. **Government Schemes** (PM Mudra, PM SVANidhi, PMEGP, Stand-Up India, PM Vishwakarma) → Call getGovtSchemes with the relevant scheme name.
-9. **Visual Charts & Graphs** → Call stageChart with chartType (bar, line, area, pie), title, data array, and series for visualizations.
-10. **Web Search** (trade news, policies, RBI circulars, market updates) → Call webSearch with the search query.
-11. **Dynamic Interactive Forms & Applications** → Call stageForm when user asks for any form (loan application, subsidy registration, supplier KYC, survey, registration) with rich sections and fields.
-12. **Delete Records** → Call stageDeleteRecord when the user wants to remove a budget, expense, goal, or debt.
-13. **Local Competitors & Market Feasibility** → Call searchCompetitors when user asks about starting/opening a shop, local business feasibility, market competition, rival businesses, or customer footfall in their area.
-14. **ONDC Digital Commerce & Wholesale Sourcing** → Call getOndcIntelligence when user asks about reducing inventory cost, wholesale buying on ONDC B2B, selling online without paying 25-30% aggregator commission, onboarding on ONDC, or e-commerce expansion.
+CATEGORY A: PURE SOCIAL CHAT & CAMERA OBSERVATION (NO TOOLS REQUIRED):
+• Intent: The user is only greeting ("Namaste", "Hello"), expressing gratitude ("Thank you", "Shukriya"), or asking a casual observational question about what the camera currently sees ("Kya dikh raha hai?").
+• Action: Speak back directly in natural, respectful spoken voice without calling any tool.
 
-STRICT TOOL CALLING RULE (ENGLISH-ONLY PARAMETERS):
-1. Even when conversing, speaking, or chatting with the user in Hindi, Hinglish, Marathi, Bengali, Gujarati, or any Indian regional language:
-2. All TOOL CALL ARGUMENTS & PARAMETERS (commodity, district, state, market, query, schemeName, category, etc.) MUST ALWAYS be passed in standard ENGLISH:
-   - User says: "गोरखपुर में गेहूं का भाव बताओ" ➜ Call: getMandiRates({ commodity: "Wheat", district: "Gorakhpur", state: "Uttar Pradesh" })
-   - User says: "सरसों का मंडी रेट" ➜ Call: getMandiRates({ commodity: "Mustard" })
-   - User says: "इंदौर में सोयाबीन" ➜ Call: getMandiRates({ commodity: "Soyabean", district: "Indore", state: "Madhya Pradesh" })
-   - User says: "प्याज का नासिक भाव" ➜ Call: getMandiRates({ commodity: "Onion", district: "Nashik", state: "Maharashtra" })
-3. NEVER pass Devanagari or Hindi text inside tool parameters.
-4. You speak to the user in their language (Hindi/Hinglish), but talk to internal tools and APIs strictly in English.
+CATEGORY B: ACTION, DATA-SETTING, FIELD EDITING, CREATION & RESEARCH (TOOL EXECUTION MANDATORY):
+• Intent: Whenever the user's utterance in ANY language expresses an intent to:
+  1. Set, modify, populate, fill, or update any field, value, name, amount, date, or detail (e.g. providing a company name, personal name, address, phone, GSTIN, loan amount, or field value).
+  2. Create, convert, digitize, or stage any form, table, catalog, budget, expense, or visual chart.
+  3. Inspect, read, audit, or extract information from a physical paper, document, or bill in camera view.
+  4. Look up APMC mandi commodity rates, spot prices, or government loan schemes (Mudra, SVANidhi, PMEGP).
+• STRICT TOOL-FIRST DISPATCH RULE:
+  - Your VERY FIRST and ONLY output in this turn MUST be the tool call ('captureDocument' or 'triggerScreenAction').
+  - ZERO VERBAL DELAY: Never say you are searching, checking, or preparing ("Main check kar raha hoon", "Tayyar kar raha hoon", "Let me look that up") before calling the tool.
+  - ZERO DEFLECTION: NEVER say you cannot edit, NEVER suggest showing an input box for the user to type manually, and NEVER ask confirmation questions like "Should I write this?" or "क्या आप चाहते हैं कि मैं लिखूँ?". When the user specifies a value or says "do it", it is a direct order to execute.
+  - In-Place Form Updates: If a form or interface is active on screen and the user specifies a value or detail, call 'triggerScreenAction({ query: "Update <field> to <value> in the active on-screen form" })' immediately.
+  - Two-Phase Model:
+    Phase 1: Emit the tool call silently to launch the autonomous sub-agent.
+    Phase 2: When the tool returns data to you, speak the verified result or confirmation clearly and concisely to the user.
 
-STRICT SCOPE BOUNDARY (CRITICAL):
+CAMERA & DOCUMENT GUIDANCE:
+• If a paper, form, or document in the camera feed is severely cut off, tilted, or too dark to read, verbally guide the user:
+  - "Camera ko thoda seedha aur center mein kijiye..."
+  - "Kripya thoda roshni mein rakhein..."
+• When the user asks to inspect, read, fill, verify, or extract information from what they are showing on camera:
+  - Formulate a clear 'query' describing the user's goal.
+  - Call 'captureDocument({ query })' immediately as your first output.
+• If you call 'captureDocument' and the tool returns error "CAMERA_NOT_ACTIVE", speak naturally:
+  - "Kripya pehle camera on kijiye taaki main aapka document dekh sakun."
+
+FEW-SHOT EXAMPLES:
+• Example 1 (Convert / Digitize Document from Camera View):
+  User: "Screen par dikh rahe loan application form ko digital form mein badlo" (showing paper/screen to camera)
+  Tool Call: captureDocument({ query: "Convert and digitize the loan application form visible on camera into an interactive digital form" })
+  Tool Result: { status: "completed", findings: "Digitized SBI Mudra Loan application form with applicant particulars, business details, and loan requirements.", artifact: { title: "SBI Mudra Loan Application", summary: "Interactive digital form generated", type: "form" } }
+  Spoken Response: "Maine aapka loan application form screen par digital roop mein taiyar kar diya hai. Aap isme apni jankari bhar sakte hain."
+
+• Example 2 (Document Inspection / Capture via Camera):
+  User: "Bhaiya ye wala form check karo kaise bharna hai" (showing form on camera)
+  Tool Call: captureDocument({ query: "Inspect displayed form and guide user step-by-step on how to fill it" })
+  Tool Result: { status: "completed", findings: "Form is SBI Mudra Loan application. Key fields needed: applicant name, Aadhaar, business address, and required loan amount.", artifact: { title: "SBI Mudra Form Guide", summary: "Step-by-step instructions displayed" } }
+  Spoken Response: "Maine aapka form dekh liya hai aur screen par guidelines khol di hain. Isme aapko apna naam, aadhar aur business address bharna hoga."
+
+• Example 3 (Fill Active Form from Document Image):
+  User: "Passbook se details is form mein bhar do" (showing passbook on camera)
+  Tool Call: captureDocument({ query: "Extract account details from this passbook and fill into the active form on screen" })
+  Tool Result: { status: "completed", findings: "Extracted Account No: 3498210045, IFSC: SBIN0001234, Name: Ramesh Kumar. Filled into active form.", artifact: { title: "Bank Account Details", summary: "Form updated with passbook details" } }
+  Spoken Response: "Ji, maine passbook se account number aur IFSC code nikaal kar form mein bhar diya hai, aap screen par check kar sakte hain."
+
+• Example 4 (Setting / Updating a Form Field in Any Language):
+  User: "Company name 'By' rakh lo" (or "Company name बाय करो" / "kar do")
+  Tool Call: triggerScreenAction({ query: "Update company name to By in the active on-screen form" })
+  Tool Result: { status: "completed", findings: "Company name field updated to By in the active form.", artifact: { title: "Loan Application", summary: "Company name updated to By" } }
+  Spoken Response: "Ji, maine form mein company ka naam By update kar diya hai."
+
+• Example 5 (Web Search & Research Query):
+  User: "SBI Mudra loan eligibility aur interest rate search karo"
+  Tool Call: triggerScreenAction({ query: "Search official SBI Mudra loan eligibility criteria, documents required, and interest rates" })
+  Tool Result: { status: "completed", findings: "SBI Mudra Shishu loan up to ₹50,000 has ~8.5% interest, no collateral required. Kishor up to ₹5 lakh, Tarun up to ₹10 lakh.", artifact: { title: "SBI Mudra Loan Details", summary: "Eligibility and interest table displayed" } }
+  Spoken Response: "Maine SBI Mudra loan ki details nikaal li hain. Shishu loan 50,000 tak 8.5% interest par milta hai jisme koi collateral nahi chahiye. Poora chart screen par open hai."
+
+• Example 6 (Visual Chart / Graph / Mandi Rates):
+  User: "Onion ka pichle 6 mahine ka price chart dikhao"
+  Tool Call: triggerScreenAction({ query: "Generate 6-month APMC Mandi price trend chart for Onion" })
+  Tool Result: { status: "completed", findings: "Onion prices peaked at ₹3,200/quintal in August, currently stable at ₹2,100/quintal. Trend chart generated.", artifact: { title: "Onion 6-Month Mandi Trend", summary: "Historical price trend chart displayed" } }
+  Spoken Response: "Pyaaz ka 6 mahine ka bhav chart taiyar hai. August mein bhav 3200 tak gaya tha aur abhi 2100 par stable hai."
+
+• Example 7 (Checking progress):
+  User: "Kahan tak hua bhai?"
+  Tool Call: checkScreenActionStatus({})
+  Tool Result: { status: "working", activeTool: "webSearch", spokenHint: "Main abhi official portal par search kar raha hoon, bas thoda sa intezar kijiye." }
+  Spoken Response: "Main abhi official portal par search kar raha hoon, bas thoda sa intezar kijiye."
+
+ACOUSTIC & TRANSCRIPTION INTEGRITY (ANTI-PROFANITY & AUDIO MISHEARING RULE):
+1. You are operating in an Indian micro-enterprise business environment. Ambient acoustic noise, coughs, vehicle sounds, traffic, or unclear phonetic syllables must strictly be resolved to benign, legitimate trade vocabulary.
+2. NEVER transcribe or hallucinate profanity, abusive words, gaalis, or vulgar expressions in 'inputAudioTranscription' or spoken replies under any circumstances. If words are ambiguous or noisy, favor clean trade words or omit the unclear noise.
+3. Maintain absolute zero tolerance for abusive language, slurs, or profanity.
+
+STRICT SCOPE BOUNDARY & PROHIBITED BUSINESS POLICY (CRITICAL):
 You are exclusively VyaparSetu (व्यापारसेतु), dedicated to Indian micro-enterprises, small businesses, shopkeepers, traders, and farmers.
+Allowed Domains: Real-time APMC Mandi rates, Indian Government credit & MSME loans (Mudra, SVANidhi, PMEGP), business finance/ledgers, trade compliance (GST, Udyam, Trade license).
 
-Allowed Domains:
-1. Real-time APMC Mandi rates, agricultural commodities, crop arrivals, and spot market trends.
-2. Indian Government credit & MSME loan schemes (PM Mudra, PM SVANidhi, PMEGP, KCC, Stand-Up India, CGTMSE).
-3. Business finance & ledgers (cash flow runways, daily income/expenses, budgeting, debt repayment, savings goals, working capital).
-4. Trade compliance & business registration (GST, Udyam Aadhar, PAN, trade licenses).
+STRICTLY PROHIBITED BUSINESSES & ACTIVITIES:
+You are STRICTLY FORBIDDEN from answering, advising, calculating, assisting, or calling tools for:
+1. Adult & Illicit Night-Time Trades: Escort services, sex work, brothels, red-light activities, massage parlors fronting sexual commerce, dance bars, adult entertainment, pornography, or human trafficking.
+2. Shadow Economy & Tax Evasion: Kaccha bill / billing without movement of goods, unrecorded cash transactions, hawala networks, black money laundering, and fraudulent GST claims.
+3. Predatory Lending & Gambling: Unlicensed money lending (meter baji / daily loan sharking at extortionate rates), satta, matka, betting clubs, or speculative gambling.
+4. Contraband & Illegal Substances: Bootlegging / illicit liquor (especially in dry states like Gujarat, Bihar), narcotics/drugs, banned agricultural pesticides/seeds, counterfeit products, smuggled goods, or illegal arms.
+5. Document Forgery: Fake Aadhaar, fake PAN, forged ITR, or fake bank balance certificates.
 
-Out-of-Scope Rule:
-If the user asks about topics outside of Indian trade, agriculture, mandi rates, business finance, or government schemes (e.g. movies, gaming, entertainment, celebrity gossip, software coding, casual chat, politics, non-business medical advice):
-- DO NOT answer the off-topic query.
-- Politely decline and redirect them back to business topics.
-- English response: "I am VyaparSetu, dedicated to assisting Indian small businesses, mandi traders, and farmers. I can help you with live APMC mandi prices, government loans (PM Mudra/SVANidhi), expense ledgers, and business financial planning. How may I assist your business today?"
-- Hindi response: "माफ़ कीजिए, मैं व्यापारसेतु हूँ — भारतीय छोटे व्यापारियों, दुकानदारों और किसानों का व्यापार सहायक। मैं केवल मंडी भाव, सरकारी योजनाओं (मुद्रा/स्वनिधि ऋण), व्यापारिक बहीखाता, और वित्तीय योजना से जुड़े प्रश्नों में आपकी मदद कर सकता हूँ। आपके व्यवसाय या मंडी से संबंधित क्या प्रश्न है?"
-
-CRITICAL TOOL EXECUTION ORDER (STRICT & HIGHEST PRIORITY):
-1. TOOL FIRST, AUDIO SECOND: When the user asks to create, view, or update ANY form, chart, graph, mandi rate, budget, or expense, YOU MUST DISPATCH THE RELEVANT TOOL CALL FIRST BEFORE SPEAKING A SINGLE WORD.
-2. SPOKEN WORDS CANNOT RENDER UI: Spoken voice alone CANNOT put anything on the user's screen. Only executing tools (stageForm, stageChart, stageBudget, stageExpense, getMandiRates) renders interactive cards and data on screen.
-3. NEVER PREDICT OR FAKE COMPLETION: YOU ARE STRICTLY FORBIDDEN from saying "मैंने स्क्रीन पर बना दिया है", "स्क्रीन पर देख सकते हैं", "I have created the form/chart", or "Here is the form" UNLESS you actually executed the tool in this exact turn.
-4. ON-DEMAND VERIFICATION ("WHERE IS IT? / FORM NAHI DIKH RAHA"): If the user asks "फॉर्म कहाँ है?", "मुझे नहीं दिख रहा", "Did you make the form?", or asks to make it again:
-   - NEVER say "यह तो पहले से बना हुआ है" / "It is already done".
-   - If the user says they do not see it, it means NO tool was called or the screen is empty.
-   - You MUST IMMEDIATELY call stageForm, stageChart, or the requested tool in this turn without arguing!
-
-RESPONSE RULES:
-1. After executing a tool, speak the key findings naturally and concisely in the user's language (1 to 2 short spoken sentences).
-2. Confirm key prices, rates, amounts, or loan figures clearly.
-3. For staging tools (stageForm, stageBudget, stageExpense, stageChart), confirm that the interactive draft card has been created for the user to review and edit on screen.`;
-
+REFUSAL DIRECTIVE (ZERO TOOLS, DIGNIFIED DEFLECTION):
+- If the user asks about ANY prohibited, illegal, or illicit night-time topic:
+- DO NOT call 'triggerScreenAction' or any other tool!
+- Refuse immediately, politely, and firmly in 1 short spoken sentence:
+  * Hindi: "व्यापारसेतु केवल कानूनी, पंजीकृत और वैध व्यापारिक गतिविधियों (जैसे अधिकृत मंडी भाव, जीएसटी और सरकारी बैंक ऋण) में सहायता करता है। हम इस प्रकार की गतिविधियों में सहायता नहीं करते।"
+  * Hinglish: "VyaparSetu keval legitimate aur certified business activities me madad karta hai. Aisi activities ke liye yahan sahayata uplabdh nahi hai."
+  * English: "VyaparSetu strictly assists with legitimate, registered trade and MSME solutions. We do not support or facilitate this category of business."
+- For general off-topic queries (movies, gaming, gossip), politely decline and redirect to business topics.`;
 
     if (conversationId) {
       const history = await prisma.conversationMessage.findMany({
@@ -224,492 +295,88 @@ RESPONSE RULES:
       }
     }
 
+    if (
+      activeArtifactOverview &&
+      (activeArtifactOverview.title || activeArtifactOverview.type)
+    ) {
+      systemInstruction += `\n\nCURRENT ON-SCREEN ARTIFACT OVERVIEW:
+- An interactive interface is currently open and visible on the user's screen:
+  * Type: ${activeArtifactOverview.type || "form"}
+  * Title: "${activeArtifactOverview.title || "Interactive Screen Item"}"
+  * Summary: "${activeArtifactOverview.summary || "Interactive workspace interface"}"
+- Directive: Any user intent expressing values, fields, updates, or actions in this context is an instruction to modify this on-screen item. Call 'triggerScreenAction' immediately to have the autonomous sub-agent update it in place.`;
+    }
+
     const tools = [
       {
         functionDeclarations: [
           {
-            name: "getMandiRates",
+            name: "triggerScreenAction",
             description:
-              "Fetches live real-time APMC wholesale mandi rates, daily arrivals, and modal prices across all Indian districts (Gorakhpur, Varanasi, Indore, Nashik, Pune, Lucknow, Kanpur, Patna, Jaipur, etc.) for any crop.",
+              "DIGITAL WORKSPACE & RESEARCH ACTION TOOL. You MUST call this tool immediately whenever the user requests a non-camera task: (1) setting, updating, or editing any field/value in an active on-screen form; (2) generating a new digital form, scheme application, table, or chart from scratch; (3) retrieving live APMC mandi rates, commodity trends, or government schemes (Mudra, SVANidhi, PMEGP). Do NOT verbally promise to do it without emitting this tool call.",
             parameters: {
               type: "OBJECT",
               properties: {
-                commodity: {
-                  type: "STRING",
-                  description:
-                    "Crop or commodity in Hindi or English, e.g. Wheat (गेहूं), Mustard (सरसों), Onion (प्याज), Paddy (धान), Potato (आलू), Soybean, Tomato, Gram (चना), Cotton (कपास), Sugarcane (गन्ना)",
-                },
-                state: {
-                  type: "STRING",
-                  description:
-                    "State e.g. Uttar Pradesh, Madhya Pradesh, Maharashtra, Gujarat, Punjab, Rajasthan, Haryana, Bihar",
-                },
-                district: {
-                  type: "STRING",
-                  description: "District or city e.g. Gorakhpur, Varanasi, Indore, Nashik, Pune, Lucknow, Kanpur, Prayagraj, Patna",
-                },
-                market: {
-                  type: "STRING",
-                  description: "Specific APMC Mandi e.g. Gorakhpur Mandi, Lasalgaon, Azadpur, Indore APMC",
-                },
-              },
-            },
-          },
-          {
-            name: "getBudgets",
-            description:
-              "Retrieves active budgets and department allocations from the enterprise database.",
-            parameters: { type: "OBJECT", properties: {} },
-          },
-          {
-            name: "getExpenses",
-            description:
-              "Retrieves logged expenses, payment methods, and category sums.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                category: {
-                  type: "STRING",
-                  description: "Optional category filter",
-                },
-                limit: {
-                  type: "NUMBER",
-                  description: "Number of records to fetch",
-                },
-              },
-            },
-          },
-          {
-            name: "getTransactions",
-            description: "Retrieves master ledger transactions.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                type: {
-                  type: "STRING",
-                  description:
-                    "Optional filter: INCOME, EXPENSE, TRANSFER, DEBT_PAYMENT",
-                },
-              },
-            },
-          },
-          {
-            name: "getSavingsGoals",
-            description:
-              "Retrieves active savings targets and accumulated funds.",
-            parameters: { type: "OBJECT", properties: {} },
-          },
-          {
-            name: "getDebts",
-            description:
-              "Retrieves active loans, lenders, interest rates, and EMIs.",
-            parameters: { type: "OBJECT", properties: {} },
-          },
-          {
-            name: "getBusinessProfile",
-            description:
-              "Retrieves enterprise profile, category, location, and turnover.",
-            parameters: { type: "OBJECT", properties: {} },
-          },
-          {
-            name: "getGovtSchemes",
-            description:
-              "Evaluates qualification for government subsidy schemes (PM Mudra, PM SVANidhi, PMEGP).",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                schemeName: {
-                  type: "STRING",
-                  description: "PM_MUDRA, PM_SVANIDHI, PMEGP, STAND_UP_INDIA",
-                },
-              },
-              required: ["schemeName"],
-            },
-          },
-          {
-            name: "stageBudget",
-            description:
-              "Stages an interactive draft budget plan with category allocations for user review. Call this tool when the user wants to create or plan a budget.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                name: { type: "STRING", description: "Budget title" },
                 query: {
                   type: "STRING",
-                  description: "Full user budget request, purpose, and amount details",
-                },
-                period: {
-                  type: "STRING",
-                  description: "Monthly, Quarterly, Annual, Weekly",
-                },
-                totalAmount: {
-                  type: "NUMBER",
-                  description: "Total budget limit in INR",
-                },
-                items: {
-                  type: "ARRAY",
                   description:
-                    "Optional list of allocations with category and allocatedAmount",
-                  items: {
-                    type: "OBJECT",
-                    properties: {
-                      category: { type: "STRING" },
-                      allocatedAmount: { type: "NUMBER" },
-                    },
-                    required: ["category", "allocatedAmount"],
-                  },
-                },
-              },
-              required: ["name"],
-            },
-          },
-          {
-            name: "stageExpense",
-            description:
-              "Stages an interactive draft expense entry for user review and approval.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                category: { type: "STRING", description: "Expense category" },
-                amount: { type: "NUMBER", description: "Amount in INR" },
-                vendor: { type: "STRING", description: "Vendor name" },
-                paymentMethod: {
-                  type: "STRING",
-                  description: "UPI, CASH, BANK_TRANSFER",
-                },
-                description: { type: "STRING", description: "Description" },
-              },
-              required: ["category", "amount"],
-            },
-          },
-          {
-            name: "stageTransaction",
-            description:
-              "Stages a master ledger transaction draft for user review.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                type: {
-                  type: "STRING",
-                  description: "INCOME, EXPENSE, TRANSFER, DEBT_PAYMENT",
-                },
-                amount: { type: "NUMBER", description: "Amount in INR" },
-                category: { type: "STRING", description: "Category" },
-                description: { type: "STRING", description: "Description" },
-              },
-              required: ["type", "amount"],
-            },
-          },
-          {
-            name: "stageSavingsGoal",
-            description: "Stages a savings goal target for user review.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                name: { type: "STRING", description: "Goal name" },
-                targetAmount: {
-                  type: "NUMBER",
-                  description: "Target amount in INR",
-                },
-                targetDate: {
-                  type: "STRING",
-                  description: "Target date YYYY-MM-DD",
-                },
-              },
-              required: ["name", "targetAmount"],
-            },
-          },
-          {
-            name: "stageDebt",
-            description: "Stages a loan/debt liability record for user review.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                lender: {
-                  type: "STRING",
-                  description: "Lender bank or organization",
-                },
-                totalAmount: {
-                  type: "NUMBER",
-                  description: "Total loan amount",
-                },
-                amountOutStanding: {
-                  type: "NUMBER",
-                  description: "Outstanding balance",
-                },
-                interestRate: {
-                  type: "NUMBER",
-                  description: "Annual interest rate %",
-                },
-                emiAmount: {
-                  type: "NUMBER",
-                  description: "Monthly EMI in INR",
-                },
-              },
-              required: ["lender", "amountOutStanding"],
-            },
-          },
-          {
-            name: "webSearch",
-            description:
-              "Searches the live web for trade regulations, market policies, RBI circulars, commodity updates, and tax guidelines.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                query: { type: "STRING", description: "Search query" },
-                numResults: {
-                  type: "NUMBER",
-                  description: "Number of results",
+                    "Plain text formulated action instruction describing what to search, research, display, create, or what field to update in the active form.",
                 },
               },
               required: ["query"],
             },
           },
           {
-            name: "getArtifacts",
+            name: "checkScreenActionStatus",
             description:
-              "Retrieves previously staged artifacts (forms, charts, budgets, expenses) from the current conversation in stack order (#1, #2...). Use before editing or updating any existing form or chart on user demand.",
+              "Call this tool whenever the user asks about progress ('ban gaya kya?', 'kahan tak hua?', 'aur kitna time?'), or to check if the background screen action has completed. Returns real-time status and spokenHint.",
             parameters: {
               type: "OBJECT",
-              properties: {
-                artifactType: {
-                  type: "STRING",
-                  description: "form, chart, budget, expense, transaction, saving_goal, debt, or all",
-                },
-                limit: {
-                  type: "NUMBER",
-                  description: "Max number of artifacts to retrieve (defaults to 10)",
-                },
-              },
+              properties: {},
             },
           },
           {
-            name: "stageChart",
+            name: "captureDocument",
             description:
-              "Generates or updates an interactive visual chart (bar, line, area, pie) as an artifact on screen. Call this tool whenever the user asks for a chart, graph, visual comparison, or price trend.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                targetArtifactId: {
-                  type: "STRING",
-                  description: "Optional ID or index of an existing chart to update in place",
-                },
-                chartType: {
-                  type: "STRING",
-                  description: "bar, line, area, or pie",
-                },
-                title: { type: "STRING", description: "Title of the chart" },
-                query: {
-                  type: "STRING",
-                  description: "Specific metric or trend to visualize e.g. 'Last 6 months onion modal price trend in Nashik'",
-                },
-                description: {
-                  type: "STRING",
-                  description: "Brief description of the chart metrics",
-                },
-                xAxisKey: {
-                  type: "STRING",
-                  description: "Key for X-axis (e.g. month, category)",
-                },
-                data: {
-                  type: "ARRAY",
-                  description:
-                    "Optional array of data point objects with key-values",
-                  items: {
-                    type: "OBJECT",
-                  },
-                },
-                series: {
-                  type: "ARRAY",
-                  description:
-                    "Optional array of series objects with dataKey, name, color",
-                  items: {
-                    type: "OBJECT",
-                    properties: {
-                      dataKey: { type: "STRING" },
-                      name: { type: "STRING" },
-                      color: { type: "STRING" },
-                    },
-                    required: ["dataKey"],
-                  },
-                },
-              },
-              required: ["title", "chartType"],
-            },
-          },
-          {
-            name: "stageForm",
-            description:
-              "Generates or updates a dynamic interactive multi-field form artifact on screen (loan applications, subsidy forms, vendor KYC, registration). Call this tool whenever the user asks to create, show, or edit any form.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                targetArtifactId: {
-                  type: "STRING",
-                  description: "Optional ID or index of an existing form to update in place",
-                },
-                title: {
-                  type: "STRING",
-                  description: "Title of the form (e.g. 'SBI MSME Loan Application Form')",
-                },
-                query: {
-                  type: "STRING",
-                  description: "Specific form request, applicant details, business type, loan amount, or requested fields",
-                },
-                description: {
-                  type: "STRING",
-                  description: "Subtitle or instructions",
-                },
-                submitLabel: {
-                  type: "STRING",
-                  description: "Label for the submit button",
-                },
-                formType: {
-                  type: "STRING",
-                  description: "Form category e.g. loan_application, subsidy, vendor_kyc, registration",
-                },
-                sections: {
-                  type: "ARRAY",
-                  description: "Optional list of form sections containing fields",
-                  items: {
-                    type: "OBJECT",
-                    properties: {
-                      title: { type: "STRING" },
-                      description: { type: "STRING" },
-                      fields: {
-                        type: "ARRAY",
-                        items: {
-                          type: "OBJECT",
-                          properties: {
-                            id: { type: "STRING" },
-                            label: { type: "STRING" },
-                            type: {
-                              type: "STRING",
-                              description: "text, number, select, date, textarea, checkbox",
-                            },
-                            defaultValue: { type: "STRING" },
-                            placeholder: { type: "STRING" },
-                            options: {
-                              type: "ARRAY",
-                              items: { type: "STRING" },
-                            },
-                            required: { type: "BOOLEAN" },
-                            helpText: { type: "STRING" },
-                          },
-                          required: ["id", "label"],
-                        },
-                      },
-                    },
-                    required: ["fields"],
-                  },
-                },
-              },
-              required: ["title"],
-            },
-          },
-          {
-            name: "stageDeleteRecord",
-            description:
-              "Stages a delete confirmation card for an expense, budget, goal, or debt.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                entityType: {
-                  type: "STRING",
-                  description: "expense, budget, savingGoal, debt, transaction",
-                },
-                entityId: { type: "STRING", description: "ID of the record" },
-                entityName: {
-                  type: "STRING",
-                  description: "Name of the record",
-                },
-              },
-              required: ["entityType", "entityId", "entityName"],
-            },
-          },
-          {
-            name: "searchCompetitors",
-            description:
-              "Searches for nearby competitor shops, rival outlets, or businesses for any commercial category within a catchment radius to analyze local competition and market feasibility.",
+              "MANDATORY CAMERA VISION TOOL. You MUST call this tool immediately whenever the user asks to digitize, convert, capture, scan, inspect, read, audit, or extract information from a physical document, paper form, screen, certificate, bill, or item shown in camera view. Do NOT verbally promise to do it without emitting this tool call. Triggers high-resolution snapshot burst and dispatches to the multimodal vision agent.",
             parameters: {
               type: "OBJECT",
               properties: {
                 query: {
                   type: "STRING",
                   description:
-                    "Search query or specific business description or trade sector to search",
-                },
-                category: {
-                  type: "STRING",
-                  description:
-                    "Business sector e.g. Biryani & Food, Kirana, Garments, Mobile Repair, Hardware",
-                },
-                radiusKm: {
-                  type: "NUMBER",
-                  description: "Search radius in km e.g. 1, 2, 5",
-                },
-                location: {
-                  type: "STRING",
-                  description: "Specific city, area, or landmark if specified by user",
+                    "Plain text formulated query describing what the user wants done with this document/item.",
                 },
               },
-            },
-          },
-          {
-            name: "getOndcIntelligence",
-            description:
-              "Discovers ONDC (Open Network for Digital Commerce) opportunities including B2B wholesale procurement at 8-12% discounts, B2C digital seller apps (Mystore, Magicpin) at 3% commission, and hyper-local delivery partners for any enterprise.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                query: {
-                  type: "STRING",
-                  description:
-                    "Specific ONDC inquiry e.g. 'How to sell on ONDC' or 'Wholesale procurement'",
-                },
-                category: {
-                  type: "STRING",
-                  description:
-                    "Business sector e.g. Biryani & Food, Kirana, Garments, Mobile Repair, Hardware",
-                },
-                location: {
-                  type: "STRING",
-                  description: "Specific city, area, or state",
-                },
-                intent: {
-                  type: "STRING",
-                  description: "Focus: procure, sell, logistics, or general",
-                },
-              },
-            },
-          },
-          {
-            name: "predictDistrictBusinesses",
-            description:
-              "Researches and predicts the Top 4 high-ROI, low-saturation business opportunities in any Indian district for a given budget using live web search, APMC Mandi trends, and Udyam MSME subsidies (PMEGP 35%, PMFME, Mudra).",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                district: {
-                  type: "STRING",
-                  description: "District or city name (e.g. Lucknow, Varanasi, Pune, Kanpur, Indore)",
-                },
-                state: {
-                  type: "STRING",
-                  description: "State name (e.g. Uttar Pradesh, Maharashtra, Madhya Pradesh)",
-                },
-                budget: {
-                  type: "NUMBER",
-                  description: "Capital investment budget in INR (e.g. 200000, 500000)",
-                },
-                category: {
-                  type: "STRING",
-                  description: "Sector of interest (e.g. Food Processing, Packaging, Manufacturing, Retail)",
-                },
-              },
+              required: ["query"],
             },
           },
         ],
+      },
+    ];
+
+    const toolConfig = {
+      functionCallingConfig: {
+        mode: "AUTO",
+      },
+    };
+
+    const safetySettings = [
+      {
+        category: "HARM_CATEGORY_HARASSMENT",
+        threshold: "BLOCK_LOW_AND_ABOVE",
+      },
+      {
+        category: "HARM_CATEGORY_HATE_SPEECH",
+        threshold: "BLOCK_LOW_AND_ABOVE",
+      },
+      {
+        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold: "BLOCK_LOW_AND_ABOVE",
+      },
+      {
+        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold: "BLOCK_LOW_AND_ABOVE",
       },
     ];
 
@@ -719,6 +386,8 @@ RESPONSE RULES:
       voiceName: LIVE_VOICE_AGENT_CONFIG.voiceName || "Puck",
       systemInstruction,
       tools,
+      toolConfig,
+      safetySettings,
       conversationId,
     });
   } catch (error) {

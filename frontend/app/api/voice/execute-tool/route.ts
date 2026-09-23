@@ -22,38 +22,63 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Immediate lightweight responses for Voice Agent triggers
+    if (toolName === "triggerScreenAction") {
+      return NextResponse.json({
+        result: {
+          status: "triggered",
+          actionType: args.actionType,
+          message: `Screen action task initiated. The Sub-Agent is actively searching official guidelines and building the ${args.actionType || "item"} on screen.`,
+        },
+      });
+    }
+
+    if (toolName === "checkScreenActionStatus") {
+      return NextResponse.json({
+        result: {
+          status: "idle",
+          description: "No background task active",
+          spokenHint: "Abhi koi screen action active nahi hai.",
+        },
+      });
+    }
+
     const tools: Record<string, any> = getAgentTools({
       userId: user.id,
       conversationId,
     });
 
     let result: any = null;
+    let targetTool = toolName;
 
-    // Check if this is a complex UI tool that needs Sub-Agent generation
+    // Check if this is an on-screen tool that needs Sub-Agent generation or raw audio parsing
     const isComplexTool =
-      (toolName === "stageForm" && (!args.sections || !args.sections.length)) ||
-      (toolName === "stageChart" && (!args.data || args.data.length < 2)) ||
-      (toolName === "stageBudget" && (!args.items || !args.items.length));
+      toolName === "triggerScreenAction" ||
+      targetTool === "stageForm" ||
+      targetTool === "stageChart" ||
+      targetTool === "stageBudget" ||
+      Boolean(args.audioBase64);
 
     if (isComplexTool) {
-      console.log(`[voice/execute-tool] Delegating "${toolName}" to Chat AI Sub-Agent:`, {
-        title: args.title || args.name,
+      console.log(`[voice/execute-tool] Delegating "${targetTool}" (action: ${args.actionType || "none"}) to Chat AI Sub-Agent:`, {
+        actionType: args.actionType,
         query: args.query,
+        hasAudio: Boolean(args.audioBase64),
       });
 
       result = await runChatSubAgent({
-        toolName,
+        toolName: targetTool,
         args,
         userId: user.id,
         conversationId,
         tools,
       });
-    } else if (tools[toolName] && typeof tools[toolName].execute === "function") {
-      result = await tools[toolName].execute(args || {}, {} as any);
+    } else if (tools[targetTool] && typeof tools[targetTool].execute === "function") {
+      result = await tools[targetTool].execute(args || {}, {} as any);
     } else {
       result = {
         success: false,
-        error: `Tool '${toolName}' is not registered.`,
+        error: `Tool '${targetTool}' is not registered.`,
       };
     }
 
@@ -111,26 +136,47 @@ async function runChatSubAgent({
 
     const queryText =
       args?.query ||
+      args?.userTranscript ||
       args?.title ||
       args?.name ||
       args?.description ||
       "Indian business trade query";
 
-    const prompt = `You are VyaparSetu's specialized Chat AI Sub-Agent.
-A voice user asked to create or display: "${queryText}".
-Target tool to invoke: "${toolName}".
+    const prompt = `You are VyaparSetu's specialized Chat AI Sub-Agent running on Google Cloud Vertex AI (Gemini 3.7 Flash).
+A voice user asked to create, display, or modify an on-screen item: "${queryText}".
+Target tool category: "${toolName}".
 User parameters passed: ${JSON.stringify(args)}.
+${args.audioBase64 ? "IMPORTANT: The user's authentic spoken audio for this turn is attached as a WAV audio file. Listen carefully to their exact spoken words, numbers, bank, crop, or requested changes." : ""}
 
 CRITICAL TASK:
-You MUST immediately invoke the tool "${toolName}" with complete, authentic, professional Indian MSME / banking / trade fields.
-- If stageForm: Build complete, real-world sections (1. Personal & KYC Details with Aadhaar, PAN, Mobile; 2. Enterprise Details with Business Name, Udyam, Constitution; 3. Banking & Loan Requirement with Bank Name, Branch IFSC, Account No, Amount; 4. Declaration checkbox).
+You MUST invoke the appropriate tool with complete, authentic, professional Indian MSME / banking / trade fields:
+- If stageForm: Build complete, real-world sections matching the user's requested bank or scheme (1. Personal & KYC Details; 2. Enterprise Details; 3. Banking & Loan Requirement with Bank Name, Branch IFSC, Account No, Amount; 4. Statutory Declaration).
+- If getMandiRates: Call getMandiRates with the commodity and district/state in English.
 - If stageChart: Provide at least 5-6 realistic monthly or category data points, suitable xAxisKey, and series.
-- If stageBudget: Provide realistic category allocations (Inventory, Wages, Logistics, Utilities, Buffer) summing to the budget limit.
+- If stageBudget: Provide realistic category allocations summing to the budget limit.
+- If stageExpense: Record expense with category and amount.
 Execute the tool now.`;
+
+    const userParts: any[] = [];
+    if (args.audioBase64) {
+      try {
+        userParts.push({
+          type: "file",
+          data: Buffer.from(args.audioBase64, "base64"),
+          mediaType: "audio/wav",
+        });
+      } catch (audioErr) {
+        console.warn("[voice/execute-tool] Failed to parse audioBase64 buffer:", audioErr);
+      }
+    }
+    userParts.push({
+      type: "text",
+      text: prompt,
+    });
 
     await generateText({
       model,
-      prompt,
+      messages: [{ role: "user", content: userParts }],
       tools: wrappedTools as any,
       stopWhen: isStepCount(3),
     });
@@ -139,7 +185,7 @@ Execute the tool now.`;
   }
 
   // If sub-agent produced a result, return it
-  if (capturedResult && capturedResult.isArtifact) {
+  if (capturedResult && (capturedResult.isArtifact || capturedResult.success)) {
     return capturedResult;
   }
 

@@ -37,10 +37,12 @@ export async function POST(req: NextRequest) {
         lng,
         userId: user?.id,
         businessName,
+        bypassCache: true, // Manual SWOT scan always fetches fresh real GPS places
       }),
     ]);
     const udyamStats = getUdyamDistrictIntelligence(district, state);
     const competitors = competitorData?.competitors || [];
+    const allPlaces = competitorData?.allPlaces || competitors;
 
     // 2. Prepare Prompt for Vertex AI Gemini 3.7 Flash
     const systemInstruction = `You are VyaparSetu's Geospatial Market & SWOT Intelligence Analyst for Indian Micro/Small Enterprises.
@@ -217,6 +219,9 @@ Provide JSON in this EXACT schema:
               opportunities: parsed.opportunities,
               threats: parsed.threats,
               competitors: competitors as any,
+              allPlaces: allPlaces as any,
+              lat: lat !== undefined ? Number(lat) : undefined,
+              lng: lng !== undefined ? Number(lng) : undefined,
             },
             actionPlan: parsed.actionPlan,
             dataSource: parsed.dataSource || `Live Trade Register for ${district}`,
@@ -232,6 +237,9 @@ Provide JSON in this EXACT schema:
               opportunities: parsed.opportunities,
               threats: parsed.threats,
               competitors: competitors as any,
+              allPlaces: allPlaces as any,
+              lat: lat !== undefined ? Number(lat) : undefined,
+              lng: lng !== undefined ? Number(lng) : undefined,
             },
             actionPlan: parsed.actionPlan,
             dataSource: parsed.dataSource || `Live Trade Register for ${district}`,
@@ -245,12 +253,76 @@ Provide JSON in this EXACT schema:
       mandiRecords,
       udyamStats,
       competitors,
+      allPlaces,
       ...parsed,
     });
   } catch (error: any) {
     console.error("[SWOT API Error]:", error);
     return NextResponse.json(
       { success: false, error: error.message || "Failed to generate SWOT scan" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { district, state, lat, lng, radiusKm } = body;
+
+    if (!district || !state) {
+      return NextResponse.json({ error: "District and state required" }, { status: 400 });
+    }
+
+    const existing = await prisma.swotMarketAnalysis.findUnique({
+      where: { userId: user.id },
+    });
+
+    const existingSwotData = (existing?.swotData as any) || {};
+    const updatedSwotData = {
+      ...existingSwotData,
+      lat: lat !== undefined ? Number(lat) : existingSwotData.lat,
+      lng: lng !== undefined ? Number(lng) : existingSwotData.lng,
+    };
+
+    await prisma.swotMarketAnalysis.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        district,
+        state,
+        radiusKm: Number(radiusKm || existing?.radiusKm || 10),
+        score: Number(existing?.score || 88),
+        swotData: updatedSwotData,
+        dataSource: existing?.dataSource || `Live Trade Register for ${district}`,
+      },
+      update: {
+        district,
+        state,
+        radiusKm: Number(radiusKm || existing?.radiusKm || 10),
+        swotData: updatedSwotData,
+      },
+    });
+
+    // Also sync city and state to the user's business profile
+    await prisma.business.updateMany({
+      where: { ownerId: user.id },
+      data: {
+        city: district,
+        state: state,
+      },
+    });
+
+    return NextResponse.json({ success: true, district, state, lat, lng });
+  } catch (err: any) {
+    console.error("[SWOT PATCH Location Error]:", err);
+    return NextResponse.json(
+      { success: false, error: err.message || "Failed to update SWOT location" },
       { status: 500 }
     );
   }
@@ -274,6 +346,7 @@ export async function GET(req: NextRequest) {
           opportunities: swot?.opportunities || [],
           threats: swot?.threats || [],
           competitors: swot?.competitors || [],
+          allPlaces: swot?.allPlaces || swot?.competitors || [],
           actionPlan: saved.actionPlan || [],
           savedInDb: true,
         });

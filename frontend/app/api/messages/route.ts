@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { conversationId, role, content, thinking, toolCalls } = body;
+    const { conversationId, role, content, thinking, toolCalls, files } = body;
 
     if (!conversationId || !role || !content) {
       return NextResponse.json(
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
         content: typeof content === "string" ? content : JSON.stringify(content),
         thinking: thinking || null,
         toolCalls: toolCalls || undefined,
+        files: Array.isArray(files) ? files : [],
       },
     });
 

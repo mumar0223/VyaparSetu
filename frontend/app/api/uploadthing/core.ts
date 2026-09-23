@@ -19,6 +19,9 @@ export const ourFileRouter = {
       return {
         uploadedBy: metadata.userId,
         url: (file as any).ufsUrl || file.url,
+        name: file.name,
+        key: file.key,
+        size: file.size,
       };
     }),
   pdfUploader: f({
@@ -35,8 +38,44 @@ export const ourFileRouter = {
       return {
         uploadedBy: metadata.userId,
         url: (file as any).ufsUrl || file.url,
+        name: file.name,
+        key: file.key,
+        size: file.size,
+      };
+    }),
+  chatAttachmentUploader: f({
+    image: {
+      maxFileSize: "16MB",
+      maxFileCount: 10,
+    },
+    pdf: {
+      maxFileSize: "32MB",
+      maxFileCount: 5,
+    },
+    text: {
+      maxFileSize: "16MB",
+      maxFileCount: 5,
+    },
+    blob: {
+      maxFileSize: "32MB",
+      maxFileCount: 5,
+    },
+  })
+    .middleware(async () => {
+      const user = await getCurrentUser();
+      return { userId: user?.id || "guest_user" };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      return {
+        uploadedBy: metadata.userId,
+        url: (file as any).ufsUrl || file.url,
+        name: file.name,
+        key: file.key,
+        size: file.size,
+        type: file.type,
       };
     }),
 } satisfies FileRouter;
 
 export type OurFileRouter = typeof ourFileRouter;
+

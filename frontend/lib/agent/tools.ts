@@ -12,6 +12,7 @@ import {
 import { searchCompetitorsIntelligence } from "./competitor-service";
 import { getOndcIntelligence } from "./ondc-service";
 import { predictDistrictBusinessesIntelligence } from "./district-predictor-service";
+import { searchGoogleWeb } from "./serpapi-service";
 
 /**
  * Zod Schemas for Tools
@@ -33,11 +34,15 @@ const MandiRatesSchema = z.object({
   district: z
     .string()
     .optional()
-    .describe("District or city filter, e.g. Gorakhpur, Varanasi, Indore, Nashik, Pune, Lucknow, Kanpur, Prayagraj, Patna, Jaipur"),
+    .describe(
+      "District or city filter, e.g. Gorakhpur, Varanasi, Indore, Nashik, Pune, Lucknow, Kanpur, Prayagraj, Patna, Jaipur",
+    ),
   market: z
     .string()
     .optional()
-    .describe("Specific APMC Mandi e.g. Gorakhpur Mandi, Lasalgaon, Azadpur, Indore APMC"),
+    .describe(
+      "Specific APMC Mandi e.g. Gorakhpur Mandi, Lasalgaon, Azadpur, Indore APMC",
+    ),
 });
 
 const WebSearchSchema = z.object({
@@ -74,30 +79,39 @@ const SearchCompetitorsSchema = z.object({
   location: z
     .string()
     .optional()
-    .describe("Specific street, area, market yard, or city if provided by user"),
+    .describe(
+      "Specific street, area, market yard, or city if provided by user",
+    ),
   lat: z.number().optional().describe("Latitude coordinate if available"),
   lon: z.number().optional().describe("Longitude coordinate if available"),
-  bypassCache: z.boolean().optional().default(false).describe("Whether to bypass DB cache"),
+  bypassCache: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Whether to bypass DB cache"),
 });
 
 const OndcIntelligenceSchema = z.object({
   query: z
     .string()
     .optional()
-    .describe("Specific ONDC inquiry e.g. 'How to sell on ONDC' or 'Wholesale procurement'"),
+    .describe(
+      "Specific ONDC inquiry e.g. 'How to sell on ONDC' or 'Wholesale procurement'",
+    ),
   category: z
     .string()
     .optional()
-    .describe("Business trade category e.g. 'Biryani & Food Outlets', 'Kirana', 'Apparel'"),
-  location: z
-    .string()
-    .optional()
-    .describe("City or state location"),
+    .describe(
+      "Business trade category e.g. 'Biryani & Food Outlets', 'Kirana', 'Apparel'",
+    ),
+  location: z.string().optional().describe("City or state location"),
   intent: z
     .enum(["procure", "sell", "logistics", "general"])
     .optional()
     .default("general")
-    .describe("Focus area: procure (buy cheaper), sell (list catalog), logistics, or general"),
+    .describe(
+      "Focus area: procure (buy cheaper), sell (list catalog), logistics, or general",
+    ),
   bypassCache: z
     .boolean()
     .optional()
@@ -109,11 +123,15 @@ const PredictDistrictBusinessesSchema = z.object({
   district: z
     .string()
     .optional()
-    .describe("District or city to evaluate (e.g. Lucknow, Varanasi, Pune, Indore, Kanpur)"),
+    .describe(
+      "District or city to evaluate (e.g. Lucknow, Varanasi, Pune, Indore, Kanpur)",
+    ),
   state: z
     .string()
     .optional()
-    .describe("State name (e.g. Uttar Pradesh, Maharashtra, Madhya Pradesh, Gujarat)"),
+    .describe(
+      "State name (e.g. Uttar Pradesh, Maharashtra, Madhya Pradesh, Gujarat)",
+    ),
   budget: z
     .number()
     .optional()
@@ -121,7 +139,9 @@ const PredictDistrictBusinessesSchema = z.object({
   category: z
     .string()
     .optional()
-    .describe("Specific sector or trade interest (e.g. Food Processing, Packaging, Manufacturing, Retail, Technical Services)"),
+    .describe(
+      "Specific sector or trade interest (e.g. Food Processing, Packaging, Manufacturing, Retail, Technical Services)",
+    ),
   riskLevel: z
     .enum(["Low", "Moderate", "High"])
     .optional()
@@ -138,7 +158,9 @@ const StageChartSchema = z.object({
   targetArtifactId: z
     .string()
     .optional()
-    .describe("Optional ID or index (e.g. 'art_1' or '1') of an existing chart to update in-place"),
+    .describe(
+      "Optional ID or index (e.g. 'art_1' or '1') of an existing chart to update in-place",
+    ),
   chartType: z
     .enum(["bar", "line", "area", "pie"])
     .default("bar")
@@ -264,7 +286,9 @@ const StageTransactionSchema = z.object({
   targetArtifactId: z
     .string()
     .optional()
-    .describe("Optional ID or index of an existing transaction to update in-place"),
+    .describe(
+      "Optional ID or index of an existing transaction to update in-place",
+    ),
   type: z
     .enum(["INCOME", "EXPENSE", "TRANSFER", "DEBT_PAYMENT", "SAVING", "OTHER"])
     .describe("Transaction type"),
@@ -280,7 +304,9 @@ const StageSavingsGoalSchema = z.object({
   targetArtifactId: z
     .string()
     .optional()
-    .describe("Optional ID or index of an existing savings goal to update in-place"),
+    .describe(
+      "Optional ID or index of an existing savings goal to update in-place",
+    ),
   name: z
     .string()
     .describe(
@@ -328,33 +354,229 @@ const StageDebtSchema = z.object({
   emiAmount: z.number().optional().describe("Monthly EMI installment in INR"),
 });
 
-const StageFormFieldSchema = z.object({
-  id: z.string().describe("Unique field key/id (e.g. 'fullName', 'loanAmount', 'businessType', 'purpose')"),
-  label: z.string().describe("Field display label (e.g. 'Applicant Full Name (आवेदक का पूरा नाम)')"),
-  type: z.enum(["text", "number", "select", "date", "textarea", "checkbox"]).default("text").describe("Input field type"),
-  defaultValue: z.any().optional().describe("Default or suggested pre-filled value"),
+export const StageFormFieldSchema = z.object({
+  id: z
+    .string()
+    .describe(
+      "Unique field key/id (e.g. 'fullName', 'loanAmount', 'businessType', 'purpose')",
+    ),
+  label: z
+    .string()
+    .describe(
+      "Field display label (e.g. 'Applicant Full Name (आवेदक का पूरा नाम)')",
+    ),
+  type: z
+    .enum(["text", "number", "select", "date", "textarea", "checkbox"])
+    .default("text")
+    .describe("Input field type"),
+  defaultValue: z
+    .any()
+    .optional()
+    .describe("Default or suggested pre-filled value"),
+  value: z.any().optional().describe("Current pre-filled value"),
   placeholder: z.string().optional().describe("Helpful placeholder text"),
-  options: z.array(z.string()).optional().describe("List of options for 'select' dropdown type"),
-  required: z.boolean().optional().default(false).describe("Whether the field is mandatory"),
-  helpText: z.string().optional().describe("Optional brief description or note under the input"),
+  options: z
+    .array(z.string())
+    .optional()
+    .describe("List of options for 'select' dropdown type"),
+  required: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Whether the field is mandatory"),
+  helpText: z
+    .string()
+    .optional()
+    .describe("Optional brief description or note under the input"),
+  colSpan: z
+    .number()
+    .optional()
+    .describe(
+      "Number of columns this field spans (e.g. 1 or 2 for full width in a 2-col section)",
+    ),
+  displayVariant: z
+    .enum(["fill_line", "character_boxes", "char_boxes", "boxed", "table_cell"])
+    .optional()
+    .describe(
+      "Layout styling: 'fill_line' (underlined line), 'character_boxes' / 'char_boxes' (discrete boxes for PAN/Aadhaar/IFSC), 'boxed'",
+    ),
+  suffix: z
+    .string()
+    .optional()
+    .describe("Unit or suffix, e.g. '₹', 'Years', '%'"),
 });
 
-const StageFormSectionSchema = z.object({
-  title: z.string().optional().describe("Section heading (e.g. '1. Personal / Applicant Details', '2. Loan Request')"),
-  description: z.string().optional().describe("Brief subtitle or description for this section"),
-  fields: z.array(StageFormFieldSchema).min(1).describe("List of fields in this section"),
+export const StageFormRowSchema = z.object({
+  fields: z
+    .array(StageFormFieldSchema)
+    .min(1)
+    .describe(
+      "Fields sitting together on this line (1, 2, or 3 fields in a row)",
+    ),
 });
 
-const StageFormSchema = z.object({
+export const StageFormTableSchema = z.object({
+  headers: z
+    .array(z.string())
+    .describe(
+      "Table column headers (e.g. ['क्रमांक', 'शैक्षिक योग्यता', 'उत्तीर्ण वर्ष', 'पूर्णांक', 'प्राप्तांक', 'प्रतिशत', 'बोर्ड'])",
+    ),
+  rows: z
+    .array(z.array(z.union([z.string(), z.number()])))
+    .describe("Array of table row cell values"),
+});
+
+export const StageFormSectionSchema = z.object({
+  title: z
+    .string()
+    .optional()
+    .describe(
+      "Clean plain section heading (e.g. '1. Branch Particulars', '2. Applicant & Promoter Identity', '3. Credit Facility Request'). NEVER use brackets, pipes, dashes or decorative symbols like '—[ ... ]—' or '|-'.",
+    ),
+  description: z
+    .string()
+    .optional()
+    .describe("Brief subtitle or description for this section"),
+  columns: z
+    .number()
+    .optional()
+    .default(2)
+    .describe("Default column count for the section (1, 2, or 3)"),
+  photoBox: z
+    .object({
+      label: z
+        .string()
+        .optional()
+        .default("फ़ोटो / Passport Photo")
+        .describe("Photo box label"),
+      url: z.string().optional().describe("Optional photo URL if available"),
+    })
+    .optional()
+    .describe("Optional passport photo box on the right of the section"),
+  rows: z
+    .array(StageFormRowSchema)
+    .optional()
+    .describe("List of rows in this section. Each row holds 1, 2, or 3 fields"),
+  table: StageFormTableSchema.optional().describe(
+    "Optional embedded sub-table for qualifications, marksheets, or financial breakdown",
+  ),
+  fields: z
+    .array(StageFormFieldSchema)
+    .optional()
+    .describe("Fallback flat list of fields in this section"),
+});
+
+export const StageFormThemeSchema = z.object({
+  primaryColor: z
+    .string()
+    .optional()
+    .describe(
+      "Bank/Scheme brand color (e.g. '#1E3A8A' for SBI, '#15803D' for Agriculture, '#C2410C' for PMEGP)",
+    ),
+  pageBg: z
+    .string()
+    .optional()
+    .describe("Paper sheet background tint (e.g. '#FFFFFF', '#FAF8F5')"),
+  borderColor: z
+    .string()
+    .optional()
+    .describe("Border color for table grid lines (e.g. '#CBD5E1')"),
+});
+
+export const StageFormSchema = z.object({
   targetArtifactId: z
     .string()
     .optional()
-    .describe("Optional ID or index (e.g. 'art_1' or '1') of an existing form to update in-place instead of creating a new duplicate"),
-  title: z.string().describe("Form title, e.g. 'MSME Business Loan Application Form' or 'Supplier Vendor Onboarding'"),
-  description: z.string().optional().describe("Subtitle, summary or instructions for the form"),
-  submitLabel: z.string().optional().default("Approve & Submit").describe("Label on the primary action button"),
-  formType: z.string().optional().describe("Form category or domain, e.g. 'loan_application', 'subsidy_registration', 'vendor_kyc', 'custom'"),
-  sections: z.array(StageFormSectionSchema).min(1).describe("Array of form sections containing dynamic interactive fields"),
+    .describe(
+      "Optional ID or index (e.g. 'art_1' or '1') of an existing form to update in-place instead of creating a new duplicate",
+    ),
+  title: z
+    .string()
+    .describe(
+      "Form title, e.g. 'MSME Business Loan Application Form' or 'GOVT ITI Registration Form'",
+    ),
+  documentBadge: z
+    .string()
+    .optional()
+    .describe(
+      "Official document code/badge (e.g. 'FORM NO. 1 • PMEGP', 'UP ITI REGISTRATION')",
+    ),
+  description: z
+    .string()
+    .optional()
+    .describe("Subtitle, summary or instructions for the form"),
+  submitLabel: z
+    .string()
+    .optional()
+    .default("Approve & Submit")
+    .describe("Label on the primary action button"),
+  formType: z
+    .string()
+    .optional()
+    .describe(
+      "Form category or domain, e.g. 'loan_application', 'subsidy_registration', 'vendor_kyc', 'custom'",
+    ),
+  theme: StageFormThemeSchema.optional().describe(
+    "Optional AI-driven styling theme",
+  ),
+  sections: z
+    .array(StageFormSectionSchema)
+    .min(1)
+    .describe("Array of form sections containing dynamic interactive fields"),
+});
+
+export const StageDocumentThemeSchema = z.object({
+  pageBg: z
+    .string()
+    .optional()
+    .describe("Background color (e.g. '#FFFFFF', '#FAF8F5')"),
+  primaryColor: z
+    .string()
+    .optional()
+    .describe(
+      "Primary highlight/accent color (e.g. '#1E3A8A', '#15803D', '#C2410C')",
+    ),
+  textColor: z.string().optional().describe("Text color (e.g. '#0F172A')"),
+  borderColor: z
+    .string()
+    .optional()
+    .describe("Border tint for tables/boxes (e.g. '#E2E8F0')"),
+});
+
+export const StageDocumentSchema = z.object({
+  targetArtifactId: z
+    .string()
+    .optional()
+    .describe("Optional ID of an existing document to update in place"),
+  title: z
+    .string()
+    .describe(
+      "Title of the document (e.g. 'Wholesale Fertilizer Price Catalog', 'Mudra vs PMEGP Comparison Matrix', 'Official Trade Agreement')",
+    ),
+  docType: z
+    .enum([
+      "catalog",
+      "table",
+      "report",
+      "guide",
+      "agreement",
+      "invoice",
+      "other",
+    ])
+    .default("catalog")
+    .describe("Document category"),
+  summary: z
+    .string()
+    .optional()
+    .describe("Brief 1-sentence summary of the document"),
+  theme: StageDocumentThemeSchema.optional().describe(
+    "AI-driven visual styling theme matching domain",
+  ),
+  content: z
+    .string()
+    .describe(
+      "Full markdown text containing GitHub-Flavored Markdown tables, headings, bold prices, badges, and terms",
+    ),
 });
 
 const GetArtifactsSchema = z.object({
@@ -362,6 +584,7 @@ const GetArtifactsSchema = z.object({
     .enum([
       "all",
       "form",
+      "document",
       "chart",
       "budget",
       "expense",
@@ -371,7 +594,9 @@ const GetArtifactsSchema = z.object({
     ])
     .optional()
     .default("all")
-    .describe("Filter by artifact type ('form', 'chart', 'budget', 'expense', 'transaction', 'saving_goal', 'debt', or 'all')"),
+    .describe(
+      "Filter by artifact type ('form', 'document', 'chart', 'budget', 'expense', 'transaction', 'saving_goal', 'debt', or 'all')",
+    ),
   limit: z
     .number()
     .optional()
@@ -389,6 +614,21 @@ const StageDeleteRecordSchema = z.object({
     .describe("Human-readable title/name of the record for confirmation"),
 });
 
+const GetRecentFilesSchema = z.object({
+  fileId: z
+    .string()
+    .optional()
+    .describe(
+      "Optional fileId or filename of the uploaded file to read/inspect (pass 'latest' to inspect the most recently uploaded file). If omitted, returns the latest 5 uploaded files in this conversation.",
+    ),
+  query: z
+    .string()
+    .optional()
+    .describe(
+      "Optional specific question or extraction goal for this file (e.g. 'Extract total marks', 'Check GST breakdown', 'Summarize key points'). If omitted, extracts the complete content.",
+    ),
+});
+
 /**
  * Agent Tools Registry
  * Fully contextualized with authenticated user session & PostgreSQL Prisma database.
@@ -398,6 +638,234 @@ export function getAgentTools(ctx?: ToolContext) {
   const conversationId = ctx?.conversationId;
 
   return {
+    // ─────────────────────────────────────────────────────────────
+    // 0. ATTACHMENT / RECENT FILES RETRIEVAL & INSPECTION
+    // ─────────────────────────────────────────────────────────────
+    getRecentFiles: tool({
+      description:
+        "Accesses previous files and attachments uploaded by the user in earlier conversation turns. Call without parameters to see the list of available files (returns the latest 5 files). Call with 'fileId' (or 'latest') to read or analyze a specific document/image. Note: Any files attached in the CURRENT user message are ALREADY provided directly inline in the prompt, so you DO NOT need to call this tool for currently attached files.",
+      inputSchema: GetRecentFilesSchema,
+      execute: async ({ fileId, query }) => {
+        if (!conversationId) {
+          return {
+            success: false,
+            message: "No active conversation context.",
+            files: [],
+          };
+        }
+
+        try {
+          const messages = await prisma.conversationMessage.findMany({
+            where: { conversationId },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: { id: true, role: true, files: true, createdAt: true },
+          });
+
+          // Extract all attachments from messages
+          const allFiles: Array<{
+            id: string;
+            uploadedName: string;
+            savedName?: string;
+            url: string;
+            type: string;
+            mimeType: string;
+            size?: number;
+            messageId: string;
+          }> = [];
+
+          for (const msg of messages) {
+            if (Array.isArray(msg.files)) {
+              for (let idx = 0; idx < msg.files.length; idx++) {
+                const raw = msg.files[idx];
+                if (typeof raw === "string") {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === "object" && parsed.url) {
+                      allFiles.push({
+                        id: parsed.id || `att_${msg.id}_${idx}`,
+                        uploadedName:
+                          parsed.uploadedName || parsed.name || "Attached File",
+                        savedName: parsed.savedName,
+                        url: parsed.url,
+                        type:
+                          parsed.type ||
+                          (parsed.mimeType?.startsWith("image/")
+                            ? "image"
+                            : "file"),
+                        mimeType: parsed.mimeType || "application/octet-stream",
+                        size: parsed.size,
+                        messageId: msg.id,
+                      });
+                      continue;
+                    }
+                  } catch {
+                    // plain url string
+                  }
+                  if (raw.trim().startsWith("http")) {
+                    const isImg = /\.(jpeg|jpg|png|gif|webp|svg)/i.test(raw);
+                    allFiles.push({
+                      id: `att_${msg.id}_${idx}`,
+                      uploadedName: raw.split("/").pop() || "Attached File",
+                      url: raw.trim(),
+                      type: isImg ? "image" : "file",
+                      mimeType: isImg ? "image/jpeg" : "application/pdf",
+                      messageId: msg.id,
+                    });
+                  }
+                }
+              }
+            }
+          }
+
+          const latest5Files = allFiles.slice(0, 5);
+
+          // Case 1: If no specific file requested, return list of latest 5 files
+          if (!fileId) {
+            return {
+              success: true,
+              totalCount: latest5Files.length,
+              files: latest5Files.map((f) => ({
+                fileId: f.id,
+                uploadedName: f.uploadedName,
+                type: f.type,
+                mimeType: f.mimeType,
+                size: f.size,
+              })),
+              hint:
+                latest5Files.length > 0
+                  ? `Found ${latest5Files.length} recent file(s). Call getRecentFiles({ fileId: "${latest5Files[0].id}" }) or getRecentFiles({ fileId: "latest" }) to inspect.`
+                  : "No files uploaded in this conversation yet.",
+            };
+          }
+
+          // Case 2: Inspect specific file (supports "latest", fileId, or uploadedName)
+          const isLatest = fileId.toLowerCase() === "latest";
+          const target = isLatest
+            ? allFiles[0]
+            : allFiles.find(
+                (f) =>
+                  f.id === fileId ||
+                  f.uploadedName.toLowerCase() === fileId.toLowerCase() ||
+                  f.uploadedName.toLowerCase().includes(fileId.toLowerCase()),
+              );
+
+          if (!target) {
+            return {
+              success: false,
+              message: `File "${fileId}" not found among recent conversation attachments.`,
+              availableFiles: latest5Files.map((f) => ({
+                fileId: f.id,
+                uploadedName: f.uploadedName,
+              })),
+            };
+          }
+
+          // Read/Analyze target file
+          const promptQuery =
+            query ||
+            `Read, extract, and thoroughly describe the contents of this ${target.uploadedName}. Extract all key figures, tables, dates, and particulars.`;
+
+          // If text or csv, fetch and read text
+          if (
+            target.mimeType.includes("text") ||
+            target.mimeType.includes("csv") ||
+            target.uploadedName.endsWith(".txt") ||
+            target.uploadedName.endsWith(".csv")
+          ) {
+            try {
+              const res = await fetch(target.url);
+              const textContent = await res.text();
+              return {
+                success: true,
+                file: {
+                  fileId: target.id,
+                  uploadedName: target.uploadedName,
+                  type: target.type,
+                  mimeType: target.mimeType,
+                },
+                content: textContent.slice(0, 15000),
+                summary: `Read text file "${target.uploadedName}" (${textContent.length} characters).`,
+              };
+            } catch (err: any) {
+              return {
+                success: false,
+                message: `Failed to fetch text file content: ${err?.message}`,
+              };
+            }
+          }
+
+          // If PDF or Image: Use Vertex AI Gemini 3.7 Flash native multimodal inspection
+          try {
+            const { generateText } = await import("ai");
+            const { getLanguageModel } = await import("./ai-provider");
+            const { DASHBOARD_CHAT_CONFIG } = await import("./chat-config");
+
+            const visionModel = getLanguageModel(
+              DASHBOARD_CHAT_CONFIG.provider,
+              DASHBOARD_CHAT_CONFIG.model,
+            );
+
+            const fileRes = await fetch(target.url);
+            const arrayBuffer = await fileRes.arrayBuffer();
+            const mType =
+              target.mimeType ||
+              (target.type === "image" ? "image/jpeg" : "application/pdf");
+
+            const filePart = {
+              type: "file",
+              data: Buffer.from(arrayBuffer),
+              mediaType: mType,
+            };
+
+            const inspectionResult = await generateText({
+              model: visionModel,
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "text",
+                      text: `You are an accurate OCR and document analysis engine for VyaparSetu. Analyze the attached document/image.\nUser Query: ${promptQuery}`,
+                    },
+                    filePart as any,
+                  ],
+                },
+              ],
+            });
+
+            return {
+              success: true,
+              file: {
+                fileId: target.id,
+                uploadedName: target.uploadedName,
+                type: target.type,
+                mimeType: target.mimeType,
+              },
+              extractedAnalysis: inspectionResult.text,
+              summary: `Successfully inspected "${target.uploadedName}".`,
+            };
+          } catch (modelErr: any) {
+            console.error(
+              "[getRecentFiles multimodal inspection error]:",
+              modelErr,
+            );
+            return {
+              success: false,
+              message: `Could not analyze file "${target.uploadedName}": ${modelErr?.message}`,
+              fileUrl: target.url,
+            };
+          }
+        } catch (dbErr: any) {
+          console.error("[getRecentFiles db error]:", dbErr);
+          return {
+            success: false,
+            message: `Error retrieving attachments: ${dbErr?.message}`,
+          };
+        }
+      },
+    }),
+
     // ─────────────────────────────────────────────────────────────
     // 0. ARTIFACT RETRIEVAL & INSPECTION (For In-Place Editing)
     // ─────────────────────────────────────────────────────────────
@@ -441,24 +909,34 @@ export function getAgentTools(ctx?: ToolContext) {
             for (let i = msg.toolCalls.length - 1; i >= 0; i--) {
               const tc: any = msg.toolCalls[i];
               const res = tc.result as any;
-              const art = res?.artifact || res?.data || (res?.isArtifact ? res : null);
+              const art =
+                res?.artifact || res?.data || (res?.isArtifact ? res : null);
               const artType = res?.artifactType || art?.artifactType;
 
               if (art && artType) {
-                const normalizedType = artType === "savinggoal" ? "saving_goal" : artType;
+                const normalizedType =
+                  artType === "savinggoal" ? "saving_goal" : artType;
 
                 if (artifactType !== "all" && normalizedType !== artifactType) {
                   continue;
                 }
 
-                const artId = art.artifactId || res.artifactId || tc.args?.targetArtifactId || `art_${globalIndex}`;
+                const artId =
+                  art.artifactId ||
+                  res.artifactId ||
+                  tc.args?.targetArtifactId ||
+                  `art_${globalIndex}`;
 
                 extractedArtifacts.push({
                   artifactId: artId,
                   index: globalIndex,
                   messageId: msg.id,
                   artifactType: normalizedType,
-                  title: res.title || art.title || tc.args?.title || `${normalizedType} Draft`,
+                  title:
+                    res.title ||
+                    art.title ||
+                    tc.args?.title ||
+                    `${normalizedType} Draft`,
                   summary: res.summary || art.summary,
                   createdAt: msg.createdAt.toISOString(),
                   data: art.sections || art.data || art,
@@ -493,13 +971,24 @@ export function getAgentTools(ctx?: ToolContext) {
       description:
         "Fetches live, real-time wholesale APMC market prices, daily arrivals, and modal rates from data.gov.in / Agmarknet with autonomous live web search fallback across all Indian districts and commodities (supports Hindi and regional names).",
       inputSchema: MandiRatesSchema,
-      execute: async ({ commodity: rawCommodity, state: rawState, district: rawDistrict, market: rawMarket }) => {
+      execute: async ({
+        commodity: rawCommodity,
+        state: rawState,
+        district: rawDistrict,
+        market: rawMarket,
+      }) => {
         try {
-          const normLocation = normalizeDistrictAndState(rawDistrict, rawState, rawMarket);
+          const normLocation = normalizeDistrictAndState(
+            rawDistrict,
+            rawState,
+            rawMarket,
+          );
           const normalizedState = normLocation.state;
           const normalizedDistrict = normLocation.district;
           const normalizedMarket = normLocation.market;
-          const normalizedCommodity = rawCommodity ? normalizeCommodity(rawCommodity) : (normLocation.primaryCrops?.[0] || "Wheat");
+          const normalizedCommodity = rawCommodity
+            ? normalizeCommodity(rawCommodity)
+            : normLocation.primaryCrops?.[0] || "Wheat";
 
           const apiKey =
             process.env.DATA_GOV_IN_API_KEY ||
@@ -531,7 +1020,10 @@ export function getAgentTools(ctx?: ToolContext) {
               records = data?.records || [];
             }
           } catch (apiErr: any) {
-            console.warn("[getMandiRates] data.gov.in slow or unreachable, triggering dynamic live search:", apiErr?.message);
+            console.warn(
+              "[getMandiRates] data.gov.in slow or unreachable, triggering dynamic live search:",
+              apiErr?.message,
+            );
           }
 
           // If official API returned records, format and return them
@@ -542,7 +1034,8 @@ export function getAgentTools(ctx?: ToolContext) {
               market: r.market || normalizedMarket || "APMC Mandi",
               commodity: r.commodity || normalizedCommodity,
               variety: r.variety || "Standard",
-              arrivalDate: r.arrival_date || new Date().toLocaleDateString("en-IN"),
+              arrivalDate:
+                r.arrival_date || new Date().toLocaleDateString("en-IN"),
               modalPricePerQuintal: `₹${r.modal_price}`,
               priceRange: `₹${r.min_price} - ₹${r.max_price} / Quintal`,
             }));
@@ -568,7 +1061,9 @@ export function getAgentTools(ctx?: ToolContext) {
         } catch (error: any) {
           console.error("[getMandiRates error]:", error?.message);
           return await searchLiveMandiWebRates({
-            commodity: rawCommodity ? normalizeCommodity(rawCommodity) : "Wheat",
+            commodity: rawCommodity
+              ? normalizeCommodity(rawCommodity)
+              : "Wheat",
             district: rawDistrict,
             state: rawState,
             market: rawMarket,
@@ -578,45 +1073,73 @@ export function getAgentTools(ctx?: ToolContext) {
     }),
 
     // ─────────────────────────────────────────────────────────────
-    // 2. INTELLIGENT WEB SEARCH TOOL (Exa Search API + Fallback)
+    // 2. INTELLIGENT HYBRID WEB SEARCH TOOL (Exa Neural + SerpApi Google Fallback)
     // ─────────────────────────────────────────────────────────────
     webSearch: tool({
       description:
-        "Searches the live web for trade regulations, market policies, RBI circulars, commodity updates, and tax guidelines.",
+        "Searches the live web for official bank loan application form layouts, MSME PDF fields, mandatory statutory disclosures, government credit schemes, trade circulars, and market regulations. Call this first whenever generating a form for a bank or scheme not yet researched in this conversation.",
       inputSchema: WebSearchSchema,
       execute: async ({ query, numResults = 5 }) => {
         try {
+          // Priority 1: Exa Neural Deep Search (Best for full application form text & tables)
           const exaKey = process.env.EXA_API_KEY;
           if (exaKey) {
-            const res = await fetch("https://api.exa.ai/search", {
-              method: "POST",
-              headers: {
-                "x-api-key": exaKey,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                query,
-                numResults,
-                useAutoprompt: true,
-              }),
-              signal: AbortSignal.timeout(7000),
-            });
+            try {
+              const res = await fetch("https://api.exa.ai/search", {
+                method: "POST",
+                headers: {
+                  "x-api-key": exaKey,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  query,
+                  numResults,
+                  useAutoprompt: true,
+                  contents: {
+                    text: { maxCharacters: 1500 },
+                    highlights: true,
+                  },
+                }),
+                signal: AbortSignal.timeout(7000),
+              });
 
-            if (res.ok) {
-              const exaData = await res.json();
-              const results = (exaData.results || []).map((r: any) => ({
-                title: r.title || "Untitled",
-                url: r.url,
-                snippet: r.text || r.snippet || `Source from ${r.url}`,
-              }));
+              if (res.ok) {
+                const exaData = await res.json();
+                const results = (exaData.results || []).map((r: any) => ({
+                  title: r.title || "Untitled",
+                  url: r.url,
+                  snippet:
+                    Array.isArray(r.highlights) && r.highlights.length > 0
+                      ? r.highlights.join(" ... ")
+                      : r.text || r.snippet || `Source from ${r.url}`,
+                }));
 
-              return {
-                success: true,
-                provider: "Exa Neural Search",
-                query,
-                results,
-              };
+                if (results.length > 0) {
+                  return {
+                    success: true,
+                    provider: "Exa Neural Search (Deep Document Grounding)",
+                    query,
+                    results,
+                  };
+                }
+              }
+            } catch (exaErr: any) {
+              console.warn(
+                "[webSearch] Exa neural search error, failing over to SerpApi:",
+                exaErr?.message,
+              );
             }
+          }
+
+          // Priority 2: SerpApi Google Web Search (Google SERP fallback)
+          const serpResults = await searchGoogleWeb(query, numResults);
+          if (serpResults && serpResults.length > 0) {
+            return {
+              success: true,
+              provider: "SerpApi Google Search",
+              query,
+              results: serpResults,
+            };
           }
 
           // Fallback search result summary
@@ -646,7 +1169,15 @@ export function getAgentTools(ctx?: ToolContext) {
       description:
         "Discovers, deduplicates, and analyzes real nearby competitor shops, rival outlets, or businesses for any commercial category using live web grounding, hyper-local landmarks, and Udyam MSME saturation data.",
       inputSchema: SearchCompetitorsSchema,
-      execute: async ({ query, category, radiusKm, location, lat, lon, bypassCache }) => {
+      execute: async ({
+        query,
+        category,
+        radiusKm,
+        location,
+        lat,
+        lon,
+        bypassCache,
+      }) => {
         return await searchCompetitorsIntelligence({
           category: category || query,
           radiusKm,
@@ -678,7 +1209,14 @@ export function getAgentTools(ctx?: ToolContext) {
       description:
         "Researches and predicts the Top 4 high-ROI, low-saturation business opportunities in any Indian district for a given budget using autonomous live web search, APMC Mandi trends, and Udyam MSME subsidies (PMEGP 35%, PMFME, Mudra).",
       inputSchema: PredictDistrictBusinessesSchema,
-      execute: async ({ district, state, budget, category, riskLevel, bypassCache }) => {
+      execute: async ({
+        district,
+        state,
+        budget,
+        category,
+        riskLevel,
+        bypassCache,
+      }) => {
         return await predictDistrictBusinessesIntelligence({
           district,
           state,
@@ -1141,7 +1679,13 @@ export function getAgentTools(ctx?: ToolContext) {
       description:
         "Prepares or updates an interactive draft budget plan with category allocations for user review. Pass 'targetArtifactId' to edit an existing budget.",
       inputSchema: StageBudgetSchema,
-      execute: async ({ targetArtifactId, name, period, totalAmount, items }) => {
+      execute: async ({
+        targetArtifactId,
+        name,
+        period,
+        totalAmount,
+        items,
+      }) => {
         try {
           const now = new Date();
           const startDate = now.toISOString().split("T")[0];
@@ -1231,7 +1775,13 @@ export function getAgentTools(ctx?: ToolContext) {
       description:
         "Prepares or updates an interactive draft master ledger transaction. Pass 'targetArtifactId' to edit an existing transaction.",
       inputSchema: StageTransactionSchema,
-      execute: async ({ targetArtifactId, type, amount, category, description }) => {
+      execute: async ({
+        targetArtifactId,
+        type,
+        amount,
+        category,
+        description,
+      }) => {
         try {
           const date = new Date().toISOString().split("T")[0];
           const artId = targetArtifactId || `art_tx_${Date.now()}`;
@@ -1342,14 +1892,28 @@ export function getAgentTools(ctx?: ToolContext) {
 
     stageForm: tool({
       description:
-        "Generates or updates a dynamic, interactive multi-field form artifact (e.g. Loan Applications, MSME Subsidies, Vendor KYC, Trade Inquiries, Checklists, Feedback) for the user to review, edit, fill, and approve. When editing an existing form on user demand, pass 'targetArtifactId' so the original form updates in place.",
+        "Generates or updates a dynamic, interactive multi-field form artifact (e.g. Loan Applications, MSME Subsidies, Vendor KYC, Trade Inquiries, Checklists, Feedback). For bank loans or government schemes not yet researched in this conversation history, call webSearch first to discover authentic fields before staging.",
       inputSchema: StageFormSchema,
-      execute: async ({ targetArtifactId, title, description, submitLabel, formType, sections }) => {
+      execute: async ({
+        targetArtifactId,
+        title,
+        documentBadge,
+        theme,
+        description,
+        submitLabel,
+        formType,
+        sections,
+      }) => {
         try {
-          const totalFields = sections.reduce(
-            (sum, sec) => sum + sec.fields.length,
-            0,
-          );
+          const totalFields = sections.reduce((sum, sec) => {
+            let count = (sec.fields || []).length;
+            if (sec.rows) {
+              for (const r of sec.rows) {
+                count += (r.fields || []).length;
+              }
+            }
+            return sum + count;
+          }, 0);
           const artId = targetArtifactId || `art_form_${Date.now()}`;
 
           return {
@@ -1368,6 +1932,8 @@ export function getAgentTools(ctx?: ToolContext) {
               targetArtifactId: targetArtifactId || undefined,
               isUpdated: Boolean(targetArtifactId),
               title,
+              documentBadge: documentBadge || undefined,
+              theme: theme || undefined,
               description: description || "",
               submitLabel: submitLabel || "Approve & Submit",
               formType: formType || "general",
@@ -1376,6 +1942,46 @@ export function getAgentTools(ctx?: ToolContext) {
           };
         } catch (error: any) {
           return { success: false, error: "Failed to stage dynamic form." };
+        }
+      },
+    }),
+
+    stageDocument: tool({
+      description:
+        "Generates or updates a rich, structured Markdown document artifact modal (e.g. Price Catalogs, APMC Wholesale Rate Sheets, Scheme Comparison Matrices, Official Agreements, Invoices, Checklists, Policies) with formatted GFM tables, bold figures, and domain colors. Use 'targetArtifactId' to update an open document in place.",
+      inputSchema: StageDocumentSchema,
+      execute: async ({
+        targetArtifactId,
+        title,
+        docType,
+        summary,
+        theme,
+        content,
+      }) => {
+        try {
+          const artId = targetArtifactId || `art_doc_${Date.now()}`;
+          return {
+            success: true,
+            isArtifact: true,
+            artifactId: artId,
+            targetArtifactId: targetArtifactId || undefined,
+            isUpdated: Boolean(targetArtifactId),
+            artifactType: "document",
+            title,
+            summary: summary || `${title} (${docType || "document"})`,
+            data: {
+              artifactId: artId,
+              targetArtifactId: targetArtifactId || undefined,
+              isUpdated: Boolean(targetArtifactId),
+              title,
+              docType: docType || "catalog",
+              summary: summary || "",
+              theme: theme || {},
+              content,
+            },
+          };
+        } catch (error: any) {
+          return { success: false, error: "Failed to stage document." };
         }
       },
     }),
@@ -1411,11 +2017,25 @@ export function getAgentTools(ctx?: ToolContext) {
 
 export interface ToolMeta {
   name: string;
-  icon: "sprout" | "landmark" | "globe" | "terminal" | "search";
+  icon:
+    | "sprout"
+    | "landmark"
+    | "globe"
+    | "terminal"
+    | "search"
+    | "document"
+    | "image"
+    | "file";
   formatSummary: (args: any, result?: any) => string;
 }
 
 export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
+  inspectAttachment: {
+    name: "inspectAttachment",
+    icon: "document",
+    formatSummary: (args) =>
+      `Read and analyzed "${args?.fileName || "attachment"}"`,
+  },
   getArtifacts: {
     name: "getArtifacts",
     icon: "search",
@@ -1429,6 +2049,14 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
       args?.targetArtifactId
         ? `Updated dynamic form "${args?.title || "Form"}"`
         : `Prepared dynamic form "${args?.title || "Form"}"`,
+  },
+  stageDocument: {
+    name: "stageDocument",
+    icon: "landmark",
+    formatSummary: (args) =>
+      args?.targetArtifactId
+        ? `Updated document "${args?.title || "Document"}"`
+        : `Generated document "${args?.title || "Document"}"`,
   },
   getMandiRates: {
     name: "getMandiRates",
@@ -1553,5 +2181,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
       const src = result?.fromCache ? " (Cached)" : "";
       return `Researched top 4 business opportunities in ${result?.district || args?.district || "district"}${src}`;
     },
+  },
+  getRecentFiles: {
+    name: "getRecentFiles",
+    icon: "document",
+    formatSummary: (args, result) =>
+      args?.fileId
+        ? `Inspected uploaded document "${result?.file?.uploadedName || args.fileId}"`
+        : `Checked recent conversation attachments (${result?.totalCount || 0} files found)`,
   },
 };

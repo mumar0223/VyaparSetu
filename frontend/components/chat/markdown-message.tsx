@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useId } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Workflow, Code as CodeIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MarkdownMessageProps {
@@ -27,37 +27,85 @@ export function MarkdownMessage({
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          // Code Block Component with Copy Action
-          code({ node, inline, className, children, ...props }: any) {
-            const match = /language-(\w+)/.exec(className || "");
-            const language = match ? match[1] : "";
-            const rawCode = String(children).replace(/\n$/, "");
+          // Fenced Code Block Handler (pre element wraps fenced blocks in react-markdown v10)
+          pre({ children, ...props }: any) {
+            // Extract the child code element's props if available
+            const child = React.isValidElement(children) ? children : null;
+            const childProps = (child ? child.props : null) as any;
+            const className = childProps?.className || "";
+            const match = /language-(\w+)/.exec(className);
+            const language = match ? match[1].toLowerCase() : "";
+            const rawCode = childProps?.children
+              ? String(childProps.children).replace(/\n$/, "")
+              : typeof children === "string"
+              ? children.replace(/\n$/, "")
+              : "";
 
-            if (!inline && language) {
+            // Intelligent classifier: determines if it's Mermaid, Process Flow, Code, or Plain Text
+            const block = detectBlockClassification(language, rawCode);
+
+            // 1. Render Mermaid Flowchart / Sequence / State Diagrams natively
+            if (block.type === "mermaid") {
+              return <MermaidDiagram chart={rawCode} />;
+            }
+
+            // 2. Render Process Flow / Step Diagrams (e.g. [Step 1] -> [Step 2])
+            if (block.type === "process-flow") {
               return (
                 <div className="relative my-3 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-zinc-900 overflow-hidden not-prose shadow-2xs">
-                  <div className="flex items-center justify-between px-3.5 py-1.5 bg-cream dark:bg-zinc-950 border-b border-sage/20 dark:border-border text-xs text-muted-foreground font-mono">
-                    <span>{language}</span>
+                  <div className="flex items-center justify-between px-3.5 py-2 bg-cream dark:bg-zinc-950 border-b border-sage/20 dark:border-border text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5 font-semibold text-forest dark:text-mint">
+                      <Workflow className="size-3.5" />
+                      <span>{block.label}</span>
+                    </div>
                     <CodeCopyButton code={rawCode} />
                   </div>
-                  <pre className="p-4 overflow-x-auto text-[13.5px] font-mono text-foreground leading-relaxed">
-                    <code>{children}</code>
+                  <pre className="p-4 overflow-x-auto text-[13px] sm:text-[13.5px] font-mono leading-relaxed text-foreground select-text whitespace-pre">
+                    <code>{rawCode}</code>
                   </pre>
                 </div>
               );
             }
 
-            if (!inline) {
+            // 3. Render Real Code with detected/specified Language Header
+            if (block.type === "code" && block.label) {
               return (
-                <pre className="my-3 p-3.5 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-zinc-900 overflow-x-auto text-[13.5px] font-mono text-foreground not-prose">
-                  <code>{children}</code>
-                </pre>
+                <div className="relative my-3 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-zinc-900 overflow-hidden not-prose shadow-2xs">
+                  <div className="flex items-center justify-between px-3.5 py-1.5 bg-cream dark:bg-zinc-950 border-b border-sage/20 dark:border-border text-xs text-muted-foreground font-mono">
+                    <div className="flex items-center gap-1.5 font-semibold text-forest dark:text-mint">
+                      <CodeIcon className="size-3.5" />
+                      <span>{block.label}</span>
+                    </div>
+                    <CodeCopyButton code={rawCode} />
+                  </div>
+                  <pre className="p-4 overflow-x-auto text-[13.5px] font-mono text-foreground leading-relaxed select-text">
+                    <code className={className}>{rawCode}</code>
+                  </pre>
+                </div>
               );
             }
 
+            // 4. Render Plain Text / Non-Code Blocks (NO "code" text label at all)
+            return (
+              <div className="relative my-3 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-zinc-900 overflow-hidden not-prose shadow-2xs">
+                <div className="flex items-center justify-end px-3.5 py-1.5 bg-cream/60 dark:bg-zinc-950/60 border-b border-sage/20 dark:border-border text-xs text-muted-foreground">
+                  <CodeCopyButton code={rawCode} />
+                </div>
+                <pre className="p-4 overflow-x-auto text-[13.5px] font-mono text-foreground leading-relaxed select-text">
+                  <code>{rawCode || children}</code>
+                </pre>
+              </div>
+            );
+          },
+
+          // Inline Code Component (Pure inline element; never returns a block or <pre>)
+          code({ className, children, node, ...props }: any) {
             return (
               <code
-                className="bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint px-1.5 py-0.5 rounded text-xs font-mono border border-mint/20"
+                className={cn(
+                  "bg-mint-pale dark:bg-mint/10 text-forest dark:text-mint px-1.5 py-0.5 rounded text-xs font-mono border border-mint/20 font-medium select-text",
+                  className
+                )}
                 {...props}
               >
                 {children}
@@ -160,10 +208,37 @@ export function MarkdownMessage({
             return <li className="leading-relaxed">{children}</li>;
           },
 
-          // Paragraphs & Blockquotes
-          p({ children }) {
-            return <p className="leading-relaxed my-2 text-foreground">{children}</p>;
+          // Paragraphs: guarded against any nested block children to prevent hydration errors
+          p({ children, ...props }: any) {
+            const hasBlockChild = React.Children.toArray(children).some((child) => {
+              if (!React.isValidElement(child)) return false;
+              const type = child.type;
+              return (
+                type === "div" ||
+                type === "pre" ||
+                type === "table" ||
+                type === "ul" ||
+                type === "ol" ||
+                type === "blockquote" ||
+                type === "hr"
+              );
+            });
+
+            if (hasBlockChild) {
+              return (
+                <div className="leading-relaxed my-2 text-foreground" {...props}>
+                  {children}
+                </div>
+              );
+            }
+
+            return (
+              <p className="leading-relaxed my-2 text-foreground" {...props}>
+                {children}
+              </p>
+            );
           },
+
           blockquote({ children }) {
             return (
               <blockquote className="border-l-2 border-mint pl-3.5 italic text-muted-foreground my-3">
@@ -171,6 +246,11 @@ export function MarkdownMessage({
               </blockquote>
             );
           },
+
+          hr() {
+            return <hr className="my-4 border-sage/30 dark:border-border" />;
+          },
+
           a({ href, children }) {
             return (
               <a
@@ -183,10 +263,144 @@ export function MarkdownMessage({
               </a>
             );
           },
+
+          img({ src, alt }: any) {
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt={alt || "Image"}
+                className="my-3 rounded-xl max-w-full h-auto border border-sage/30 dark:border-border shadow-2xs"
+                loading="lazy"
+              />
+            );
+          },
         }}
       >
         {content}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+/**
+ * Native Mermaid Diagram Client Component
+ * Supports dynamic rendering with light/dark theme synchronization,
+ * source code toggle, copy button, and graceful error fallback.
+ */
+function MermaidDiagram({ chart }: { chart: string }) {
+  const [svgHtml, setSvgHtml] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showCode, setShowCode] = useState(false);
+  const rawChart = chart.trim();
+  const uid = useId().replace(/:/g, "_");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function renderMermaid() {
+      try {
+        const mermaid = (await import("mermaid")).default;
+        const isDark = document.documentElement.classList.contains("dark");
+
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: isDark ? "dark" : "default",
+          securityLevel: "loose",
+          fontFamily: "var(--font-sans), system-ui, -apple-system, sans-serif",
+          themeVariables: isDark
+            ? {
+                darkMode: true,
+                background: "#18181b",
+                primaryColor: "#059669",
+                primaryTextColor: "#f4f4f5",
+                primaryBorderColor: "#10b981",
+                lineColor: "#71717a",
+                secondaryColor: "#1e293b",
+                tertiaryColor: "#27272a",
+              }
+            : {
+                primaryColor: "#064e3b",
+                primaryTextColor: "#064e3b",
+                primaryBorderColor: "#059669",
+                lineColor: "#94a3b8",
+                secondaryColor: "#f0fdf4",
+                tertiaryColor: "#f4f4f5",
+              },
+        });
+
+        // Ensure unique element ID for each render pass
+        const renderId = `mermaid_${uid}_${Math.random().toString(36).substring(2, 7)}`;
+        const { svg } = await mermaid.render(renderId, rawChart);
+
+        if (isMounted) {
+          setSvgHtml(svg);
+          setError(null);
+        }
+      } catch (err: any) {
+        console.warn("Mermaid render error:", err);
+        if (isMounted) {
+          setError(err?.message || "Diagram syntax could not be rendered");
+        }
+      }
+    }
+
+    renderMermaid();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [rawChart, uid]);
+
+  return (
+    <div className="relative my-4 rounded-xl border border-sage/30 dark:border-border bg-white dark:bg-zinc-900 overflow-hidden not-prose shadow-2xs">
+      <div className="flex items-center justify-between px-3.5 py-2 bg-cream dark:bg-zinc-950 border-b border-sage/20 dark:border-border text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 font-medium text-forest dark:text-mint">
+          <Workflow className="size-3.5" />
+          <span>Workflow Diagram</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowCode(!showCode)}
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            title="Toggle source code"
+          >
+            <CodeIcon className="size-3" />
+            <span>{showCode ? "Hide Code" : "Source"}</span>
+          </button>
+          <CodeCopyButton code={rawChart} />
+        </div>
+      </div>
+
+      {showCode && (
+        <pre className="p-3 bg-muted/40 border-b border-sage/20 dark:border-border overflow-x-auto text-[12px] font-mono text-foreground">
+          <code>{rawChart}</code>
+        </pre>
+      )}
+
+      <div className="p-4 overflow-x-auto flex justify-center items-center min-h-[100px] bg-white/50 dark:bg-zinc-900/50">
+        {error ? (
+          <div className="text-xs text-muted-foreground py-2 text-center w-full">
+            <p className="text-amber-600 dark:text-amber-400 font-medium mb-1">
+              Diagram preview unavailable (Syntax Error)
+            </p>
+            <pre className="text-[11.5px] font-mono bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20 text-left overflow-x-auto">
+              <code>{rawChart}</code>
+            </pre>
+          </div>
+        ) : svgHtml ? (
+          <div
+            className="w-full flex justify-center [&_svg]:max-w-full [&_svg]:h-auto"
+            dangerouslySetInnerHTML={{ __html: svgHtml }}
+          />
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+            <Loader2 className="size-4 animate-spin text-mint" />
+            <span>Rendering diagram...</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -224,3 +438,152 @@ function CodeCopyButton({ code }: { code: string }) {
     </button>
   );
 }
+
+interface BlockClassification {
+  type: "mermaid" | "process-flow" | "code" | "text";
+  label: string | null;
+}
+
+/**
+ * Intelligent classifier for fenced blocks.
+ * Distinguishes between:
+ * 1. Native Mermaid diagrams
+ * 2. ASCII / Unicode process flows & workflow step diagrams
+ * 3. Real code (specified or auto-detected by syntax patterns)
+ * 4. Plain text / data tables (which show NO code label at all)
+ */
+function detectBlockClassification(language: string, rawCode: string): BlockClassification {
+  const lang = (language || "").toLowerCase().trim();
+  const code = rawCode.trim();
+
+  // 1. Explicit Mermaid diagram
+  if (lang === "mermaid") {
+    return { type: "mermaid", label: "Workflow Diagram" };
+  }
+
+  // 2. Known programming languages
+  const knownLanguages: Record<string, string> = {
+    javascript: "JavaScript",
+    js: "JavaScript",
+    typescript: "TypeScript",
+    ts: "TypeScript",
+    tsx: "TypeScript (React)",
+    jsx: "JavaScript (React)",
+    python: "Python",
+    py: "Python",
+    bash: "Terminal",
+    sh: "Terminal",
+    shell: "Terminal",
+    zsh: "Terminal",
+    json: "JSON",
+    sql: "SQL",
+    html: "HTML",
+    css: "CSS",
+    scss: "SCSS",
+    yaml: "YAML",
+    yml: "YAML",
+    rust: "Rust",
+    rs: "Rust",
+    go: "Go",
+    golang: "Go",
+    java: "Java",
+    c: "C",
+    cpp: "C++",
+    csharp: "C#",
+    cs: "C#",
+    php: "PHP",
+    dockerfile: "Docker",
+    docker: "Docker",
+    graphql: "GraphQL",
+    xml: "XML",
+    markdown: "Markdown",
+    md: "Markdown",
+  };
+
+  if (lang && knownLanguages[lang]) {
+    return { type: "code", label: knownLanguages[lang] };
+  }
+
+  // 3. Process Flow / ASCII Diagram / Step sequences
+  // Matches arrows: ->, -->, ==>, =>, ➔, ➜, →, ►, ▶, <-, <--
+  // and step boxes: [ Step 1: ... ] or tree connectors: ├──, └──, │
+  const hasArrows = /(?:->|-->|==>|=>|➔|➜|→|►|▶|<-|<--|←)/.test(code);
+  const hasStepBoxes = /\[\s*(?:Step|\d+|Phase|[A-Za-z0-9\s]+?)\s*\]/i.test(code);
+  const hasTreeChars = /[├└│┌┐┘┴┬┼]/.test(code) || /(?:\+--|\|--|\+-\+-)/.test(code);
+  const hasNumberedSteps = /(?:Step\s*\d+:|Phase\s*\d+:)/i.test(code);
+
+  if ((hasArrows && (hasStepBoxes || hasNumberedSteps)) || hasTreeChars) {
+    return { type: "process-flow", label: "Process Flow" };
+  }
+
+  // 4. Code heuristic detection if language tag was omitted:
+  // JSON
+  if (
+    (code.startsWith("{") && code.endsWith("}")) ||
+    (code.startsWith("[") && code.endsWith("]"))
+  ) {
+    try {
+      JSON.parse(code);
+      return { type: "code", label: "JSON" };
+    } catch (_) {}
+  }
+
+  // SQL
+  if (
+    /\b(SELECT\s+[\s\S]+?\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE)\b/i.test(
+      code
+    )
+  ) {
+    return { type: "code", label: "SQL" };
+  }
+
+  // Shell / Terminal
+  if (
+    /^(?:npm|npx|pnpm|yarn|git|docker|curl|pip|sudo|cd|export)\s+[a-zA-Z0-9_-]/m.test(code) ||
+    /^\$\s+[a-zA-Z0-9_-]/m.test(code)
+  ) {
+    return { type: "code", label: "Terminal" };
+  }
+
+  // Python
+  if (
+    /\b(def\s+[a-zA-Z0-9_]+\s*\(|import\s+[a-zA-Z0-9_]+|from\s+[a-zA-Z0-9_]+\s+import|class\s+[a-zA-Z0-9_]+:)\b/.test(
+      code
+    )
+  ) {
+    return { type: "code", label: "Python" };
+  }
+
+  // JavaScript / TypeScript
+  if (
+    /\b(const\s+[a-zA-Z0-9_$]+\s*=|let\s+[a-zA-Z0-9_$]+\s*=|function\s+[a-zA-Z0-9_$]*\s*\(|console\.(?:log|error|warn)\(|export\s+(?:default|const|function))\b/.test(
+      code
+    )
+  ) {
+    return { type: "code", label: "JavaScript" };
+  }
+
+  // HTML / XML
+  if (
+    /^<([a-zA-Z0-9_-]+)(?:\s+[^>]*)?>[\s\S]*<\/\1>$/m.test(code) &&
+    /<\/[a-zA-Z0-9_-]+>/.test(code)
+  ) {
+    return { type: "code", label: "HTML" };
+  }
+
+  // If an explicit language tag was provided that isn't a plain text alias
+  if (
+    lang &&
+    lang !== "text" &&
+    lang !== "plaintext" &&
+    lang !== "none" &&
+    lang !== "code"
+  ) {
+    return { type: "code", label: lang.toUpperCase() };
+  }
+
+  // 5. Default: It is NOT code! Return text with NO label at all.
+  return { type: "text", label: null };
+}
+
+

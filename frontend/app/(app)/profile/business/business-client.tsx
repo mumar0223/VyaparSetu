@@ -56,17 +56,97 @@ const BUSINESS_TYPES = [
   "Hindu Undivided Family (HUF)",
 ];
 
-const POPULAR_CATEGORIES = [
-  "General Store / Kirana",
-  "Agricultural Trading / Mandi Vendor",
-  "Textiles & Garment Retail",
-  "FMCG Wholesale Distribution",
-  "Hardware, Electrical & Building Material",
-  "Food Processing & Dairy Products",
-  "Automobile Spare Parts & Workshop",
-  "Electronics & Mobile Retail",
-  "Catering & Restaurant Services",
-  "Manufacturing & Light Engineering",
+export const INDUSTRY_CATEGORIES_MAP: Record<string, string[]> = {
+  "Agriculture & Allied Agro-Trade": [
+    "Agricultural Trading / Mandi Commission Agent (Adtiya)",
+    "Fertilizer, Pesticides & Seeds Retail",
+    "Grain, Pulses & Oilseeds Trading",
+    "Horticulture, Floriculture & Plant Nursery",
+    "Dairy Farming & Cattle Feed Trading",
+    "Poultry Farming & Commercial Hatchery",
+    "Farm Machinery, Tractor & Implements Retail",
+    "Fisheries & Aquaculture Supplies",
+    "Organic Produce & Hydroponic Farming",
+  ],
+  "Retail & Trade Commerce": [
+    "General Store / Kirana & Provisions",
+    "FMCG Wholesale & Semi-Wholesale Distribution",
+    "Supermarket & Mini-Mart",
+    "Hardware, Electrical & Sanitaryware Retail",
+    "Mobile Phones, Electronics & IT Peripherals",
+    "Footwear & Leather Accessories",
+    "Jewellery, Gold & Silver Ornaments",
+    "Stationery, Books & Printing Press",
+    "Utensils, Crockery & Kitchenware",
+  ],
+  "Food & Beverage Processing": [
+    "Catering & Restaurant Services / Dhaba",
+    "Bakery, Confectionery & Sweet Mart (Mithai)",
+    "Flour Mill (Chakki), Dal Mill & Oil Ghani",
+    "Dairy Products Processing (Milk, Paneer, Ghee)",
+    "Packaged Snacks, Namkeen & Spices Grinding",
+    "Cold Storage & Agro-Perishables Warehousing",
+    "Beverage, Juice & Packaged Drinking Water",
+    "Food Processing & Preservation Unit",
+  ],
+  "Textiles & Apparel": [
+    "Ready-made Garments & Clothing Retail",
+    "Saree, Suiting & Ethnic Wear Showroom",
+    "Handloom, Powerloom & Textile Weaving",
+    "Boutique, Tailoring & Embroidery Studio",
+    "Cotton Ginning & Fabric Wholesaling",
+    "Home Furnishings, Curtains & Bedding",
+    "Hosiery & Knitwear Manufacturing",
+    "Yarn, Thread & Sewing Accessories",
+  ],
+  "Logistics, Freight & Transport": [
+    "Local Tempo & Mini-Truck Goods Carrier",
+    "Inter-State Freight Logistics & Booking Agency",
+    "Cold-Chain Refrigerated Transport",
+    "E-Commerce & Parcel Delivery Fleet",
+    "Warehouse & Godown Storage Services",
+    "Auto Rickshaw / Taxi Passenger Fleet Operator",
+    "Packers & Movers Logistics",
+  ],
+  "Manufacturing & MSME Fabrication": [
+    "Metal Fabrication, Grill & Gate Workshop",
+    "Woodworking, Carpentry & Furniture Unit",
+    "Plastic Products & Moulding Unit",
+    "Cement Blocks, Bricks & Construction Materials",
+    "Automobile Spare Parts & Machine Components",
+    "Light Engineering & CNC Job Work",
+    "Corrugated Box & Packaging Paper Manufacturing",
+    "Chemicals, Paints & Industrial Solvents",
+  ],
+  "Services, Repair & Maintenance": [
+    "Two-Wheeler / Four-Wheeler Garage & Workshop",
+    "AC, Refrigerator & Home Appliance Repair",
+    "Electrical & Plumbing Contracting",
+    "Digital Service Centre (CSC / Jan Seva Kendra)",
+    "Salon, Parlour & Grooming Services",
+    "Event Management, Tent & Sound Rental",
+    "Security Guard & Facility Management Agency",
+  ],
+  "Healthcare & Pharma Distribution": [
+    "Retail Chemist & Pharmacy (Medical Store)",
+    "Wholesale Pharmaceuticals & Medicine Depot",
+    "Ayurvedic, Herbal & Wellness Products",
+    "Diagnostic Lab & Medical Testing Collection",
+    "Surgical & Medical Equipment Supplies",
+    "Dental & Specialty Clinic",
+    "Veterinary Clinic & Livestock Medicine",
+  ],
+};
+
+export const DEFAULT_CATEGORIES = [
+  "General Store / Kirana & Provisions",
+  "Agricultural Trading / Mandi Commission Agent (Adtiya)",
+  "FMCG Wholesale & Semi-Wholesale Distribution",
+  "Catering & Restaurant Services / Dhaba",
+  "Ready-made Garments & Clothing Retail",
+  "Hardware, Electrical & Sanitaryware Retail",
+  "Two-Wheeler / Four-Wheeler Garage & Workshop",
+  "Retail Chemist & Pharmacy (Medical Store)",
 ];
 
 const POPULAR_INDUSTRIES = [
@@ -101,6 +181,20 @@ export function BusinessClient({ initialData }: { initialData: BusinessFormData 
     );
     return stateObj ? stateObj.districts : [];
   }, [form.state]);
+
+  const availableCategories = useMemo(() => {
+    return INDUSTRY_CATEGORIES_MAP[form.industry] || DEFAULT_CATEGORIES;
+  }, [form.industry]);
+
+  const handleIndustryChange = (ind: string) => {
+    const cats = INDUSTRY_CATEGORIES_MAP[ind] || DEFAULT_CATEGORIES;
+    const isStillValid = cats.includes(form.category);
+    setForm((prev) => ({
+      ...prev,
+      industry: ind,
+      category: isStillValid ? prev.category : cats[0],
+    }));
+  };
 
   const filteredStates = useMemo(() => {
     if (!stateSearch.trim()) return ALL_INDIAN_STATES_DATA;
@@ -269,7 +363,7 @@ export function BusinessClient({ initialData }: { initialData: BusinessFormData 
                     {POPULAR_INDUSTRIES.map((ind) => (
                       <DropdownMenuItem
                         key={ind}
-                        onClick={() => setForm({ ...form, industry: ind })}
+                        onClick={() => handleIndustryChange(ind)}
                         className={cn(
                           "cursor-pointer px-3 py-2 text-xs font-medium rounded-lg flex items-center justify-between transition-colors",
                           form.industry === ind
@@ -297,9 +391,9 @@ export function BusinessClient({ initialData }: { initialData: BusinessFormData 
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-84 max-h-64 overflow-y-auto p-1.5 rounded-xl bg-popover/98 backdrop-blur-md border border-border shadow-xl z-50">
                     <DropdownMenuLabel className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-1">
-                      Select Business Trade
+                      Select Business Trade ({availableCategories.length})
                     </DropdownMenuLabel>
-                    {POPULAR_CATEGORIES.map((cat) => (
+                    {availableCategories.map((cat) => (
                       <DropdownMenuItem
                         key={cat}
                         onClick={() => setForm({ ...form, category: cat })}

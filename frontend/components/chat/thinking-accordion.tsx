@@ -8,6 +8,9 @@ import {
   Sprout,
   Landmark,
   FolderGit2,
+  FileText,
+  Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ToolCallItem } from "./types";
@@ -55,14 +58,20 @@ export function ThinkingAccordion({
   }
 
   // IF AT LEAST ONE TOOL WAS CALLED: Immediately render the accordion
-  const durationToShow =
-    completedDurationSeconds ?? (seconds > 0 ? seconds : undefined);
+  const resolvedDuration =
+    typeof completedDurationSeconds === "number" && completedDurationSeconds > 0
+      ? completedDurationSeconds
+      : seconds > 0
+        ? seconds
+        : hasTools
+          ? 1
+          : undefined;
   const formattedDuration = seconds < 10 ? `0${seconds}` : `${seconds}`;
 
   const headerText = isStreaming
     ? `Thinking... ${seconds > 0 ? `(${formattedDuration}s)` : ""}`
-    : durationToShow !== undefined
-      ? `Thought for ${durationToShow}s`
+    : resolvedDuration !== undefined
+      ? `Thought for ${resolvedDuration}s`
       : "Thought";
 
   return (
@@ -99,10 +108,17 @@ export function ThinkingAccordion({
           {toolCalls.map((tc, idx) => {
             const icon = renderToolIcon(tc.icon || tc.toolName);
             const summary = tc.summary || `Executed ${tc.toolName}`;
+            const isCalling = tc.status === "calling";
 
             return (
               <div key={idx} className="flex items-center gap-2.5 py-0.5">
-                <span className="shrink-0 text-mint">{icon}</span>
+                <span className="shrink-0">
+                  {isCalling ? (
+                    <Loader2 className="size-4 text-muted-foreground animate-spin" />
+                  ) : (
+                    icon
+                  )}
+                </span>
                 <span className="text-[14px] font-normal text-foreground/90 leading-relaxed">
                   {summary}
                 </span>
@@ -129,6 +145,12 @@ function renderToolIcon(iconType?: string) {
   }
   if (t === "landmark" || t.includes("scheme") || t.includes("loan") || t.includes("mudra")) {
     return <Landmark className="size-4 text-orange" />;
+  }
+  if (t === "image" || t.includes("img") || t.includes("photo")) {
+    return <ImageIcon className="size-4 text-sky-500" />;
+  }
+  if (t === "document" || t.includes("doc") || t.includes("file") || t.includes("pdf")) {
+    return <FileText className="size-4 text-sky-500" />;
   }
   if (t === "code" || t.includes("clone")) {
     return <Terminal className="size-4 text-muted-foreground" />;

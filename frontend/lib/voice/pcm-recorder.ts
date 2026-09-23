@@ -23,7 +23,7 @@ export interface PCMRecorderOptions {
   targetSampleRate?: number;
   bufferSize?: number;
   noiseGateThreshold?: number; // API compatibility; NOT USED
-  gainBoost?: number;           // API compatibility; NOT USED
+  gainBoost?: number; // API compatibility; NOT USED
   onChunk: (base64Chunk: string) => void;
   onVolume?: (volume: number) => void;
   onAudioLevel?: (rms: number) => void;
@@ -42,6 +42,8 @@ export class PCMRecorder {
   private options: PCMRecorderOptions;
   /** The actual rate after Chrome's MediaStream-to-AudioContext resampling. */
   private nativeSampleRate: number = GEMINI_LIVE_INPUT_SAMPLE_RATE;
+  private currentTurnPcmChunks: Int16Array[] = [];
+  private currentTurnBytes = 0;
   private debugPcmChunks: Int16Array[] = [];
   private debugPcmBytes = 0;
   private debugClipCount = 0;
@@ -105,7 +107,9 @@ export class PCMRecorder {
       });
 
       const AudioCtx =
-        window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
 
       if (!AudioCtx) {
         throw new Error("Web Audio API is not supported in this browser.");
@@ -119,18 +123,23 @@ export class PCMRecorder {
       });
 
       if (this.audioContext.state === "suspended") {
-        await this.audioContext.resume();
+        this.audioContext.resume().catch(() => {});
       }
 
       this.nativeSampleRate = this.audioContext.sampleRate;
-      console.log("[PCMRecorder] AudioContext sample rate:", this.nativeSampleRate);
+      console.log(
+        "[PCMRecorder] AudioContext sample rate:",
+        this.nativeSampleRate,
+      );
       if (this.nativeSampleRate !== GEMINI_LIVE_INPUT_SAMPLE_RATE) {
         throw new Error(
           `Chrome did not provide the required ${GEMINI_LIVE_INPUT_SAMPLE_RATE} Hz audio context (received ${this.nativeSampleRate} Hz).`,
         );
       }
 
-      this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+      this.sourceNode = this.audioContext.createMediaStreamSource(
+        this.mediaStream,
+      );
 
       const bufferSize = this.options.bufferSize ?? 2048;
 
@@ -200,10 +209,12 @@ export class PCMRecorder {
 
       this.workletNode = new AudioWorkletNode(
         this.audioContext,
-        "raw-pcm-processor"
+        "raw-pcm-processor",
       );
 
-      this.workletNode.port.onmessage = (event: MessageEvent<{ type?: string; buffer?: Float32Array }>) => {
+      this.workletNode.port.onmessage = (
+        event: MessageEvent<{ type?: string; buffer?: Float32Array }>,
+      ) => {
         if (!this.isRecording || this.isMuted) return;
 
         const data = event.data;
@@ -212,6 +223,20 @@ export class PCMRecorder {
         const float32Data = data.buffer as Float32Array;
         const pcm16Data = this.floatTo16BitPCM(float32Data);
         this.inspectDevAudio(pcm16Data);
+
+        // Retain turn audio for the Sub-Agent raw voice processing (capped at 30 seconds)
+        const turnCopy = pcm16Data.slice();
+        this.currentTurnPcmChunks.push(turnCopy);
+        this.currentTurnBytes += turnCopy.byteLength;
+        const maxTurnBytes = GEMINI_LIVE_INPUT_SAMPLE_RATE * 2 * 30;
+        while (
+          this.currentTurnBytes > maxTurnBytes &&
+          this.currentTurnPcmChunks.length > 1
+        ) {
+          const removed = this.currentTurnPcmChunks.shift();
+          if (removed) this.currentTurnBytes -= removed.byteLength;
+        }
+
         const base64Chunk = this.arrayBufferToBase64(pcm16Data.buffer);
 
         if (base64Chunk) {
@@ -298,7 +323,11 @@ export class PCMRecorder {
 
   public async resume(): Promise<void> {
     if (this.audioContext && this.audioContext.state === "suspended") {
-      await this.audioContext.resume();
+      try {
+        await this.audioContext.resume();
+      } catch (e) {
+        console.warn("[PCMRecorder] AudioContext resume failed:", e);
+      }
     }
   }
 
@@ -322,6 +351,58 @@ export class PCMRecorder {
   }
 
   /**
+   * Resets the turn-scoped audio buffer at the start of a user speaking turn.
+   */
+  public startTurn(): void {
+    this.currentTurnPcmChunks = [];
+    this.currentTurnBytes = 0;
+  }
+
+  /**
+   * Returns the user's authentic spoken audio for the current/latest turn as a
+   * standard 16kHz mono WAV Base64 string for direct processing by the Sub-Agent.
+   */
+  public getLastTurnWavBase64(): string | null {
+    if (!this.currentTurnPcmChunks.length || this.currentTurnBytes === 0) {
+      return null;
+    }
+
+    const wav = new ArrayBuffer(44 + this.currentTurnBytes);
+    const view = new DataView(wav);
+    const bytes = new Uint8Array(wav);
+    const writeText = (offset: number, value: string) => {
+      for (let i = 0; i < value.length; i++)
+        view.setUint8(offset + i, value.charCodeAt(i));
+    };
+
+    writeText(0, "RIFF");
+    view.setUint32(4, 36 + this.currentTurnBytes, true);
+    writeText(8, "WAVEfmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, 1, true); // Mono channel
+    view.setUint32(24, GEMINI_LIVE_INPUT_SAMPLE_RATE, true);
+    view.setUint32(28, GEMINI_LIVE_INPUT_SAMPLE_RATE * 2, true); // Byte rate (16000 * 2)
+    view.setUint16(32, 2, true); // Block align (16-bit mono)
+    view.setUint16(34, 16, true); // Bits per sample
+    writeText(36, "data");
+    view.setUint32(40, this.currentTurnBytes, true);
+
+    let offset = 44;
+    for (const chunk of this.currentTurnPcmChunks) {
+      const chunkBytes = new Uint8Array(
+        chunk.buffer,
+        chunk.byteOffset,
+        chunk.byteLength,
+      );
+      bytes.set(chunkBytes, offset);
+      offset += chunkBytes.byteLength;
+    }
+
+    return this.arrayBufferToBase64(wav);
+  }
+
+  /**
    * Development-only local capture for diagnosing audio before it reaches
    * Gemini. It never uploads or persists microphone data.
    */
@@ -334,7 +415,8 @@ export class PCMRecorder {
     const view = new DataView(wav);
     const bytes = new Uint8Array(wav);
     const writeText = (offset: number, value: string) => {
-      for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
+      for (let i = 0; i < value.length; i++)
+        view.setUint8(offset + i, value.charCodeAt(i));
     };
     writeText(0, "RIFF");
     view.setUint32(4, 36 + this.debugPcmBytes, true);
@@ -351,7 +433,11 @@ export class PCMRecorder {
 
     let offset = 44;
     for (const chunk of this.debugPcmChunks) {
-      const chunkBytes = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+      const chunkBytes = new Uint8Array(
+        chunk.buffer,
+        chunk.byteOffset,
+        chunk.byteLength,
+      );
       bytes.set(chunkBytes, offset);
       offset += chunkBytes.byteLength;
     }
@@ -432,7 +518,8 @@ export class PCMRecorder {
       bytesPerSecond: GEMINI_LIVE_INPUT_SAMPLE_RATE * 2,
       chunkFrames: pcm.length,
       chunkMilliseconds: (pcm.length / GEMINI_LIVE_INPUT_SAMPLE_RATE) * 1_000,
-      retainedMilliseconds: (this.debugPcmBytes / 2 / GEMINI_LIVE_INPUT_SAMPLE_RATE) * 1_000,
+      retainedMilliseconds:
+        (this.debugPcmBytes / 2 / GEMINI_LIVE_INPUT_SAMPLE_RATE) * 1_000,
       clippedSamples: this.debugClipCount,
     });
   }

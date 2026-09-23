@@ -18,13 +18,16 @@ export default async function ScannerPage() {
     where: { userId: user.id },
   });
 
+  const savedSwotData = savedSwot?.swotData as any;
   const initialSwotData = savedSwot
     ? {
         district: savedSwot.district,
         state: savedSwot.state,
         radiusKm: savedSwot.radiusKm,
         score: savedSwot.score,
-        swotData: savedSwot.swotData as any,
+        swotData: savedSwotData,
+        lat: typeof savedSwotData?.lat === "number" ? savedSwotData.lat : undefined,
+        lng: typeof savedSwotData?.lng === "number" ? savedSwotData.lng : undefined,
         actionPlan: (savedSwot.actionPlan as any[]) || [],
         dataSource: savedSwot.dataSource || `Live Trade Register for ${savedSwot.district}`,
         lastEvaluatedAt: savedSwot.updatedAt.toISOString(),

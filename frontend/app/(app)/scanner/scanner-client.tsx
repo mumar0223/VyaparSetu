@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useTranslation } from "@/lib/i18n";
 import {
   DropdownMenu,
@@ -31,6 +32,21 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ALL_INDIAN_STATES_DATA, getDistrictGeo } from "@/lib/api/district-data";
+
+const CatchmentLeafletMap = dynamic(
+  () => import("@/components/scanner/catchment-leaflet-map"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-72 sm:h-96 rounded-2xl border border-sage/40 dark:border-border bg-muted/60 animate-pulse flex flex-col items-center justify-center gap-3">
+        <div className="size-8 rounded-full border-2 border-mint border-t-transparent animate-spin" />
+        <span className="text-xs font-bold text-muted-foreground">
+          Initializing Geospatial Radar Map Engine...
+        </span>
+      </div>
+    ),
+  }
+);
 
 export interface ScannerBusinessProfile {
   id: string;
@@ -51,6 +67,10 @@ export interface CompetitorItem {
   priceRange: string;
   threatLevel: "High" | "Medium" | "Low";
   differentiator?: string;
+  lat?: number;
+  lng?: number;
+  rating?: number;
+  reviews?: number;
 }
 
 export interface InitialSwotData {
@@ -64,7 +84,12 @@ export interface InitialSwotData {
     opportunities: string[];
     threats: string[];
     competitors?: CompetitorItem[];
+    allPlaces?: CompetitorItem[];
+    lat?: number;
+    lng?: number;
   };
+  lat?: number;
+  lng?: number;
   actionPlan: { time: string; action: string; impact: string }[];
   dataSource: string;
   lastEvaluatedAt: string;
@@ -82,16 +107,22 @@ export function ScannerClient({
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [isLocating, setIsLocating] = useState<boolean>(false);
 
-  // Initial State & District Setup
+  // Initial State & District Setup: Prioritize exact saved coordinates from SWOT or profile
   const initialDistrict = initialSwotData?.district || profile?.city || "Pune";
-  const initialGeo = getDistrictGeo(initialDistrict, initialSwotData?.state || profile?.state || "Maharashtra");
+  const initialSavedState = initialSwotData?.state || profile?.state || "Maharashtra";
 
-  const [selectedState, setSelectedState] = useState<string>(initialSwotData?.state || profile?.state || "Maharashtra");
-  const [selectedDistrict, setSelectedDistrict] = useState<string>(initialGeo.name);
-  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
-    lat: initialGeo.lat,
-    lng: initialGeo.lng,
-  });
+  const savedLat = initialSwotData?.lat ?? initialSwotData?.swotData?.lat;
+  const savedLng = initialSwotData?.lng ?? initialSwotData?.swotData?.lng;
+
+  const fallbackGeo = getDistrictGeo(initialDistrict, initialSavedState);
+  const initialCoords =
+    typeof savedLat === "number" && typeof savedLng === "number" && !isNaN(savedLat) && !isNaN(savedLng)
+      ? { lat: savedLat, lng: savedLng }
+      : { lat: fallbackGeo.lat, lng: fallbackGeo.lng };
+
+  const [selectedState, setSelectedState] = useState<string>(initialSavedState);
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(initialDistrict);
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>(initialCoords);
 
   const currentDistrictsList =
     ALL_INDIAN_STATES_DATA.find((s) => s.state === selectedState)?.districts || [];
@@ -115,13 +146,14 @@ export function ScannerClient({
     }
   };
 
-  // Debounced auto-sync location changes to user's Enterprise Profile in DB
+  // Debounced auto-sync location changes to backend and localStorage (waits until after initial load)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialMount = useRef(true);
+  const isHydratedRef = useRef(false);
 
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
+    // Skip initial mount so initial page load NEVER sends an auto-save request
+    if (!isHydratedRef.current) {
+      isHydratedRef.current = true;
       return;
     }
 
@@ -131,19 +163,33 @@ export function ScannerClient({
 
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        await fetch("/api/business", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            state: selectedState,
-            city: selectedDistrict,
-          }),
-        });
-
-        // Invalidate dashboard analytics cache so dashboard reflects new location
+        // 1. Save to local storage for instant zero-latency recall
         if (typeof window !== "undefined") {
+          localStorage.setItem(
+            "vyaparsetu_last_swot_location",
+            JSON.stringify({
+              district: selectedDistrict,
+              state: selectedState,
+              lat: coords.lat,
+              lng: coords.lng,
+              radiusKm,
+            })
+          );
           localStorage.removeItem("vyaparsetu_dashboard_analytics_v3");
         }
+
+        // 2. Persist to backend without triggering an expensive AI re-scan
+        await fetch("/api/ai/swot-scan", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            district: selectedDistrict,
+            state: selectedState,
+            lat: coords.lat,
+            lng: coords.lng,
+            radiusKm,
+          }),
+        });
       } catch (err) {
         console.error("Failed to auto-save location from SWOT scanner:", err);
       }
@@ -154,7 +200,7 @@ export function ScannerClient({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [selectedState, selectedDistrict]);
+  }, [selectedState, selectedDistrict, coords.lat, coords.lng, radiusKm]);
 
   // Scan Results state (Loaded from Prisma if available, otherwise null until scanned)
   const [scanResult, setScanResult] = useState<{
@@ -163,6 +209,7 @@ export function ScannerClient({
     opportunities: string[];
     threats: string[];
     competitors?: CompetitorItem[];
+    allPlaces?: CompetitorItem[];
     score: number;
     dataSource: string;
     actionPlan: { time: string; action: string; impact: string }[];
@@ -174,6 +221,10 @@ export function ScannerClient({
           opportunities: initialSwotData.swotData?.opportunities || [],
           threats: initialSwotData.swotData?.threats || [],
           competitors: initialSwotData.swotData?.competitors || [],
+          allPlaces:
+            initialSwotData.swotData?.allPlaces ||
+            initialSwotData.swotData?.competitors ||
+            [],
           score: initialSwotData.score || 88,
           dataSource:
             initialSwotData.dataSource ||
@@ -181,6 +232,46 @@ export function ScannerClient({
           actionPlan: initialSwotData.actionPlan || [],
         }
       : null
+  );
+  // Dedicated Catchment Shops Radar state (Fetched instantly via 15s SerpApi pipeline)
+  const [catchmentShops, setCatchmentShops] = useState<CompetitorItem[]>(
+    initialSwotData?.swotData?.allPlaces || []
+  );
+  const [isFetchingShops, setIsFetchingShops] = useState<boolean>(false);
+
+  const fetchShops = useCallback(
+    async (
+      targetDistrict: string,
+      targetState: string,
+      targetRadius: number,
+      lat: number,
+      lng: number
+    ) => {
+      setIsFetchingShops(true);
+      try {
+        const res = await fetch("/api/ai/catchment-shops", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            district: targetDistrict,
+            state: targetState,
+            radiusKm: targetRadius,
+            category: profile?.category || "General Store / Kirana",
+            lat,
+            lng,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.shops)) {
+          setCatchmentShops(data.shops);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch catchment shops:", err);
+      } finally {
+        setIsFetchingShops(false);
+      }
+    },
+    [profile?.category]
   );
 
   // Reusable GPS Fetch Logic
@@ -230,27 +321,41 @@ export function ScannerClient({
     );
   }, [selectedDistrict, selectedState]);
 
-  // Auto-detect GPS location on mount (only if permission already granted — no prompt)
+  // One-time fallback restore from localStorage if initialSwotData was not present on server
   useEffect(() => {
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
-        if (result.state === "granted") {
-          fetchGpsLocation({ silent: true });
+    if (!initialSwotData && typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("vyaparsetu_last_swot_location");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.district && parsed.state) {
+            setSelectedDistrict(parsed.district);
+            setSelectedState(parsed.state);
+            if (
+              typeof parsed.lat === "number" &&
+              typeof parsed.lng === "number" &&
+              !isNaN(parsed.lat) &&
+              !isNaN(parsed.lng)
+            ) {
+              setCoords({ lat: parsed.lat, lng: parsed.lng });
+            }
+          }
         }
-      }).catch(() => {
-        // permissions API not supported, skip auto-detect
-      });
+      } catch {}
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialSwotData]);
 
   // Manual button handler
   const handleJumpToMyLocation = () => fetchGpsLocation();
 
 
-  // Run Real AI SWOT Feasibility Scan
+  // Run Simultaneous Feasibility Scan: Fast Catchment Radar (15s) + Deep AI SWOT (9s)
   const handleRunFeasibilityScan = async () => {
     setIsScanning(true);
+    // 1. Immediately launch Fast Catchment Shop Radar (15s timeout, returns in 2-3s!)
+    fetchShops(selectedDistrict, selectedState, radiusKm, coords.lat, coords.lng);
+
+    // 2. Concurrently execute Deep AI SWOT & Competitor Ranking (9s AI search timeout!)
     try {
       const res = await fetch("/api/ai/swot-scan", {
         method: "POST",
@@ -274,6 +379,7 @@ export function ScannerClient({
           opportunities: data.opportunities || [],
           threats: data.threats || [],
           competitors: data.competitors || [],
+          allPlaces: data.allPlaces || data.competitors || [],
           score: data.score || 88,
           dataSource: data.dataSource || `Live Trade Register for ${selectedDistrict}`,
           actionPlan: data.actionPlan || [],
@@ -290,7 +396,6 @@ export function ScannerClient({
   };
 
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedDistrict}, ${selectedState}`)}`;
-  const googleMapsEmbedUrl = `https://maps.google.com/maps?q=${coords.lat},${coords.lng}&z=${Math.max(10, 16 - Math.floor(radiusKm / 5))}&output=embed`;
 
   return (
     <div className="h-full flex flex-col pt-16 sm:pt-16 md:pt-16 lg:pt-8 p-4 md:p-6 lg:p-8 overflow-y-auto font-sans text-foreground">
@@ -449,98 +554,15 @@ export function ScannerClient({
             </a>
           </div>
 
-          {/* Interactive Geospatial Map Display */}
-          <div className="relative rounded-2xl overflow-hidden border border-sage/30 dark:border-border bg-muted h-64 sm:h-80 shadow-inner">
-            {/* Map iframe — forced to z-1 so overlays paint on top */}
-            <iframe
-              key={`${coords.lat}-${coords.lng}-${radiusKm}`}
-              src={googleMapsEmbedUrl}
-              title="District Catchment Map"
-              className="w-full h-full border-0 filter contrast-105"
-              loading="lazy"
-              style={{ position: "relative", zIndex: 1 }}
-            />
-
-            {/* SVG Catchment Circle Overlay — z-10 renders reliably above the iframe */}
-            <svg
-              className="absolute inset-0 pointer-events-none select-none"
-              style={{ zIndex: 10 }}
-              width="100%"
-              height="100%"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="xMidYMid meet"
-            >
-              <defs>
-                {/* Vignette mask: cut out the catchment circle from a full-area dark overlay */}
-                <mask id="catchment-mask">
-                  <rect x="0" y="0" width="100" height="100" fill="white" />
-                  <circle cx="50" cy="50" r={Math.min(45, Math.max(10, 9 + (radiusKm / 25) * 36))} fill="black" />
-                </mask>
-              </defs>
-
-              {/* Semi-transparent vignette outside the circle */}
-              <rect x="0" y="0" width="100" height="100" fill="rgba(15,23,42,0.25)" mask="url(#catchment-mask)" />
-
-              {/* Outer catchment circle — dashed, high contrast */}
-              <circle
-                cx="50"
-                cy="50"
-                r={Math.min(45, Math.max(10, 9 + (radiusKm / 25) * 36))}
-                fill="rgba(16,185,129,0.18)"
-                stroke="#059669"
-                strokeWidth="0.7"
-                strokeDasharray="2.5 1.5"
-              />
-
-              {/* Inner concentric ring (50% of outer) */}
-              <circle
-                cx="50"
-                cy="50"
-                r={Math.min(45, Math.max(10, 9 + (radiusKm / 25) * 36)) / 2}
-                fill="none"
-                stroke="rgba(16,185,129,0.35)"
-                strokeWidth="0.35"
-                strokeDasharray="1.5 1"
-              />
-
-              {/* Crosshair lines */}
-              <line x1="5" y1="50" x2="95" y2="50" stroke="rgba(16,185,129,0.3)" strokeWidth="0.2" />
-              <line x1="50" y1="5" x2="50" y2="95" stroke="rgba(16,185,129,0.3)" strokeWidth="0.2" />
-
-              {/* Center pulsing beacon */}
-              <circle cx="50" cy="50" r="2.5" fill="rgba(16,185,129,0.3)">
-                <animate attributeName="r" values="1.5;3.5;1.5" dur="2s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.5;0.15;0.5" dur="2s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="50" cy="50" r="1" fill="#059669" stroke="white" strokeWidth="0.5" />
-            </svg>
-
-            {/* Catchment Radius Pill — on the top edge of the SVG circle */}
-            <div
-              className="absolute left-1/2 -translate-x-1/2 bg-emerald-700 dark:bg-mint text-white dark:text-black text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-lg border border-white/40 dark:border-black/30 flex items-center gap-1.5 whitespace-nowrap pointer-events-none"
-              style={{
-                zIndex: 11,
-                top: `calc(50% - ${Math.min(45, Math.max(10, 9 + (radiusKm / 25) * 36))}% - 8px)`,
-              }}
-            >
-              <span className="size-1.5 rounded-full bg-mint dark:bg-forest animate-ping" />
-              <span>{radiusKm} km Catchment</span>
-            </div>
-
-            {/* Radar Radius Catchment Visual Overlay Badge */}
-            <div className="absolute top-3 left-3 bg-white/95 dark:bg-card/95 backdrop-blur-md px-3.5 py-2 rounded-xl border border-sage/40 dark:border-border shadow-xs flex items-center gap-2" style={{ zIndex: 11 }}>
-              <div className="size-3 rounded-full bg-mint animate-ping" />
-              <div className="text-[11px] font-bold text-forest dark:text-mint">
-                {radiusKm}km Catchment Area • {selectedDistrict}, {selectedState}
-              </div>
-            </div>
-
-            {/* Center Shop Pin Indicator */}
-            <div className="absolute bottom-3 right-3 bg-white/95 dark:bg-card/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sage/40 dark:border-border shadow-xs text-[10px] font-medium text-foreground flex items-center gap-1.5" style={{ zIndex: 11 }}>
-              <MapPin className="size-3 text-red-500 fill-red-500" />
-              <span>Coordinates: {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}</span>
-            </div>
-          </div>
+          {/* Interactive Geospatial Leaflet Map Display */}
+          <CatchmentLeafletMap
+            coords={coords}
+            radiusKm={radiusKm}
+            selectedDistrict={selectedDistrict}
+            selectedState={selectedState}
+            competitors={scanResult?.competitors}
+            allShops={catchmentShops.length > 0 ? catchmentShops : (scanResult?.allPlaces || scanResult?.competitors)}
+          />
 
 
           {/* Interactive Radius Controller & Trigger */}
@@ -685,15 +707,15 @@ export function ScannerClient({
               <div className="bg-white/40 dark:bg-card/40 rounded-2xl border border-sage/20 dark:border-border p-6 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="font-serif font-bold text-lg text-forest dark:text-foreground flex items-center gap-2">
-                      <Store className="size-5 text-mint" /> Hyper-Local Competitor Landscape
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Verified rival businesses competing in {profile?.category || "this sector"} within {radiusKm}km catchment radius
+                    <h4 className="font-serif font-bold text-base sm:text-lg text-forest dark:text-foreground flex items-center gap-2">
+                      <Store className="size-5 text-mint" /> Top 12 Strategic Competitors
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Key commercial rivals evaluated by AI from {scanResult.allPlaces?.length || scanResult.competitors.length} verified establishments mapped in the catchment.
                     </p>
                   </div>
                   <span className="text-[11px] font-bold text-forest dark:text-mint bg-mint-pale dark:bg-mint/20 px-3 py-1 rounded-full border border-mint/20 self-start sm:self-auto">
-                    {scanResult.competitors.length} Rivals Mapped
+                    {scanResult.allPlaces ? `${scanResult.allPlaces.length} Mapped on Radar` : `${scanResult.competitors.length} Rivals Mapped`}
                   </span>
                 </div>
 

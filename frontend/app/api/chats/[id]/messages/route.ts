@@ -16,7 +16,7 @@ export async function POST(
 
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
-    const { userTranscript, assistantTranscript, toolCalls, thinking } = body;
+    const { userTranscript, assistantTranscript, toolCalls, thinking, files } = body;
 
     const conversation = await prisma.conversation.findFirst({
       where: { id, userId: user.id },
@@ -28,11 +28,12 @@ export async function POST(
 
     const messagesToCreate = [];
 
-    if (userTranscript?.trim()) {
+    if (userTranscript?.trim() || (Array.isArray(files) && files.length > 0)) {
       messagesToCreate.push({
         conversationId: id,
         role: "user",
-        content: userTranscript.trim(),
+        content: userTranscript?.trim() || "",
+        files: Array.isArray(files) ? files : [],
       });
     }
 

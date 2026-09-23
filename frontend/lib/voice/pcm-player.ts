@@ -27,9 +27,17 @@ export class PCMPlayer {
     this.ensureAudioSessionPlayback();
     const ctx = this.initAudioContext();
     if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+  }
+
+  public async resume(): Promise<void> {
+    if (this.audioContext && this.audioContext.state === "suspended") {
       try {
-        await ctx.resume();
-      } catch (e) {}
+        await this.audioContext.resume();
+      } catch (e) {
+        console.warn("[PCMPlayer] AudioContext resume failed:", e);
+      }
     }
   }
 

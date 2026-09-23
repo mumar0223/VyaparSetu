@@ -29,9 +29,15 @@ import { ChatMessageList } from "./chat-message-list";
 import { VoiceAgentView, type VoiceAgentStatus } from "./voice-agent-view";
 import { useLiveAgent } from "./use-live-agent";
 import { ArtifactModal, type ArtifactPayload } from "./artifact-modal";
-import type { ChatMessage, ConversationSummary, ToolCallItem } from "./types";
+import type {
+  ChatMessage,
+  ConversationSummary,
+  ToolCallItem,
+  ChatAttachment,
+} from "./types";
 import type { AuthUser } from "@/lib/auth-types";
 import { cn } from "@/lib/utils";
+
 import { useTranslation } from "@/lib/i18n";
 
 interface ChatWorkspaceProps {
@@ -60,6 +66,17 @@ export function ChatWorkspace({
       setIsSidebarOpen(window.innerWidth >= 1024);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isMobile = window.innerWidth < 1024;
+      window.dispatchEvent(
+        new CustomEvent("chat-sidebar-toggle", {
+          detail: { isOpen: isMobile && isSidebarOpen },
+        }),
+      );
+    }
+  }, [isSidebarOpen]);
 
   const [isInitialLoading, setIsInitialLoading] = useState(
     Boolean(initialChatId),
@@ -133,16 +150,32 @@ export function ChatWorkspace({
       }
 
       setMessages((prev) => {
-        const next: ChatMessage[] = [
-          ...prev,
-          {
-            id: `user_${Date.now()}`,
-            role: "user",
-            content: turn.userTranscript,
-            createdAt: new Date(),
-          },
-        ];
-        if (turn.assistantTranscript.trim()) {
+        const next: ChatMessage[] = [...prev];
+        const trimmedUser = turn.userTranscript.trim();
+
+        if (trimmedUser) {
+          // If the last message is already a user message and no assistant response intervened,
+          // merge the continuation rather than creating duplicate consecutive user bubbles
+          const lastMsg = next[next.length - 1];
+          if (lastMsg && lastMsg.role === "user") {
+            if (!lastMsg.content.includes(trimmedUser)) {
+              lastMsg.content = `${lastMsg.content} ${trimmedUser}`.trim();
+            }
+          } else {
+            next.push({
+              id: `user_${Date.now()}`,
+              role: "user",
+              content: trimmedUser,
+              files: (turn as any).files || [],
+              createdAt: new Date(),
+            });
+          }
+        }
+
+        if (
+          turn.assistantTranscript.trim() ||
+          (turn.toolCalls && turn.toolCalls.length > 0)
+        ) {
           next.push({
             id: `asst_${Date.now()}`,
             role: "assistant",
@@ -152,6 +185,9 @@ export function ChatWorkspace({
             toolCalls: turn.toolCalls,
             createdAt: new Date(),
           });
+        }
+        if (activeChatId) {
+          chatCache.current.set(activeChatId, next);
         }
         return next;
       });
@@ -228,53 +264,120 @@ export function ChatWorkspace({
     [activeChatId, router],
   );
 
-  // ── Start Live Voice Session ──
-  const handleStartVoiceSession = useCallback(async () => {
-    if (isVoiceMode || voiceStartInFlightRef.current) return;
-    voiceStartInFlightRef.current = true;
-    voiceTurnsRef.current = [];
-    setIsStartingVoiceSession(true);
-    if (scrollViewportRef.current) {
-      savedScrollPositionRef.current = scrollViewportRef.current.scrollTop;
-    }
-    setIsVoiceMode(true);
-    // This screen is intentionally shown before any model/WebSocket work. It
-    // represents only creation or resolution of the durable chat session.
-    liveAgent.setStatus("initializing");
+  // ── URL Search Parameters Sync for Voice Agent State ──
+  const updateVoiceUrlParams = useCallback(
+    (updates: {
+      mode?: string | null;
+      camera?: boolean | null;
+      mic?: string | null;
+    }) => {
+      if (typeof window === "undefined") return;
+      const url = new URL(window.location.href);
 
-    try {
-      let targetId = activeChatId;
-      if (!targetId) {
-        const res = await fetch("/api/chats", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: "Live Voice Session" }),
-        });
-        if (!res.ok)
-          throw new Error("Could not create a chat for this voice session.");
-        const data = await res.json();
-        targetId = data?.conversation?.id;
-        if (!targetId)
-          throw new Error("Voice session chat creation returned no chat ID.");
-        setActiveChatId(targetId);
-        fetchConversations();
+      if (updates.mode !== undefined) {
+        if (updates.mode) {
+          url.searchParams.set("mode", updates.mode);
+        } else {
+          url.searchParams.delete("mode");
+        }
       }
 
-      // The URL update is also complete before any Vertex connection begins.
-      window.history.pushState(null, "", `/ai-saathi/c/${targetId}?mode=voice`);
-      await liveAgent.connect(targetId);
-    } catch (error) {
-      console.error("Failed to initialize voice session:", error);
-      liveAgent.reportError(
-        error instanceof Error
-          ? error.message
-          : "Unable to start the voice session.",
-      );
-    } finally {
-      voiceStartInFlightRef.current = false;
-      setIsStartingVoiceSession(false);
-    }
-  }, [activeChatId, liveAgent, fetchConversations, isVoiceMode]);
+      if (updates.camera !== undefined) {
+        if (updates.camera) {
+          url.searchParams.set("camera", "true");
+        } else {
+          url.searchParams.delete("camera");
+        }
+      }
+
+      if (updates.mic !== undefined) {
+        if (updates.mic) {
+          url.searchParams.set("mic", updates.mic);
+        } else {
+          url.searchParams.delete("mic");
+        }
+      }
+
+      window.history.replaceState(null, "", url.toString());
+    },
+    [],
+  );
+
+  // ── Start Live Voice Session ──
+  const handleStartVoiceSession = useCallback(
+    async (options?: { autoStartCamera?: boolean; initialMuted?: boolean }) => {
+      if (isVoiceMode || voiceStartInFlightRef.current) return;
+      voiceStartInFlightRef.current = true;
+      voiceTurnsRef.current = [];
+      setIsStartingVoiceSession(true);
+      if (scrollViewportRef.current) {
+        savedScrollPositionRef.current = scrollViewportRef.current.scrollTop;
+      }
+      setIsVoiceMode(true);
+      // This screen is intentionally shown before any model/WebSocket work. It
+      // represents only creation or resolution of the durable chat session.
+      liveAgent.setStatus("initializing");
+
+      try {
+        let targetId = activeChatId;
+        if (!targetId) {
+          const res = await fetch("/api/chats", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: "Live Voice Session" }),
+          });
+          if (!res.ok)
+            throw new Error("Could not create a chat for this voice session.");
+          const data = await res.json();
+          targetId = data?.conversation?.id;
+          if (!targetId)
+            throw new Error("Voice session chat creation returned no chat ID.");
+          setActiveChatId(targetId);
+          fetchConversations();
+        }
+
+        // Build URL parameters reflecting voice mode, camera, and mic
+        const searchParams = new URLSearchParams();
+        searchParams.set("mode", "voice");
+        if (options?.autoStartCamera) {
+          searchParams.set("camera", "true");
+        }
+        if (options?.initialMuted) {
+          searchParams.set("mic", "off");
+        }
+        window.history.replaceState(
+          null,
+          "",
+          `/ai-saathi/c/${targetId}?${searchParams.toString()}`,
+        );
+
+        await liveAgent.connect(targetId, options);
+      } catch (error) {
+        console.error("Failed to initialize voice session:", error);
+        liveAgent.reportError(
+          error instanceof Error
+            ? error.message
+            : "Unable to start the voice session.",
+        );
+      } finally {
+        voiceStartInFlightRef.current = false;
+        setIsStartingVoiceSession(false);
+      }
+    },
+    [activeChatId, liveAgent, fetchConversations, isVoiceMode],
+  );
+
+  const handleToggleMute = useCallback(() => {
+    liveAgent.toggleMute();
+    const nextMuted = !liveAgent.isMuted;
+    updateVoiceUrlParams({ mic: nextMuted ? "off" : null });
+  }, [liveAgent, updateVoiceUrlParams]);
+
+  const handleToggleCamera = useCallback(async () => {
+    const nextCamera = !liveAgent.isCameraActive;
+    updateVoiceUrlParams({ camera: nextCamera });
+    await liveAgent.toggleCamera();
+  }, [liveAgent, updateVoiceUrlParams]);
 
   // ── End Live Voice Session (Auto-Delete Empty Voice Sessions) ──
   const handleEndVoiceSession = useCallback(async () => {
@@ -334,17 +437,23 @@ export function ChatWorkspace({
     fetchConversations();
   }, [activeChatId, messages.length, liveAgent, fetchConversations]);
 
-  // Check URL search parameter for initial mode=voice (strictly once on mount)
+  // Check URL search parameter for initial mode=voice, camera, and mic (strictly once on mount)
   const hasCheckedUrlVoiceMode = useRef(false);
   useEffect(() => {
     if (typeof window !== "undefined" && !hasCheckedUrlVoiceMode.current) {
       hasCheckedUrlVoiceMode.current = true;
       const params = new URLSearchParams(window.location.search);
       if (params.get("mode") === "voice") {
-        handleStartVoiceSession();
+        const autoStartCamera =
+          params.get("camera") === "true" || params.get("camera") === "1";
+        const initialMuted =
+          params.get("mic") === "off" ||
+          params.get("mic") === "muted" ||
+          params.get("muted") === "true";
+        handleStartVoiceSession({ autoStartCamera, initialMuted });
       }
     }
-  }, []);
+  }, [handleStartVoiceSession]);
 
   // 2. Load Active Conversation Messages if initialChatId provided
   useEffect(() => {
@@ -385,12 +494,16 @@ export function ChatWorkspace({
                   if (!isNaN(num) && num > 0) duration = num;
                 }
               }
+              if (duration === undefined && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+                duration = 1;
+              }
               return {
                 id: m.id,
                 role: m.role,
                 content: m.content,
                 thinking: m.thinking,
                 toolCalls: m.toolCalls,
+                files: Array.isArray(m.files) ? m.files : [],
                 thoughtDurationSeconds: duration,
                 createdAt: m.createdAt,
               };
@@ -472,12 +585,16 @@ export function ChatWorkspace({
                   if (!isNaN(num) && num > 0) duration = num;
                 }
               }
+              if (duration === undefined && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+                duration = 1;
+              }
               return {
                 id: m.id,
                 role: m.role,
                 content: m.content,
                 thinking: m.thinking,
                 toolCalls: m.toolCalls,
+                files: Array.isArray(m.files) ? m.files : [],
                 thoughtDurationSeconds: duration,
                 createdAt: m.createdAt,
               };
@@ -578,8 +695,15 @@ export function ChatWorkspace({
   };
 
   // 8. Real-time Message Send with Silent URL Update
-  const handleSendMessage = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+  const handleSendMessage = async (
+    text: string,
+    attachments?: ChatAttachment[],
+  ) => {
+    if (
+      (!text.trim() && (!attachments || attachments.length === 0)) ||
+      isLoading
+    )
+      return;
 
     const userMessageId = `user_${Date.now()}`;
     const assistantMessageId = `asst_${Date.now()}`;
@@ -588,6 +712,8 @@ export function ChatWorkspace({
       id: userMessageId,
       role: "user",
       content: text.trim(),
+      attachments: attachments || [],
+      files: attachments?.map((a) => JSON.stringify(a)) || [],
       createdAt: new Date(),
     };
 
@@ -638,6 +764,7 @@ export function ChatWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text.trim(),
+          attachments: attachments || [],
           conversationId: activeChatId,
           language,
           history: previousMessages.map((m) => ({
@@ -737,6 +864,7 @@ export function ChatWorkspace({
                     ...existingTools,
                     {
                       toolName: data.toolName,
+                      toolCallId: data.toolCallId,
                       icon: data.icon,
                       args: data.args,
                       summary: data.summary,
@@ -785,7 +913,11 @@ export function ChatWorkspace({
               return updatedPrev.map((m) => {
                 if (m.id !== assistantMessageId) return m;
                 const tools = (m.toolCalls || []).map((t) =>
-                  t.toolName === data.toolName
+                  (
+                    t.toolCallId && data.toolCallId
+                      ? t.toolCallId === data.toolCallId
+                      : t.toolName === data.toolName
+                  )
                     ? {
                         ...t,
                         icon: data.icon || t.icon,
@@ -877,8 +1009,18 @@ export function ChatWorkspace({
 
   // Derive artifact strictly scoped to the current active chat
   const currentChatArtifact = useMemo(() => {
-    // If an artifact was generated live in this voice turn, show it
-    if (liveAgent.liveArtifact) return liveAgent.liveArtifact;
+    // If user is on a brand new chat, NEVER leak old artifacts!
+    if (!activeChatId) return null;
+
+    // If an artifact was generated live in this voice turn, only show if it belongs to this active chat
+    if (
+      liveAgent.liveArtifact &&
+      (!liveAgent.liveArtifactChatId ||
+        liveAgent.liveArtifactChatId === activeChatId)
+    ) {
+      return liveAgent.liveArtifact;
+    }
+
     // Otherwise, find the latest artifact from the CURRENT chat's messages
     if (activeChatId && messages.length > 0) {
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -902,14 +1044,31 @@ export function ChatWorkspace({
       }
     }
     return null;
-  }, [liveAgent.liveArtifact, activeChatId, messages]);
+  }, [
+    liveAgent.liveArtifact,
+    liveAgent.liveArtifactChatId,
+    activeChatId,
+    messages,
+  ]);
+
+  // Synchronize active on-screen artifact overview with Live Voice Agent
+  useEffect(() => {
+    if (currentChatArtifact) {
+      liveAgent.setActiveArtifactOverview({
+        type: currentChatArtifact.artifactType,
+        title: currentChatArtifact.title,
+        summary: currentChatArtifact.summary,
+      });
+    } else {
+      liveAgent.setActiveArtifactOverview(null);
+    }
+  }, [currentChatArtifact, liveAgent.setActiveArtifactOverview]);
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-transparent text-foreground font-sans">
+    <div className="relative flex h-full w-full overflow-hidden bg-transparent text-foreground font-sans">
       {/* ── Top-Right Floating Controls (ChatGPT Style Mobile & Collapsed Desktop) ── */}
-      {(!isSidebarOpen ||
-        (typeof window !== "undefined" && window.innerWidth < 1024)) && (
-        <div className="absolute top-3 right-3 z-30 flex items-center pointer-events-auto select-none">
+      {!isSidebarOpen && (
+        <div className="fixed top-3 right-3 z-30 flex items-center pointer-events-auto select-none">
           <div className="h-10 px-1.5 flex items-center gap-1 bg-white/90 dark:bg-card/90 backdrop-blur-md border border-sage/40 dark:border-border rounded-2xl shadow-xs">
             <button
               onClick={handleNewChat}
@@ -944,21 +1103,31 @@ export function ChatWorkspace({
             errorMessage={liveAgent.errorMessage}
             selectedLanguage={liveAgent.selectedLanguage}
             onSelectLanguage={liveAgent.setLanguage}
-            onToggleMute={liveAgent.toggleMute}
+            onToggleMute={handleToggleMute}
             onStartSpeaking={liveAgent.startSpeaking}
             onStopSpeaking={liveAgent.stopSpeaking}
             onEndSession={handleEndVoiceSession}
-            onRetry={liveAgent.connect}
+            onRetry={() => liveAgent.connect()}
             liveTranscript={liveAgent.liveUserTranscript}
             assistantTranscript={liveAgent.liveAssistantTranscript}
             activeToolName={liveAgent.activeToolName}
             activeArtifact={currentChatArtifact}
             onOpenArtifact={(art) => setActiveArtifact(art)}
-            onDownloadDebugAudio={liveAgent.downloadDebugAudio}
+            backgroundTask={liveAgent.backgroundTask}
+            activeTasks={liveAgent.activeTasks}
+            sessionCompletedTasks={liveAgent.sessionCompletedTasks}
+            isCameraActive={liveAgent.isCameraActive}
+            cameraFacingMode={liveAgent.cameraFacingMode}
+            cameraError={liveAgent.cameraError}
+            onClearCameraError={liveAgent.clearCameraError}
+            onToggleCamera={handleToggleCamera}
+            onSwitchCameraFacing={liveAgent.switchCameraFacing}
+            onAttachCameraVideoElement={liveAgent.attachCameraVideoElement}
+            isSidebarOpen={isSidebarOpen}
           />
         ) : isNewChatView ? (
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */
-          <div className="w-full h-full overflow-y-auto flex flex-col justify-center items-center px-4 pt-16 pb-8 md:py-8 -mt-6">
+          <div className="w-full h-full overflow-y-auto flex flex-col justify-start sm:justify-center items-center px-4 pt-28 pb-12 md:py-10">
             <div className="w-full max-w-3xl text-center mb-8 animate-in fade-in-50 duration-300">
               <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-forest dark:text-foreground mb-2">
                 {t("chat.agendaTitle", "What's on the agenda today?")}
@@ -985,7 +1154,10 @@ export function ChatWorkspace({
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 w-full max-w-4xl px-4 md:px-6">
               {[
                 {
-                  label: t("chat.promptCompetitorsTitle", "Hyper-Local Competitors"),
+                  label: t(
+                    "chat.promptCompetitorsTitle",
+                    "Hyper-Local Competitors",
+                  ),
                   desc: t(
                     "chat.promptCompetitorsDesc",
                     "Scan nearby rival businesses, prices & threat ratings",
@@ -997,7 +1169,10 @@ export function ChatWorkspace({
                   ),
                 },
                 {
-                  label: t("chat.promptOndcWholesaleTitle", "ONDC Wholesale Sourcing"),
+                  label: t(
+                    "chat.promptOndcWholesaleTitle",
+                    "ONDC Wholesale Sourcing",
+                  ),
                   desc: t(
                     "chat.promptOndcWholesaleDesc",
                     "Source inventory & raw materials 8-12% cheaper on B2B",
@@ -1078,11 +1253,11 @@ export function ChatWorkspace({
             </div>
           </div>
         ) : (
-          /* ACTIVE CHAT THREAD (Single Unified Scroll Viewport with Sticky Bottom Input) */
+          /* ACTIVE CHAT THREAD (Unified Viewport with 1:1 Horizontally Aligned Sticky Floating Input) */
           <div
             ref={scrollViewportRef}
             onScroll={handleScroll}
-            className="relative flex-1 flex flex-col h-full overflow-y-auto w-full"
+            className="relative flex-1 flex flex-col h-full overflow-y-auto w-full overscroll-y-contain"
           >
             {/* Top Sentinel for future-proof infinite scroll */}
             <div
@@ -1090,8 +1265,8 @@ export function ChatWorkspace({
               className="h-1 w-full shrink-0 pointer-events-none"
             />
 
-            {/* Scrollable Message List */}
-            <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-6 pt-16 pb-6 md:py-6">
+            {/* Scrollable Message List: pt-28 on mobile clears floating buttons; md:pt-6 on desktop; pb-6 bottom spacing */}
+            <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-6 pt-28 md:pt-6 pb-6">
               <ChatMessageList
                 messages={messages}
                 isLoading={isLoading}
@@ -1100,27 +1275,35 @@ export function ChatWorkspace({
               <div ref={bottomRef} className="h-6" />
             </div>
 
-            {/* Sticky Bottom Input Bar (Sticks to bottom of scroll viewport with frosted backdrop) */}
-            <div className="sticky bottom-0 w-full max-w-3xl mx-auto px-4 md:px-6 pb-4 pt-2 bg-gradient-to-t from-cream via-cream/90 to-transparent dark:from-background dark:via-background/90 pointer-events-none z-20">
-              <div className="relative pointer-events-auto">
-                {/* Dynamic Scroll to Bottom Button anchored directly above the input */}
-                {showScrollBottom && (
-                  <button
-                    type="button"
-                    onClick={scrollToBottom}
-                    title="Scroll to bottom"
-                    className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 size-8 rounded-full bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted border border-sage/40 dark:border-border shadow-lg flex items-center justify-center text-forest dark:text-mint transition-all cursor-pointer backdrop-blur animate-in fade-in-0 zoom-in-90 duration-150 group"
-                  >
-                    <ArrowDown className="size-4 text-forest dark:text-mint group-hover:translate-y-0.5 transition-transform duration-150" />
-                  </button>
-                )}
+            {/* Sticky Floating Glass Input Bar: Sticks to bottom of scroll viewport, perfectly 1:1 aligned with message column */}
+            <div
+              style={{
+                paddingBottom:
+                  "max(0.875rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem))",
+              }}
+              className="sticky bottom-0 w-full pointer-events-none z-20 pt-6 bg-gradient-to-t from-cream via-cream/90 to-transparent dark:from-background dark:via-background/90"
+            >
+              <div className="w-full max-w-3xl mx-auto px-4 md:px-6">
+                <div className="relative pointer-events-auto">
+                  {/* Dynamic Scroll to Bottom Button anchored directly above the input */}
+                  {showScrollBottom && (
+                    <button
+                      type="button"
+                      onClick={scrollToBottom}
+                      title="Scroll to bottom"
+                      className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 size-8 rounded-full bg-white dark:bg-card hover:bg-cream dark:hover:bg-muted border border-sage/40 dark:border-border shadow-lg flex items-center justify-center text-forest dark:text-mint transition-all cursor-pointer backdrop-blur animate-in fade-in-0 zoom-in-90 duration-150 group"
+                    >
+                      <ArrowDown className="size-4 text-forest dark:text-mint group-hover:translate-y-0.5 transition-transform duration-150" />
+                    </button>
+                  )}
 
-                <FloatingInput
-                  onSend={handleSendMessage}
-                  onStartVoiceMode={handleStartVoiceSession}
-                  isLoading={isLoading}
-                  isCentered={false}
-                />
+                  <FloatingInput
+                    onSend={handleSendMessage}
+                    onStartVoiceMode={handleStartVoiceSession}
+                    isLoading={isLoading}
+                    isCentered={false}
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -17,15 +17,21 @@ export async function POST(req: NextRequest) {
 
     const {
       message,
+      attachments = [],
       conversationId,
       history = [],
       language = "en",
+      files = [],
     } = await req.json();
 
-    if (!message || typeof message !== "string" || !message.trim()) {
+    const textContent = typeof message === "string" ? message.trim() : "";
+    if (
+      !textContent &&
+      (!Array.isArray(attachments) || attachments.length === 0)
+    ) {
       return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 }
+        { error: "Message or attachment is required" },
+        { status: 400 },
       );
     }
 
@@ -35,8 +41,11 @@ export async function POST(req: NextRequest) {
     let conversationTitle = "New Conversation";
 
     if (!activeConversationId) {
-      const fallback = message
-        .trim()
+      const fallback = (
+        textContent ||
+        attachments[0]?.uploadedName ||
+        "New Conversation"
+      )
         .replace(/\n+/g, " ")
         .split(" ")
         .slice(0, 6)
@@ -62,18 +71,35 @@ export async function POST(req: NextRequest) {
       if (!existing) {
         return NextResponse.json(
           { error: "Conversation not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       conversationTitle = existing.title;
     }
 
-    // 2. Persist User Message
+    // 2. Persist User Message with serialized dual-name attachments
+    const serializedFiles: string[] = [];
+    if (Array.isArray(attachments)) {
+      for (const att of attachments) {
+        serializedFiles.push(
+          typeof att === "string" ? att : JSON.stringify(att),
+        );
+      }
+    }
+    if (Array.isArray(files)) {
+      for (const f of files) {
+        if (!serializedFiles.includes(f)) {
+          serializedFiles.push(f);
+        }
+      }
+    }
+
     await prisma.conversationMessage.create({
       data: {
         conversationId: activeConversationId,
         role: "user",
-        content: message.trim(),
+        content: textContent,
+        files: serializedFiles,
       },
     });
 
@@ -90,13 +116,16 @@ export async function POST(req: NextRequest) {
 
     const model = getLanguageModel(
       DASHBOARD_CHAT_CONFIG.provider,
-      DASHBOARD_CHAT_CONFIG.model
+      DASHBOARD_CHAT_CONFIG.model,
     );
 
     const LANGUAGE_MAP: Record<string, { name: string; native: string }> = {
       en: { name: "English", native: "English" },
       hi: { name: "Hindi", native: "हिन्दी" },
-      hinglish: { name: "Hinglish", native: "Hinglish (Hindi in Roman script)" },
+      hinglish: {
+        name: "Hinglish",
+        native: "Hinglish (Hindi in Roman script)",
+      },
       mr: { name: "Marathi", native: "मराठी" },
       bn: { name: "Bengali", native: "বাংলা" },
       gu: { name: "Gujarati", native: "ગુજરાતી" },
@@ -142,34 +171,54 @@ ${languageInstruction}
 CAPABILITIES & TOOL USAGE (CRITICAL — YOU MUST USE TOOLS AUTONOMOUSLY):
 You have access to powerful tools. When the user's query relates to any of the following, you MUST autonomously call the appropriate tool — do NOT say "I can't do that" and do NOT output static text forms:
 
-1. **Interactive Dynamic Forms & Applications (CRITICAL)**:
-   - When the user asks for ANY form (e.g. "give me a form", "loan form", "loan application form", "MSME loan form", "supplier onboarding form", "subsidy registration form", "expense entry form", "form to fill", "form bana do", etc.), NEVER output a static text or markdown table form in chat!
-   - You MUST autonomously call the \`stageForm\` tool to generate a rich, multi-section, interactive editable form artifact.
-   - Structure rich sections (e.g. "1. Personal / Applicant Details", "2. Business & Enterprise Details", "3. Loan / Facility Request", "4. Banking & Financial Details") with appropriate field types (text, number, select with options, date, textarea, checkbox) and smart pre-filled defaults.
-   - The user will NOT say "generate an interactive form" — any request for "a form", "application", or "form filling" must trigger \`stageForm\` directly!
+1. **Interactive Dynamic Forms & Applications (CRITICAL — SMART PER-BANK RESEARCH PROTOCOL)**:
+   - When the user asks for ANY loan, credit facility, or government scheme application form (e.g. "loan form", "loan application form", "State Bank of India MSME loan", "Indian Bank loan form", "Bank of Baroda form", "PMEGP application", "KCC form", "Mudra loan form", "form bana do", etc.), NEVER output a static text or markdown table form in chat!
+   - **SMART PER-BANK RESEARCH PROTOCOL (CACHE VS LIVE WEB SEARCH)**:
+     * When a specific bank or scheme is requested (e.g. State Bank of India / SBI, Indian Bank, Bank of Baroda / BOB, Punjab National Bank / PNB, Canara Bank, HDFC, ICICI, PMEGP, Mudra, KCC):
+     * **Step 1: Check Active Conversation Memory**: Look at the conversation messages above. If that specific bank/scheme's official format was ALREADY researched via 'webSearch' earlier in this conversation, OR if the user is editing/updating an already generated form for that same bank, SKIP 'webSearch' and directly use the layout from memory.
+     * **Step 2: If New Bank / Not Yet Researched**: If this bank or scheme has NOT yet been researched in this conversation (or if the user switches to a different bank, e.g. switches from SBI to Indian Bank):
+       - You MUST FIRST call 'webSearch' with a targeted query: "<Bank/Scheme Name> MSME loan application form pdf layout fields particulars" or "<Bank Name> borrower credit application format columns" to discover the latest authentic sections, mandatory disclosures, and column layouts.
+       - ONLY AFTER receiving the search results, call 'stageForm' in the next step to construct the authentic form mirroring the retrieved layout.
+   - **CLEAN SECTION HEADINGS (STRICT RULE)**:
+     * Section titles MUST be plain clean strings, e.g. "1. Branch & Processing Office Particulars", "2. Enterprise Constitution & Activity", "3. Credit Facilities Requested & Purpose", "4. Existing Banking Arrangements & Past Conduct", "5. Collateral & Primary Securities Offered".
+     * NEVER wrap, prefix, or decorate section titles with dashes, brackets, regex tokens, or pipes like "—[ ... ]—", "[- ... -]", or "|-". Always use clean plain titles.
+   - **RICH STRUCTURAL LAYOUT**:
+     * Use 'documentBadge' matching the bank/scheme (e.g. "STATE BANK OF INDIA • MSME CREDIT APPLICATION", "INDIAN BANK • MSME LOAN SCHEME", "FORM 1 • PMEGP").
+     * Use 'rows' with multi-field arrays (1, 2, or 3 fields per line) matching the document's real paper layout.
+     * If the document has a passport photo box, add 'photoBox: { label: "फ़ोटो / Passport Photo" }' to the borrower/promoter section.
+     * If the form involves multiple partners, directors, or existing loans from other banks, include 'table: { headers: [...], rows: [...] }' (e.g. headers: ["S.No.", "Name of Partner/Director", "PAN", "Shareholding %", "Net Worth (₹)"] or ["Bank / Lender Name", "Facility Type", "Sanctioned Limit (₹)", "Outstanding (₹)", "Security Held"]).
+     * For registration/roll/PAN/Aadhaar/IFSC numbers, set 'displayVariant: "char_boxes"'.
 
-2. **Inspecting & In-Place Editing Existing Forms / Artifacts (CRITICAL)**:
-   - When the user asks to modify, update, change fields in, or add sections to an already generated form, chart, budget, or other artifact (e.g. "change loan amount to 15 lakhs", "add guarantor section to the form", "update interest rate to 9%"):
-   - Step 1: Call \`getArtifacts({ artifactType: "..." })\` to inspect the existing artifact's structure, sections, and \`artifactId\` (or index #1, #2).
+2. **Price Catalogs, Wholesale Rate Sheets, Agreements & Markdown Documents**:
+   - If a table, rate sheet, price catalog, quotation, or formal document is large, structured, printable, or the user specifically asks for a document modal/catalog/card (e.g. "wholesale price catalog", "printable rate sheet", "comparison matrix", "vendor agreement"):
+   - Call 'stageDocument' with rich GitHub-Flavored Markdown tables, clean headings, bullet points, badge, and theme colors. If a simple short 2-row table fits naturally in a chat reply, you can reply directly in chat, but use 'stageDocument' whenever a full-page document, printable catalog, or staged card is appropriate!
+
+3. **Inspecting & In-Place Editing Existing Forms / Documents / Artifacts (CRITICAL)**:
+   - When the user asks to modify, update, change fields in, or add sections to an already generated form, document, chart, budget, or other artifact (e.g. "change loan amount to 15 lakhs", "add guarantor section to the form", "update interest rate to 9%", "add wholesale discount column"):
+   - Step 1: Call 'getArtifacts({ artifactType: "..." })' to inspect the existing artifact's structure, sections, and 'artifactId' (or index #1, #2).
    - Step 2: Modify the schema/values as requested, keeping other sections/fields intact.
-   - Step 3: Call the staging tool (e.g. \`stageForm\`, \`stageChart\`, \`stageBudget\`) passing \`targetArtifactId: "<artifactId>"\` (e.g. \`targetArtifactId: "art_1"\` or matching ID) so the original artifact updates in place without creating duplicate cards.
+   - Step 3: Call the staging tool (e.g. 'stageForm', 'stageDocument', 'stageChart', 'stageBudget') passing 'targetArtifactId: "<artifactId>"' (e.g. 'targetArtifactId: "art_1"' or matching ID) so the original artifact updates in place without creating duplicate cards.
 
-3. **APMC Mandi Commodity Prices**: Call \`getMandiRates\` with commodity name (Onion, Wheat, Cotton, Tomato, Soyabean, etc.) and optional state/district/market.
-4. **Visual Charts & Graphs**: Call \`stageChart\` with chartType (bar/line/area/pie), title, data points, and series.
-5. **Government Schemes & Subsidies**: Call \`getGovtSchemes\` with the relevant scheme name (PM_MUDRA, PM_SVANIDHI, PMEGP, STAND_UP_INDIA, PM_VISHWAKARMA).
-6. **Budgets**: Call \`getBudgets\` to query, or \`stageBudget\` to create/update an interactive budget plan.
-7. **Expenses**: Call \`getExpenses\` to query, or \`stageExpense\` to log/update an expense draft.
-8. **Ledger Transactions**: Call \`getTransactions\` to query, or \`stageTransaction\` to create/update a transaction draft.
-9. **Savings Goals**: Call \`getSavingsGoals\` to query, or \`stageSavingsGoal\` to create/update a savings target draft.
-10. **Debts & Loans**: Call \`getDebts\` to query active liabilities, or \`stageDebt\` / \`stageForm\` for loan applications.
-11. **Web Search**: Call \`webSearch\` for live policies, trade circulars, and tax news.
-12. **Delete Records**: Call \`stageDeleteRecord\` to safely confirm deletion of a record.
-13. **Local Competitors & Market Feasibility**: Call \`searchCompetitors\` whenever the user asks about starting/opening a shop, commercial viability, local competition, rival businesses, or customer footfall in an area.
+4. **APMC Mandi Commodity Prices**: Call 'getMandiRates' with commodity name (Onion, Wheat, Cotton, Tomato, Soyabean, etc.) and optional state/district/market.
+5. **Visual Charts & Graphs**: Call 'stageChart' with chartType (bar/line/area/pie), title, data points, and series.
+6. **Government Schemes & Subsidies**: Call 'getGovtSchemes' with the relevant scheme name (PM_MUDRA, PM_SVANIDHI, PMEGP, STAND_UP_INDIA, PM_VISHWAKARMA).
+7. **Budgets**: Call 'getBudgets' to query, or 'stageBudget' to create/update an interactive budget plan.
+8. **Expenses**: Call 'getExpenses' to query, or 'stageExpense' to log/update an expense draft.
+9. **Ledger Transactions**: Call 'getTransactions' to query, or 'stageTransaction' to create/update a transaction draft.
+10. **Savings Goals**: Call 'getSavingsGoals' to query, or 'stageSavingsGoal' to create/update a savings target draft.
+11. **Debts & Loans**: Call 'getDebts' to query active liabilities, or 'stageDebt' / 'stageForm' for loan applications.
+12. **Web Search**: Call 'webSearch' for live policies, trade circulars, and tax news.
+13. **Delete Records**: Call 'stageDeleteRecord' to safely confirm deletion of a record.
+14. **Local Competitors & Market Feasibility**: Call 'searchCompetitors' whenever the user asks about starting/opening a shop, commercial viability, local competition, rival businesses, or customer footfall in an area.
     - Cites real competitor shop names, distances, landmarks, and price ranges.
     - Works dynamically for ANY business category (Biryani, Kirana, Clothes, Hardware, Repair, etc.).
     - If the tool reports location is missing, politely ask the user to turn on their device location (GPS) or tell you the specific area/city.
-14. **ONDC Digital Commerce & Wholesale Sourcing**: Call \`getOndcIntelligence\` whenever the user asks about reducing inventory or supply costs, wholesale buying on ONDC B2B, selling online without paying 25-30% aggregator commission, onboarding on ONDC, or e-commerce expansion.
-15. **Predict Top District Businesses & High-ROI Opportunities**: Call \`predictDistrictBusinesses\` whenever the user asks which business to start or open in their district/city, what are profitable business opportunities for a given budget (e.g. ₹2-5 Lakh), or which industries have low saturation and high government subsidies (PMEGP/Mudra).
+15. **ONDC Digital Commerce & Wholesale Sourcing**: Call 'getOndcIntelligence' whenever the user asks about reducing inventory or supply costs, wholesale buying on ONDC B2B, selling online without paying 25-30% aggregator commission, onboarding on ONDC, or e-commerce expansion.
+16. **Predict Top District Businesses & High-ROI Opportunities**: Call 'predictDistrictBusinesses' whenever the user asks which business to start or open in their district/city, what are profitable business opportunities for a given budget (e.g. ₹2-5 Lakh), or which industries have low saturation and high government subsidies (PMEGP/Mudra).
+17. **Accessing Attached Documents, Marksheets, Invoices & Images ('getRecentFiles')**:
+    - When the user asks about, uploads, or references any document, PDF, bill, image, marksheet, or file:
+    - Call 'getRecentFiles' to list recently uploaded files, or call 'getRecentFiles({ fileId: "..." })' with the target filename/ID to read, inspect, and extract information with multimodal intelligence.
+    - NEVER say you cannot view files or attachments — always autonomously call 'getRecentFiles' to inspect them!
 
 STRICT TOOL CALLING RULE (ENGLISH-ONLY PARAMETERS):
 1. Even when conversing, thinking, or replying in Hindi, Hinglish, Marathi, Bengali, Gujarati, or any Indian regional language:
@@ -179,7 +228,7 @@ STRICT TOOL CALLING RULE (ENGLISH-ONLY PARAMETERS):
    - User writes: "इंदौर में सोयाबीन" ➜ Call: getMandiRates({ commodity: "Soyabean", district: "Indore", state: "Madhya Pradesh" })
 3. NEVER pass Devanagari script or regional language text inside tool parameters.
 
-STRICT SCOPE BOUNDARY (CRITICAL):
+STRICT SCOPE BOUNDARY & PROHIBITED BUSINESS POLICY (CRITICAL):
 You are exclusively VyaparSetu (व्यापारसेतु), dedicated to Indian micro-enterprises, small businesses, shopkeepers, traders, and farmers.
 
 Allowed Domains:
@@ -188,12 +237,23 @@ Allowed Domains:
 3. Business finance & ledgers (cash flow runways, daily income/expenses, budgeting, debt repayment, savings goals, working capital).
 4. Trade compliance & business registration (GST, Udyam Aadhar, PAN, trade licenses).
 
-Out-of-Scope Rule:
-If the user asks about topics outside of Indian trade, agriculture, mandi rates, business finance, or government schemes (e.g. movies, gaming, entertainment, celebrity gossip, software coding, casual chat, politics, non-business medical advice):
-- DO NOT answer the off-topic query.
-- Politely decline and redirect them back to business topics.
-- English response: "I am VyaparSetu, dedicated to assisting Indian small businesses, mandi traders, and farmers. I can help you with live APMC mandi prices, government loans (PM Mudra/SVANidhi), expense ledgers, and business financial planning. How may I assist your business today?"
-- Hindi response: "माफ़ कीजिए, मैं व्यापारसेतु हूँ — भारतीय छोटे व्यापारियों, दुकानदारों और किसानों का व्यापार सहायक। मैं केवल मंडी भाव, सरकारी योजनाओं (मुद्रा/स्वनिधि ऋण), व्यापारिक बहीखाता, और वित्तीय योजना से जुड़े प्रश्नों में आपकी मदद कर सकता हूँ। आपके व्यवसाय या मंडी से संबंधित क्या प्रश्न है?"
+STRICTLY PROHIBITED BUSINESSES & ACTIVITIES:
+You are STRICTLY FORBIDDEN from advising, facilitating, calculating, creating documents/forms, or executing tools for:
+1. Adult & Illicit Night-Time Trades: Escort services, commercial sex work, brothels, red-light activities, massage parlors fronting sexual commerce, dance bars, adult entertainment, and pornography.
+2. Shadow Economy & Tax Evasion: Kaccha bill / billing without movement of goods, unrecorded cash transactions, hawala networks, black money laundering, and fraudulent GST claims.
+3. Predatory Lending & Gambling: Unlicensed money lending (meter baji / daily loan sharking at extortionate rates), satta, matka, betting clubs, or speculative gambling.
+4. Contraband & Illegal Substances: Bootlegging / illicit liquor (especially in dry states like Gujarat, Bihar), narcotics, banned agricultural pesticides/seeds, counterfeit/duplicate goods, smuggled goods, or illegal arms.
+5. Document Forgery: Fake Aadhaar, fake PAN, forged ITR, or fake bank balance certificates.
+
+PROHIBITED / OFF-TOPIC REFUSAL PROTOCOL:
+- If the user asks about ANY prohibited, illegal, or illicit night-time topic:
+  * NEVER invoke tools (no 'webSearch', 'stageForm', 'stageDocument', etc.)!
+  * Immediately provide a dignified, professional refusal:
+    - Hindi: "माफ़ कीजिए, व्यापारसेतु केवल कानूनी, पंजीकृत और वैध व्यापारिक गतिविधियों (जैसे अधिकृत मंडी भाव, जीएसटी अनुपालन और सरकारी बैंक ऋण) में सहायता करता है। हम इस प्रकार की गतिविधियों में सहायता नहीं करते।"
+    - Hinglish: "VyaparSetu keval legitimate aur certified business activities me madad karta hai. Aisi activities ke liye yahan sahayata uplabdh nahi hai."
+    - English: "VyaparSetu strictly assists with legitimate, registered trade and MSME compliance. We do not facilitate or support this category of business."
+- If the user asks general off-topic queries (movies, gaming, celebrity gossip, software coding, casual chat, politics, non-business medical advice):
+  * Politely decline and redirect them back to business topics.
 
 PRESENTATION & SYNTHESIS RULES:
 1. ALWAYS provide a comprehensive, clear markdown response to the user AFTER executing any tools.
@@ -201,20 +261,73 @@ PRESENTATION & SYNTHESIS RULES:
 3. Present rates, comparisons, and financial breakdowns in clean Markdown tables with key actionable insights.
 4. Respond adhering to the language and dynamic script rules above.`;
 
+    const userParts: any[] = [];
+    if (textContent) {
+      userParts.push({ type: "text", text: textContent });
+    } else {
+      userParts.push({
+        type: "text",
+        text: "Please inspect and analyze the attached document/image.",
+      });
+    }
+
+    if (Array.isArray(attachments)) {
+      for (const att of attachments) {
+        if (att?.url) {
+          const mType =
+            att.mimeType ||
+            (att.type === "image" ? "image/jpeg" : "application/pdf");
+          try {
+            if (
+              mType.includes("text") ||
+              mType.includes("csv") ||
+              att.uploadedName?.endsWith(".txt") ||
+              att.uploadedName?.endsWith(".csv")
+            ) {
+              const res = await fetch(att.url);
+              const txt = await res.text();
+              userParts.push({
+                type: "text",
+                text: `[Attached Text File: "${att.uploadedName || "document.txt"}"]:\n${txt.slice(0, 20000)}`,
+              });
+            } else {
+              const res = await fetch(att.url);
+              const arrayBuffer = await res.arrayBuffer();
+              userParts.push({
+                type: "file",
+                data: Buffer.from(arrayBuffer),
+                mediaType: mType,
+              });
+            }
+          } catch (fileErr) {
+            console.error(
+              `[Chat Stream] Failed to fetch attachment ${att.url}:`,
+              fileErr,
+            );
+            userParts.push({
+              type: "text",
+              text: `[Attached File: "${att.uploadedName || "attachment"}" (URL: ${att.url})]`,
+            });
+          }
+        }
+      }
+    }
+
     const rawFilteredHistory = history
       .filter((h: any) => h.role === "user" || h.role === "assistant")
       .map((h: any) => ({
         role: h.role as "user" | "assistant",
         content:
-          typeof h.content === "string"
-            ? h.content
-            : JSON.stringify(h.content),
+          typeof h.content === "string" ? h.content : JSON.stringify(h.content),
       }));
 
     const formattedMessages = rawFilteredHistory.slice(-10);
     formattedMessages.push({
       role: "user",
-      content: message.trim(),
+      content:
+        userParts.length === 1 && userParts[0].type === "text"
+          ? userParts[0].text
+          : userParts,
     });
 
     const encoder = new TextEncoder();
@@ -224,8 +337,8 @@ PRESENTATION & SYNTHESIS RULES:
           try {
             controller.enqueue(
               encoder.encode(
-                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-              )
+                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+              ),
             );
           } catch (e) {
             // controller closed
@@ -241,6 +354,52 @@ PRESENTATION & SYNTHESIS RULES:
         const streamStartTime = Date.now();
         let accumulatedText = "";
         const toolInvocations: any[] = [];
+
+        // Synthetic status events for attached files in Thinking Accordion (ChatGPT-style)
+        if (Array.isArray(attachments) && attachments.length > 0) {
+          for (let i = 0; i < attachments.length; i++) {
+            const att = attachments[i];
+            const name = att.uploadedName || att.name || `Attachment ${i + 1}`;
+            const isImg =
+              att.type === "image" ||
+              att.mimeType?.startsWith("image/") ||
+              /\.(jpeg|jpg|png|webp|gif)/i.test(name);
+            const iconType = isImg ? "image" : "document";
+            const pseudoId = `inspect_${att.id || i}_${Date.now()}`;
+
+            // 1. Emit calling step
+            sendEvent("tool_call", {
+              toolName: "inspectAttachment",
+              toolCallId: pseudoId,
+              icon: iconType,
+              args: { fileName: name },
+              summary: `Reading "${name}"...`,
+              status: "calling",
+            });
+
+            // 2. Persist completed step to toolInvocations (for DB persistence)
+            toolInvocations.push({
+              toolName: "inspectAttachment",
+              toolCallId: pseudoId,
+              icon: iconType,
+              args: { fileName: name },
+              result: { success: true, fileName: name },
+              summary: `Read and analyzed "${name}"`,
+              status: "completed",
+            });
+
+            // 3. Emit completed step
+            sendEvent("tool_result", {
+              toolName: "inspectAttachment",
+              toolCallId: pseudoId,
+              icon: iconType,
+              args: { fileName: name },
+              result: { success: true, fileName: name },
+              summary: `Read and analyzed "${name}"`,
+              status: "completed",
+            });
+          }
+        }
 
         try {
           // Native Autonomous Multi-Step Tool Execution via Vertex AI Gemini 3.7 Flash
@@ -328,29 +487,32 @@ PRESENTATION & SYNTHESIS RULES:
                   take: 25,
                 });
                 for (const pastMsg of pastMsgs) {
-                  if (!pastMsg.toolCalls || !Array.isArray(pastMsg.toolCalls)) continue;
+                  if (!pastMsg.toolCalls || !Array.isArray(pastMsg.toolCalls))
+                    continue;
                   let modified = false;
-                  const updatedCalls = (pastMsg.toolCalls as any[]).map((tc) => {
-                    const tcRes = tc.result as any;
-                    const match =
-                      tcRes?.artifactId === targetId ||
-                      tcRes?.data?.artifactId === targetId ||
-                      (targetId === "1" && tcRes?.isArtifact) ||
-                      (targetId === "art_1" && tcRes?.isArtifact);
-                    if (match) {
-                      modified = true;
-                      return {
-                        ...tc,
-                        result: {
-                          ...tcRes,
-                          title: res.title || tcRes.title,
-                          summary: res.summary || tcRes.summary,
-                          data: res.data || res,
-                        },
-                      };
-                    }
-                    return tc;
-                  });
+                  const updatedCalls = (pastMsg.toolCalls as any[]).map(
+                    (tc) => {
+                      const tcRes = tc.result as any;
+                      const match =
+                        tcRes?.artifactId === targetId ||
+                        tcRes?.data?.artifactId === targetId ||
+                        (targetId === "1" && tcRes?.isArtifact) ||
+                        (targetId === "art_1" && tcRes?.isArtifact);
+                      if (match) {
+                        modified = true;
+                        return {
+                          ...tc,
+                          result: {
+                            ...tcRes,
+                            title: res.title || tcRes.title,
+                            summary: res.summary || tcRes.summary,
+                            data: res.data || res,
+                          },
+                        };
+                      }
+                      return tc;
+                    },
+                  );
                   if (modified) {
                     await prisma.conversationMessage.update({
                       where: { id: pastMsg.id },
@@ -368,7 +530,7 @@ PRESENTATION & SYNTHESIS RULES:
           // 4. Persist Assistant Response to Database with exact measured duration
           const thoughtDurationSeconds = Math.max(
             1,
-            Math.round((Date.now() - streamStartTime) / 1000)
+            Math.round((Date.now() - streamStartTime) / 1000),
           );
 
           if (accumulatedText.trim()) {
@@ -377,7 +539,9 @@ PRESENTATION & SYNTHESIS RULES:
                 conversationId: activeConversationId,
                 role: "assistant",
                 content: accumulatedText.trim(),
-                thinking: JSON.stringify({ durationSeconds: thoughtDurationSeconds }),
+                thinking: JSON.stringify({
+                  durationSeconds: thoughtDurationSeconds,
+                }),
                 toolCalls:
                   toolInvocations.length > 0
                     ? (toolInvocations as any)
@@ -408,7 +572,7 @@ PRESENTATION & SYNTHESIS RULES:
     console.error("[POST /api/chat/stream error]:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

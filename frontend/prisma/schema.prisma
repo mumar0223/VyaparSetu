@@ -89,6 +89,7 @@ model ConversationMessage {
   role           String // "user" | "assistant" | "system"
   content        String       @db.Text
   thinking       String?      @db.Text
+  files          String[]     @default([])
   toolCalls      Json?
   createdAt      DateTime     @default(now())
 

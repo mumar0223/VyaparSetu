@@ -11,24 +11,24 @@ async function runTest() {
   const LAT = 26.958548;
   const LON = 81.000371;
 
-  console.log("Testing with Coordinates: Kursi Road, Lucknow (Biryani & Food Outlets)...");
+  console.log("Testing with Coordinates: Kursi Road, Lucknow (Catering & Restaurant Services)...");
   const result = await searchCompetitorsIntelligence({
-    category: "Biryani & Food Outlets",
-    radiusKm: 3,
+    category: "Catering & Restaurant Services",
+    radiusKm: 2,
     lat: LAT,
     lon: LON,
+    bypassCache: true,
   });
 
   console.log("\n--- RESULT ---");
   console.log("Success:", result.success);
   console.log("Location Summary:", result.locationSummary);
   console.log("Category:", result.category);
-  console.log("Udyam Saturation:", result.udyamStats?.saturationLevel);
-  console.log("Spoken Summary:", result.spokenSummary);
-  console.log("\nCompetitors Found:", result.competitors.length);
+  console.log("Total Places Discovered for Map (allPlaces):", result.allPlaces?.length || 0);
+  console.log("Top Competitors for SWOT Cards (competitors):", result.competitors.length);
   result.competitors.forEach((c, idx) => {
     console.log(`\n[${idx + 1}] ${c.name}`);
-    console.log(`    Distance: ${c.distance} | Landmark: ${c.landmark}`);
+    console.log(`    Distance: ${c.distance} | Landmark: ${c.landmark} | GPS: ${c.lat}, ${c.lng}`);
     console.log(`    Speciality: ${c.speciality} | Price: ${c.priceRange}`);
     console.log(`    Threat Level: ${c.threatLevel} | Why: ${c.differentiator || "N/A"}`);
   });
