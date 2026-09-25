@@ -629,102 +629,11 @@ const GetRecentFilesSchema = z.object({
     ),
 });
 
-const CaptureDocumentSchema = z.object({
-  query: z
-    .string()
-    .optional()
-    .describe(
-      "Optional specific extraction goals or instructions for this document (e.g. 'Extract all fields to digitize loan application', 'Extract passbook details'). If omitted, extracts the complete document layout and fields.",
-    ),
-});
-
-/**
- * Agent Tools Registry
- * Fully contextualized with authenticated user session & PostgreSQL Prisma database.
- */
 export function getAgentTools(ctx?: ToolContext) {
   const userId = ctx?.userId;
   const conversationId = ctx?.conversationId;
 
   return {
-    // ─────────────────────────────────────────────────────────────
-    // 0. CAMERA DOCUMENT CAPTURE & VISION OCR INSPECTION
-    // ─────────────────────────────────────────────────────────────
-    captureDocument: tool({
-      description:
-        "Captures, inspects, and extracts structured data, form fields, and text from the physical document, paper form, passbook, receipt, bill, or screen shown on the user's camera. Call this tool whenever the user is showing a document on camera or asks to digitize/inspect/extract what is visible on the live camera screen. Uses multimodal vision to perform OCR and layout recognition.",
-      inputSchema: CaptureDocumentSchema,
-      execute: async ({ query: promptQuery }) => {
-        const imageBuf = ctx?.imageBuffer;
-        const savedUrl = ctx?.savedImageUrl;
-
-        if (!imageBuf) {
-          return {
-            success: false,
-            error: "CAMERA_NOT_ACTIVE",
-            message:
-              "Camera is currently turned off or no active frame was captured. Ask the user to turn on their camera to capture the document.",
-          };
-        }
-
-        try {
-          const { generateText } = await import("ai");
-          const { getLanguageModel } = await import("./ai-provider");
-          const { DASHBOARD_CHAT_CONFIG } = await import("./chat-config");
-
-          const visionModel = getLanguageModel(
-            DASHBOARD_CHAT_CONFIG.provider,
-            DASHBOARD_CHAT_CONFIG.model,
-          );
-
-          const filePart = {
-            type: "file",
-            data: imageBuf,
-            mediaType: ctx?.imageMimeType || "image/jpeg",
-          };
-
-          const inspectionResult = await generateText({
-            model: visionModel,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: `You are an expert OCR, document layout, and form analysis engine for VyaparSetu.
-Carefully inspect this live camera frame of a document, paper form, bill, passbook, or screen.
-User Extraction Goal: ${promptQuery || "Extract all fields, tables, sections, labels, and text to digitize this document."}
-
-Output a comprehensive structured breakdown:
-1. Document Title / Official Heading
-2. Document Badge (e.g. "OFFICIAL APPLICATION", "BANK PASSBOOK", "TAX INVOICE")
-3. Sections and all Form Fields: field labels, field types (text, number, date, select, checkbox), and any values already written or printed.
-4. Tables: column headers and rows (if any).
-5. Photos / Stamps / Signatures present or required.`,
-                  },
-                  filePart as any,
-                ],
-              },
-            ],
-          });
-
-          return {
-            success: true,
-            documentType: "captured_document",
-            savedImageUrl: savedUrl,
-            extractedStructure: inspectionResult.text,
-            summary: "Captured and extracted document structure from live camera.",
-          };
-        } catch (err: any) {
-          console.error("[captureDocument tool error]:", err);
-          return {
-            success: false,
-            message: `Could not process camera document: ${err?.message}`,
-            savedImageUrl: savedUrl,
-          };
-        }
-      },
-    }),
 
     // ─────────────────────────────────────────────────────────────
     // 0.5 ATTACHMENT / RECENT FILES RETRIEVAL & INSPECTION
@@ -2337,13 +2246,5 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
       args?.fileId
         ? `Inspected uploaded document "${result?.file?.uploadedName || args.fileId}"`
         : `Checked recent conversation attachments (${result?.totalCount || 0} files found)`,
-  },
-  captureDocument: {
-    name: "captureDocument",
-    icon: "camera",
-    formatSummary: (args, result) =>
-      result?.success
-        ? `Captured and inspected document from live camera`
-        : `Camera capture: ${result?.message || "Unavailable"}`,
   },
 };

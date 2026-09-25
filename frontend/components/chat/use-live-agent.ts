@@ -230,6 +230,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
   const assistantUsesOutputTranscriptRef = useRef(false);
   const toolCallsRef = useRef<ToolCallItem[]>([]);
   const turnFilesRef = useRef<string[]>([]);
+  const pendingCloudUploadsRef = useRef<Array<Promise<void>>>([]);
   const isExecutingToolRef = useRef(false);
   const turnTaskTriggeredRef = useRef(false);
   const turnCompleteRef = useRef(false);
@@ -331,6 +332,14 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
   const flushAndPersistActiveTurn = useCallback(async () => {
     clearFlushTimer();
     if (isExecutingToolRef.current) return;
+
+    // Await any pending parallel cloud uploads so permanent CDN URLs are ready for DB
+    if (pendingCloudUploadsRef.current.length > 0) {
+      const activeUploads = [...pendingCloudUploadsRef.current];
+      pendingCloudUploadsRef.current = [];
+      await Promise.allSettled(activeUploads);
+    }
+
     const vertexUser = userTranscriptRef.current.trim();
     const browserUser = nativeCaptionFinalRef.current.trim();
     const userTranscript =
@@ -681,6 +690,28 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       await cameraManagerRef.current.start(cameraFacingMode);
       setIsCameraActive(true);
       startCameraPreviewLoop();
+
+      // Silently notify Gemini Live that camera is active and frames are streaming
+      const socket = socketRef.current;
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(
+          JSON.stringify({
+            clientContent: {
+              turns: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      text: "[System note: User turned ON camera. Video frames are now streaming in real time.]",
+                    },
+                  ],
+                },
+              ],
+              turnComplete: false,
+            },
+          }),
+        );
+      }
     } catch (err: any) {
       // Permission denied or dismissed by user: do NOT console.error or abort active voice call
       const isPermissionDenied =
@@ -703,6 +734,28 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     cameraManagerRef.current?.stop();
     setIsCameraActive(false);
     setCameraError(null);
+
+    // Silently notify Gemini Live that camera is closed
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          clientContent: {
+            turns: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: "[System note: User turned OFF camera. Camera is closed; no video frames are streaming.]",
+                  },
+                ],
+              },
+            ],
+            turnComplete: false,
+          },
+        }),
+      );
+    }
   }, [stopCameraPreviewLoop]);
 
   const toggleCamera = useCallback(async () => {
@@ -826,9 +879,6 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             });
 
             uploadedSerializedFiles.push(filePayload);
-            if (!turnFilesRef.current.includes(filePayload)) {
-              turnFilesRef.current.push(filePayload);
-            }
             return {
               ...doc,
               persistentUrl,
@@ -1278,8 +1328,30 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       if (!cameraManagerRef.current || !cameraManagerRef.current.isActive())
         return;
       const captureStartTime = Date.now();
+
+      backgroundTaskRef.current = {
+        status: "working",
+        activeTool: "camera",
+        description: "Capturing 3-frame burst...",
+        progressPhase: "capturing",
+      };
+      setBackgroundTask({ ...backgroundTaskRef.current });
+
       const burst = await cameraManagerRef.current.captureBestFrameBlob();
-      if (!burst || !burst.blob) return;
+      if (!burst || !burst.blob) {
+        backgroundTaskRef.current = { status: "idle" };
+        setBackgroundTask({ ...backgroundTaskRef.current });
+        return;
+      }
+
+      const scoreDisplay = burst.sharpnessScore ? ` (Sharpness: ${burst.sharpnessScore})` : "";
+      backgroundTaskRef.current = {
+        status: "working",
+        activeTool: "camera",
+        description: `Optimal frame selected${scoreDisplay}`,
+        progressPhase: "evaluating",
+      };
+      setBackgroundTask({ ...backgroundTaskRef.current });
 
       const query =
         overrideQuery ||
@@ -1287,21 +1359,43 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
         nativeCaptionFinalRef.current.trim() ||
         "Inspect and process captured document";
 
+      // Parallel cloud upload to UploadThing for permanent CDN persistence
+      const file = new File([burst.blob], `doc-${Date.now()}.jpg`, { type: "image/jpeg" });
+      const cloudUploadPromise = uploadFiles("chatAttachmentUploader", { files: [file] })
+        .then((res) => (res?.[0] as any)?.ufsUrl || (res?.[0] as any)?.url || null)
+        .catch((err) => {
+          console.warn("[voice] Parallel UploadThing manual capture upload failed:", err);
+          return null;
+        });
+
       const subResult = await launchBackgroundScreenTask(
         { query },
         undefined,
         burst.blob,
       );
 
+      const cloudUrl = await cloudUploadPromise;
+      const finalImgUrl = cloudUrl || subResult.savedImageUrl;
+
       const elapsedSeconds =
         subResult.thoughtDurationSeconds ||
         Math.max(1, Math.round((Date.now() - captureStartTime) / 1000));
+
+      const filePayload = finalImgUrl
+        ? JSON.stringify({
+            id: `cam_${Date.now()}`,
+            name: `Captured Document ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.jpg`,
+            url: finalImgUrl,
+            type: "IMAGE",
+            mimeType: "image/jpeg",
+          })
+        : null;
 
       // If manual capture triggered outside of voice tool call, persist the result
       void persistTurnSnapshot({
         userTranscript: query,
         assistantTranscript: subResult.finalAssistant,
-        files: subResult.savedImageUrl ? [subResult.savedImageUrl] : undefined,
+        files: filePayload ? [filePayload] : undefined,
         toolCalls:
           subResult.toolCalls.length > 0 ? subResult.toolCalls : [],
       });
@@ -1323,38 +1417,76 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             cameraManagerRef.current && cameraManagerRef.current.isActive()
           );
 
+          // If the model explicitly requested camera capture but the camera is OFF:
+          if (Boolean(call.args?.captureImage) && !isCameraOn) {
+            functionResponses.push({
+              id: call.id,
+              name: call.name,
+              response: {
+                output: {
+                  status: "error",
+                  error: "CAMERA_OFF",
+                  findings: "Camera is currently turned off. Please ask the user out loud to open or turn on their camera so you can view and capture the document.",
+                },
+              },
+            });
+            continue;
+          }
+
           let imageBlob: Blob | undefined = undefined;
 
-          // Directly capture camera frame if camera is open and the task is document/camera related
-          if (isCameraOn && cameraManagerRef.current) {
-            const queryStr = typeof call.args?.query === "string" ? call.args.query : "";
-            const actionTypeStr = typeof call.args?.actionType === "string" ? call.args.actionType : "";
+          // Pure model-driven capture: if the voice agent decided captureImage is true and camera is active
+          if (Boolean(call.args?.captureImage) && cameraManagerRef.current && isCameraOn) {
+            try {
+              // Micro-status 1: Burst capture
+              backgroundTaskRef.current = {
+                status: "working",
+                activeTool: "camera",
+                description: "Capturing 3-frame burst...",
+                progressPhase: "capturing",
+              };
+              setBackgroundTask({ ...backgroundTaskRef.current });
 
-            const isExplicitCapture = call.name === "captureDocument";
-            const isDocAction =
-              actionTypeStr === "document" ||
-              actionTypeStr === "capture" ||
-              actionTypeStr === "ocr" ||
-              actionTypeStr === "paper";
+              const burst = await cameraManagerRef.current.captureBestFrameBlob();
+              if (burst?.blob) {
+                imageBlob = burst.blob;
 
-            const isDocQuery =
-              /camera|document|paper|capture|showing|passbook|receipt|bill|invoice|aadhaar|pan|scan|inspect|digitize|photo|frame|kalam|pen|dastaavez|praroop|dekho|ye\s*form|iska\s*form/i.test(
-                queryStr,
-              );
+                // Micro-status 2: Sharpness evaluated
+                const scoreDisplay = burst.sharpnessScore ? ` (Sharpness: ${burst.sharpnessScore})` : "";
+                backgroundTaskRef.current = {
+                  status: "working",
+                  activeTool: "camera",
+                  description: `Optimal frame selected${scoreDisplay}`,
+                  progressPhase: "evaluating",
+                };
+                setBackgroundTask({ ...backgroundTaskRef.current });
 
-            const isMandiOnly =
-              /mandi|rate|bhav|price|apmc|commodity/i.test(queryStr) && !isDocQuery;
-
-            // Only capture camera if it is explicitly a document/camera task, NOT for mandi or pure search
-            if (isExplicitCapture || isDocAction || isDocQuery || (!isMandiOnly && !actionTypeStr)) {
-              try {
-                const burst = await cameraManagerRef.current.captureBestFrameBlob();
-                if (burst?.blob) {
-                  imageBlob = burst.blob;
-                }
-              } catch (e) {
-                console.warn("[voice] Error capturing camera frame for screen task:", e);
+                // Non-blocking parallel upload to UploadThing for permanent CDN persistence
+                const file = new File([burst.blob], `doc-${Date.now()}.jpg`, { type: "image/jpeg" });
+                const uploadTask = (async () => {
+                  try {
+                    const res = await uploadFiles("chatAttachmentUploader", { files: [file] });
+                    const cloudUrl = (res?.[0] as any)?.ufsUrl || (res?.[0] as any)?.url || null;
+                    if (cloudUrl) {
+                      const filePayload = JSON.stringify({
+                        id: `cam_${Date.now()}`,
+                        name: `Captured Document ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.jpg`,
+                        url: cloudUrl,
+                        type: "IMAGE",
+                        mimeType: "image/jpeg",
+                      });
+                      if (!turnFilesRef.current.some((f) => f.includes(cloudUrl))) {
+                        turnFilesRef.current.push(filePayload);
+                      }
+                    }
+                  } catch (err) {
+                    console.warn("[voice] Parallel UploadThing camera upload failed:", err);
+                  }
+                })();
+                pendingCloudUploadsRef.current.push(uploadTask);
               }
+            } catch (e) {
+              console.warn("[voice] Error capturing camera frame for screen task:", e);
             }
           }
 
@@ -1364,13 +1496,6 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             imageBlob,
             isCameraOn,
           );
-
-          if (
-            subResult.savedImageUrl &&
-            !turnFilesRef.current.includes(subResult.savedImageUrl)
-          ) {
-            turnFilesRef.current.push(subResult.savedImageUrl);
-          }
 
           // Push real sub-agent tool calls (including captureDocument, stageForm, webSearch, etc.)
           if (subResult.toolCalls && subResult.toolCalls.length > 0) {
@@ -1639,6 +1764,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             conversationId: currentChatId,
             language: selectedLanguageRef.current,
             activeArtifactOverview: activeArtifactOverviewRef.current || undefined,
+            isCameraActive: Boolean(cameraManagerRef.current && cameraManagerRef.current.isActive()),
           }),
         });
         const session = (await response.json()) as VoiceSessionConfig & {

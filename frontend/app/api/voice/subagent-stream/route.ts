@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     let imageMimeType = "image/jpeg";
     let sharpnessScore: number | undefined = undefined;
     let isCameraActive = false;
+    let savedImageUrl: string | null = null;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       const scoreStr = formData.get("sharpnessScore") as string;
       if (scoreStr) sharpnessScore = Number(scoreStr);
       isCameraActive = formData.get("isCameraActive") === "true";
+      savedImageUrl = (formData.get("imageUrl") as string) || null;
 
       const imageFile = formData.get("image");
       if (imageFile && typeof (imageFile as any).arrayBuffer === "function") {
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
       actionType = body.actionType || "general";
       conversationId = body.conversationId;
       audioBase64 = body.audioBase64;
+      savedImageUrl = body.imageUrl || null;
       if (body.isCameraActive) isCameraActive = true;
       if (body.imageBase64) {
         try {
@@ -77,20 +80,7 @@ export async function POST(req: NextRequest) {
 
     const streamStartTime = Date.now();
 
-    // ── File & Database Persistence ──
-    let savedImageUrl: string | null = null;
-    if (imageBuffer) {
-      try {
-        const uploadDir = path.join(process.cwd(), "public", "uploads", "captured-documents");
-        await fs.promises.mkdir(uploadDir, { recursive: true });
-        const fileName = `doc-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.jpg`;
-        const filePath = path.join(uploadDir, fileName);
-        await fs.promises.writeFile(filePath, imageBuffer);
-        savedImageUrl = `/uploads/captured-documents/${fileName}`;
-      } catch (fsErr) {
-        console.warn("[voice/subagent-stream] Failed to save image to disk:", fsErr);
-      }
-    }
+    // ── Zero disk I/O on server: imageBuffer stays in memory for multimodal vision prompt ──
 
     // ── Compact Chat History Prepending (Last 6 messages, ~100 tokens, zero cost burst) ──
     let chatHistoryMessages: any[] = [];
@@ -122,7 +112,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const tools = getAgentTools({
+    const allTools = getAgentTools({
       userId: user.id,
       conversationId,
       imageBuffer,
@@ -131,6 +121,9 @@ export async function POST(req: NextRequest) {
       sharpnessScore,
       isCameraActive,
     });
+    const tools: Record<string, any> = { ...allTools };
+    // Subagent model does not need captureDocument tool because the browser directly captures and attaches the image in multimodal vision (userParts)
+    delete tools.captureDocument;
 
     const model = getLanguageModel(
       DASHBOARD_CHAT_CONFIG.provider,
@@ -144,24 +137,23 @@ User Action Request: "${query}"
 Camera Status: ${isCameraActive ? "ACTIVE (Live video feed is open)" : "INACTIVE"}
 ${savedImageUrl ? `Direct Attached File: "${savedImageUrl}"` : ""}
 
-CRITICAL DOCUMENT & IMAGE RESOLUTION HIERARCHY (STRICT 3-TIER ORDER):
-1. TIER 1 (DIRECT ATTACHED IMAGE):
-   • If an image is already attached directly in this turn (savedImageUrl), visually inspect and use it immediately with multimodal vision. You do NOT need to call 'captureDocument' or 'getRecentFiles' if the document is already attached right here!
-2. TIER 2 (CHAT HISTORY & RECENT FILES):
-   • If NO image is directly attached in this turn, check if an image or document was previously uploaded or discussed in recent chat history.
-   • Call 'getRecentFiles({ fileId: "latest" })' to retrieve and inspect any previously uploaded invoice, passbook, paper, or document.
-3. TIER 3 (LIVE CAMERA CAPTURE):
-   • ONLY if NO image is found in Tier 1 and Tier 2, and the user asks to digitize or inspect what is visible on camera/screen:
-   • Call 'captureDocument({ query })' to capture and read a fresh frame from the live camera feed.
-   • Use the extracted document structure from 'captureDocument' to invoke 'stageForm' (or 'stageDocument') to stage the authentic digital interface on the user's screen!
+DOCUMENT & VISION EXECUTION PROTOCOL:
+• When an image or document frame is attached directly in this turn (via userParts / savedImageUrl), visually inspect it immediately with your native multimodal vision!
+• Read all field labels, sections, printed/written text, tables, and data directly from the image.
+• Immediately invoke 'stageForm' (or 'stageDocument') to assemble the authentic digital interface on the user's screen.
+• If NO image is directly attached and the user asks about an uploaded document, call 'getRecentFiles({ fileId: "latest" })' to retrieve any previously uploaded file.
 
 DOCUMENT VISION & MULTIMODAL EXECUTION PROTOCOL (WHEN AN IMAGE IS ATTACHED):
-1. LEGIBILITY CHECK:
+1. LEGIBILITY & IMAGE QUALITY AUDIT:
    • First, visually inspect the provided document image.
-   • IF the image is heavily blurred, out-of-focus, obscured by strong glare/shadows, or the text is impossible to read with certainty:
+   • IF the image is heavily blurred, out-of-focus, obscured by strong glare/shadows, too far, too close, or text is impossible to read:
      - DO NOT invent or hallucinate field values!
-     - Immediately output the exact phrase: "IMAGE_UNCLEAR: <reason>" (e.g. "IMAGE_UNCLEAR: Document text is blurry due to motion. Please hold steady in good lighting and capture again.").
-     - Do not call staging tools with fake or guessed data.
+     - Immediately output the exact spoken diagnostic explanation (under 25 words):
+       * If Blurry / Motion: "Document image blur hai aur text saaf nahi padh paya. Kripya camera sthir rakhkar dubara capture karein."
+       * If Too Far / Text tiny: "Camera document se bahut door hai, text chhota hai. Kripya camera thoda paas laayein."
+       * If Too Close / Cut off: "Document ke kinare cut rahe hain. Kripya camera thoda peeche karein taaki poora page dikhe."
+       * If Glare / Dark: "Document par tez chamak (glare) ya parchhayi hai. Kripya behtar roshni mein capture karein."
+     - Do NOT call staging tools with fake, guessed, or placeholder data.
 
 2. AUTONOMOUS TASK FULFILLMENT BASED ON USER QUERY:
    • Read the user's request and fulfill it intelligently using the document image and your tools:
@@ -318,21 +310,7 @@ STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
           wrappedTools[name] = {
             ...t,
             execute: async (toolArgs: any, context: any) => {
-              if (name === "captureDocument") {
-                sendEvent("status", {
-                  status: "working",
-                  activeTool: "captureDocument",
-                  description: "Scanning and reading document from live camera...",
-                  spokenHint: "Main aapka camera document scan aur extract kar raha hoon, bas thoda intezar kijiye.",
-                  progressPhase: "document_ocr",
-                });
-                if (savedImageUrl) {
-                  sendEvent("document_captured", {
-                    url: savedImageUrl,
-                    query: toolArgs?.query || query || "Camera Document",
-                  });
-                }
-              } else if (name === "webSearch") {
+              if (name === "webSearch") {
                 sendEvent("status", {
                   status: "working",
                   activeTool: "webSearch",
