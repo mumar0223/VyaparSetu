@@ -82,18 +82,40 @@ model Conversation {
   @@index([updatedAt])
 }
 
+enum AttachmentType {
+  DOCUMENT
+  IMAGE
+  PDF
+  SHEET
+}
+
 model ConversationMessage {
-  id             String       @id @default(cuid())
+  id             String              @id @default(cuid())
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           String // "user" | "assistant" | "system"
-  content        String       @db.Text
-  thinking       String?      @db.Text
-  files          String[]     @default([])
+  content        String              @db.Text
+  thinking       String?             @db.Text
+  files          String[]            @default([])
+  attachments    MessageAttachment[]
   toolCalls      Json?
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime            @default(now())
 
   @@index([conversationId])
+}
+
+model MessageAttachment {
+  id        String              @id @default(cuid())
+  messageId String
+  message   ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  url       String
+  name      String
+  type      AttachmentType      @default(DOCUMENT)
+  mimeType  String?
+  size      Int?
+  createdAt DateTime            @default(now())
+
+  @@index([messageId])
 }
 
 model Business {

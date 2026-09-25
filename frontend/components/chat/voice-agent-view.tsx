@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Mic,
   MicOff,
@@ -26,6 +26,8 @@ import {
   VideoOff,
   SwitchCamera,
   X,
+  Plus,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SupportedLanguageCode } from "@/lib/agent/chat-config";
@@ -34,6 +36,7 @@ import type {
   BackgroundScreenTaskState,
   SubAgentTaskItem,
   CompletedTaskItem,
+  VoiceAttachedDocument,
 } from "./use-live-agent";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -79,6 +82,18 @@ interface VoiceAgentViewProps {
   onSwitchCameraFacing?: () => void;
   onAttachCameraVideoElement?: (el: HTMLVideoElement | null) => void;
   isSidebarOpen?: boolean;
+  attachedDocuments?: VoiceAttachedDocument[];
+  attachedDocument?: VoiceAttachedDocument | null;
+  onAttachDocuments?: (files: FileList | File[]) => void;
+  onAttachDocument?: (file: File) => void;
+  onRemoveAttachedDocument?: (id?: string) => void;
+}
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // ── Memoized Live Transcript Card (Light, Dark & Camera Feed Optimized) ──
@@ -446,10 +461,35 @@ export const VoiceAgentView = React.memo(function VoiceAgentView({
   onSwitchCameraFacing,
   onAttachCameraVideoElement,
   isSidebarOpen,
+  attachedDocuments = [],
+  attachedDocument,
+  onAttachDocuments,
+  onAttachDocument,
+  onRemoveAttachedDocument,
 }: VoiceAgentViewProps) {
   const [showLiveCaptions, setShowLiveCaptions] = useState(true);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [isResultsHubOpen, setIsResultsHubOpen] = useState(false);
+  const [isFilesDialogOpen, setIsFilesDialogOpen] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  const docs: VoiceAttachedDocument[] = useMemo(() => {
+    if (attachedDocuments && attachedDocuments.length > 0) return attachedDocuments;
+    if (attachedDocument) return [attachedDocument];
+    return [];
+  }, [attachedDocuments, attachedDocument]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      if (onAttachDocuments) {
+        onAttachDocuments(files);
+      } else if (onAttachDocument) {
+        onAttachDocument(files[0]);
+      }
+    }
+    e.target.value = "";
+  };
 
   // ── Track History Sidebar Open State (Hides Top & Bottom Controls on Mobile like Language Switcher) ──
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
@@ -1212,6 +1252,96 @@ export const VoiceAgentView = React.memo(function VoiceAgentView({
           </div>
         )}
 
+        {/* Hidden file input for uploading images & documents (Android WhatsApp-style rich picker) */}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          multiple
+          accept="image/*,application/pdf,text/*,.pdf,.doc,.docx,.xls,.xlsx"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        {/* Floating Document Attachment Controls: Dialog Opener Badge + Same-Line "+ Add File" Button */}
+        {docs.length > 0 ? (
+          <div className="flex items-center justify-center gap-2 mb-1 max-w-[95%] sm:max-w-md animate-in fade-in slide-in-from-bottom-2 duration-200">
+            {/* Opener Pill / Card */}
+            <button
+              type="button"
+              onClick={() => setIsFilesDialogOpen(true)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-md transition-all cursor-pointer hover:scale-[1.02] active:scale-95 text-left min-w-0 max-w-[260px] sm:max-w-xs",
+                isCameraActive
+                  ? "bg-black/75 hover:bg-black/90 text-white border-white/25"
+                  : "bg-white/95 dark:bg-card/90 hover:bg-cream dark:hover:bg-muted text-foreground border-sage/40 dark:border-border",
+              )}
+              title="Click to view attached documents"
+            >
+              {docs[docs.length - 1]?.previewUrl ? (
+                <img
+                  src={docs[docs.length - 1].previewUrl}
+                  alt={docs[docs.length - 1].name}
+                  className="size-5 rounded-md object-cover border border-sage/30 dark:border-border/60 shrink-0"
+                />
+              ) : (
+                <div className="size-5 rounded-md bg-forest/10 dark:bg-mint/10 flex items-center justify-center shrink-0 text-forest dark:text-mint">
+                  <FileText className="size-3" />
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 min-w-0 truncate">
+                <span className="text-xs font-semibold truncate">
+                  {docs.length === 1 ? docs[0].name : `${docs.length} Files Attached`}
+                </span>
+                {docs.some((d) => d.status === "uploading") ? (
+                  <Loader2 className="size-3 animate-spin text-amber-500 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="size-3 text-emerald-500 shrink-0" />
+                )}
+              </div>
+            </button>
+
+            {/* Same-line "+ Add File" button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (docs.length >= 5) return;
+                uploadInputRef.current?.click();
+              }}
+              disabled={docs.length >= 5 || isInitializing || isEnding || isError}
+              title={docs.length >= 5 ? "Maximum 5 files reached" : "Add more files (max 5)"}
+              className={cn(
+                "h-8 px-2.5 rounded-full flex items-center gap-1 text-xs font-medium transition-all shadow-xs hover:shadow cursor-pointer active:scale-95 shrink-0",
+                docs.length >= 5
+                  ? "opacity-50 cursor-not-allowed bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
+                  : isCameraActive
+                    ? "bg-black/65 hover:bg-black/85 text-white/90 border border-white/20 backdrop-blur-md"
+                    : "bg-white/90 dark:bg-card/90 hover:bg-cream dark:hover:bg-muted text-forest dark:text-mint border border-sage/40 dark:border-border",
+              )}
+            >
+              <Plus className="size-3.5" />
+              <span>Add File</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center mb-1">
+            <button
+              type="button"
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={isInitializing || isEnding || isError}
+              title="Upload document or bill photo (up to 5 files)"
+              className={cn(
+                "h-7 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium transition-all shadow-xs hover:shadow cursor-pointer active:scale-95",
+                isCameraActive
+                  ? "bg-black/65 hover:bg-black/85 text-white/90 border border-white/20 backdrop-blur-md"
+                  : "bg-white/90 dark:bg-card/90 hover:bg-cream dark:hover:bg-muted text-forest dark:text-mint border border-sage/40 dark:border-border",
+              )}
+            >
+              <Plus className="size-3.5" />
+              <span>Add Document</span>
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-center gap-2.5 sm:gap-3.5 md:gap-4 w-full px-2">
           {/* Mute / Unmute Button */}
           <button
@@ -1281,6 +1411,16 @@ export const VoiceAgentView = React.memo(function VoiceAgentView({
               onStartSpeaking?.();
             }}
             onPointerUp={(e) => {
+              try {
+                (e.currentTarget as HTMLElement).releasePointerCapture(
+                  e.pointerId,
+                );
+              } catch {
+                /* already released */
+              }
+              onStopSpeaking?.();
+            }}
+            onPointerCancel={(e) => {
               try {
                 (e.currentTarget as HTMLElement).releasePointerCapture(
                   e.pointerId,
@@ -1731,6 +1871,135 @@ export const VoiceAgentView = React.memo(function VoiceAgentView({
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ATTACHED DOCUMENTS DIALOG (Matching isResultsHubOpen layout) ── */}
+      {isFilesDialogOpen && docs.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <div className="size-9 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <FileText className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-zinc-900 dark:text-white">
+                      Attached Documents
+                    </h3>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/50">
+                      {docs.length}/5 Attached
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Uploaded files available to AI during this voice session
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilesDialogOpen(false)}
+                className="size-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* List of files */}
+            <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
+              {docs.map((doc, idx) => (
+                <div
+                  key={doc.id || idx}
+                  className="p-3.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/60 flex items-center justify-between gap-3 shadow-xs"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {doc.previewUrl ? (
+                      <img
+                        src={doc.previewUrl}
+                        alt={doc.name}
+                        className="size-11 rounded-xl object-cover border border-zinc-200 dark:border-zinc-700 shrink-0"
+                      />
+                    ) : (
+                      <div className="size-11 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <FileText className="size-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0 text-left">
+                      <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                        {doc.name}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {doc.size ? (
+                          <span className="text-[11px] text-zinc-400 font-mono">
+                            {formatFileSize(doc.size)}
+                          </span>
+                        ) : null}
+                        <span className="text-zinc-300 dark:text-zinc-700">&bull;</span>
+                        {doc.status === "uploading" ? (
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                            <Loader2 className="size-3 animate-spin" />
+                            Uploading {doc.progress}%
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="size-3" />
+                            Ready
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onRemoveAttachedDocument) {
+                        onRemoveAttachedDocument(doc.id);
+                      }
+                      if (docs.length <= 1) {
+                        setIsFilesDialogOpen(false);
+                      }
+                    }}
+                    title="Remove this file"
+                    className="size-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/50 dark:hover:text-rose-400 text-zinc-500 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer with Add More & Done */}
+            <div className="px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (docs.length >= 5) return;
+                  uploadInputRef.current?.click();
+                }}
+                disabled={docs.length >= 5}
+                className={cn(
+                  "px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs",
+                  docs.length >= 5
+                    ? "opacity-50 cursor-not-allowed bg-zinc-200 dark:bg-zinc-800 text-zinc-400"
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 active:scale-95",
+                )}
+              >
+                <Plus className="size-3.5" />
+                <span>Add More Files ({docs.length}/5)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsFilesDialogOpen(false)}
+                className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

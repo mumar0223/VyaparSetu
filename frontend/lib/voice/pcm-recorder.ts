@@ -60,6 +60,34 @@ export class PCMRecorder {
     if (this.isRecording) return true;
 
     try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+
+      if (!AudioCtx) {
+        throw new Error("Web Audio API is not supported in this browser.");
+      }
+
+      // Synchronously instantiate and resume the AudioContext right at the start
+      // so it captures the active user gesture stack and enters "running" immediately
+      if (!this.audioContext || this.audioContext.state === "closed") {
+        this.audioContext = new AudioCtx({
+          sampleRate: GEMINI_LIVE_INPUT_SAMPLE_RATE,
+        });
+      }
+
+      if (this.audioContext.state === "suspended") {
+        void this.audioContext.resume().catch(() => {});
+      }
+
+      this.nativeSampleRate = this.audioContext.sampleRate;
+      if (this.nativeSampleRate !== GEMINI_LIVE_INPUT_SAMPLE_RATE) {
+        throw new Error(
+          `Chrome did not provide the required ${GEMINI_LIVE_INPUT_SAMPLE_RATE} Hz audio context (received ${this.nativeSampleRate} Hz).`,
+        );
+      }
+
       // Detect mobile / touch devices.
       // On mobile devices, requesting echoCancellation forces Android into
       // MODE_IN_COMMUNICATION (telephony call mode) and iOS into earpiece routing.
@@ -105,37 +133,6 @@ export class PCMRecorder {
         autoGainControl: actualSettings.autoGainControl ?? "unknown",
         deviceId: actualSettings.deviceId ?? "unknown",
       });
-
-      const AudioCtx =
-        window.AudioContext ||
-        (window as Window & { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext;
-
-      if (!AudioCtx) {
-        throw new Error("Web Audio API is not supported in this browser.");
-      }
-
-      // Chrome resamples the microphone stream into this context. Requesting
-      // 16 kHz here is safer and more predictable than asking Gemini to infer
-      // the source rate from arbitrary desktop hardware (typically 48 kHz).
-      this.audioContext = new AudioCtx({
-        sampleRate: GEMINI_LIVE_INPUT_SAMPLE_RATE,
-      });
-
-      if (this.audioContext.state === "suspended") {
-        this.audioContext.resume().catch(() => {});
-      }
-
-      this.nativeSampleRate = this.audioContext.sampleRate;
-      console.log(
-        "[PCMRecorder] AudioContext sample rate:",
-        this.nativeSampleRate,
-      );
-      if (this.nativeSampleRate !== GEMINI_LIVE_INPUT_SAMPLE_RATE) {
-        throw new Error(
-          `Chrome did not provide the required ${GEMINI_LIVE_INPUT_SAMPLE_RATE} Hz audio context (received ${this.nativeSampleRate} Hz).`,
-        );
-      }
 
       this.sourceNode = this.audioContext.createMediaStreamSource(
         this.mediaStream,

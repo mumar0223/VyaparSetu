@@ -1056,14 +1056,9 @@ export function ArtifactModal({
               )}
 
               <div
-                className="p-5 sm:p-7 rounded-2xl border border-sage/30 dark:border-border shadow-xs overflow-x-auto print:border-none print:shadow-none print:p-0 bg-white dark:bg-card/60"
-                style={{
-                  backgroundColor: formData.theme?.pageBg || undefined,
-                  color: formData.theme?.textColor || undefined,
-                  borderColor: formData.theme?.borderColor || undefined,
-                }}
+                className="p-5 sm:p-7 rounded-2xl border border-sage/30 dark:border-zinc-800 shadow-xs overflow-x-auto print:border-none print:shadow-none print:p-0 bg-[#FAF9F6] dark:bg-[#131620] text-foreground dark:text-zinc-200"
               >
-                <div className="prose prose-sm dark:prose-invert max-w-none">
+                <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-forest dark:prose-headings:text-zinc-100 prose-p:text-zinc-800 dark:prose-p:text-zinc-200 prose-li:text-zinc-800 dark:prose-li:text-zinc-200 prose-strong:text-zinc-900 dark:prose-strong:text-zinc-100 prose-table:border-collapse prose-th:bg-forest/5 dark:prose-th:bg-zinc-800/80 prose-th:text-forest dark:prose-th:text-zinc-100 prose-td:text-zinc-800 dark:prose-td:text-zinc-200">
                   <MarkdownMessage content={formData.content || ""} />
                 </div>
               </div>

@@ -629,6 +629,15 @@ const GetRecentFilesSchema = z.object({
     ),
 });
 
+const CaptureDocumentSchema = z.object({
+  query: z
+    .string()
+    .optional()
+    .describe(
+      "Optional specific extraction goals or instructions for this document (e.g. 'Extract all fields to digitize loan application', 'Extract passbook details'). If omitted, extracts the complete document layout and fields.",
+    ),
+});
+
 /**
  * Agent Tools Registry
  * Fully contextualized with authenticated user session & PostgreSQL Prisma database.
@@ -639,7 +648,86 @@ export function getAgentTools(ctx?: ToolContext) {
 
   return {
     // ─────────────────────────────────────────────────────────────
-    // 0. ATTACHMENT / RECENT FILES RETRIEVAL & INSPECTION
+    // 0. CAMERA DOCUMENT CAPTURE & VISION OCR INSPECTION
+    // ─────────────────────────────────────────────────────────────
+    captureDocument: tool({
+      description:
+        "Captures, inspects, and extracts structured data, form fields, and text from the physical document, paper form, passbook, receipt, bill, or screen shown on the user's camera. Call this tool whenever the user is showing a document on camera or asks to digitize/inspect/extract what is visible on the live camera screen. Uses multimodal vision to perform OCR and layout recognition.",
+      inputSchema: CaptureDocumentSchema,
+      execute: async ({ query: promptQuery }) => {
+        const imageBuf = ctx?.imageBuffer;
+        const savedUrl = ctx?.savedImageUrl;
+
+        if (!imageBuf) {
+          return {
+            success: false,
+            error: "CAMERA_NOT_ACTIVE",
+            message:
+              "Camera is currently turned off or no active frame was captured. Ask the user to turn on their camera to capture the document.",
+          };
+        }
+
+        try {
+          const { generateText } = await import("ai");
+          const { getLanguageModel } = await import("./ai-provider");
+          const { DASHBOARD_CHAT_CONFIG } = await import("./chat-config");
+
+          const visionModel = getLanguageModel(
+            DASHBOARD_CHAT_CONFIG.provider,
+            DASHBOARD_CHAT_CONFIG.model,
+          );
+
+          const filePart = {
+            type: "file",
+            data: imageBuf,
+            mediaType: ctx?.imageMimeType || "image/jpeg",
+          };
+
+          const inspectionResult = await generateText({
+            model: visionModel,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: `You are an expert OCR, document layout, and form analysis engine for VyaparSetu.
+Carefully inspect this live camera frame of a document, paper form, bill, passbook, or screen.
+User Extraction Goal: ${promptQuery || "Extract all fields, tables, sections, labels, and text to digitize this document."}
+
+Output a comprehensive structured breakdown:
+1. Document Title / Official Heading
+2. Document Badge (e.g. "OFFICIAL APPLICATION", "BANK PASSBOOK", "TAX INVOICE")
+3. Sections and all Form Fields: field labels, field types (text, number, date, select, checkbox), and any values already written or printed.
+4. Tables: column headers and rows (if any).
+5. Photos / Stamps / Signatures present or required.`,
+                  },
+                  filePart as any,
+                ],
+              },
+            ],
+          });
+
+          return {
+            success: true,
+            documentType: "captured_document",
+            savedImageUrl: savedUrl,
+            extractedStructure: inspectionResult.text,
+            summary: "Captured and extracted document structure from live camera.",
+          };
+        } catch (err: any) {
+          console.error("[captureDocument tool error]:", err);
+          return {
+            success: false,
+            message: `Could not process camera document: ${err?.message}`,
+            savedImageUrl: savedUrl,
+          };
+        }
+      },
+    }),
+
+    // ─────────────────────────────────────────────────────────────
+    // 0.5 ATTACHMENT / RECENT FILES RETRIEVAL & INSPECTION
     // ─────────────────────────────────────────────────────────────
     getRecentFiles: tool({
       description:
@@ -904,18 +992,73 @@ export function getAgentTools(ctx?: ToolContext) {
 
           let globalIndex = 1;
 
-          for (const msg of messages) {
-            if (!msg.toolCalls || !Array.isArray(msg.toolCalls)) continue;
-            for (let i = msg.toolCalls.length - 1; i >= 0; i--) {
-              const tc: any = msg.toolCalls[i];
-              const res = tc.result as any;
-              const art =
-                res?.artifact || res?.data || (res?.isArtifact ? res : null);
-              const artType = res?.artifactType || art?.artifactType;
+          const seenArtifactIds = new Set<string>();
 
-              if (art && artType) {
+          for (const msg of messages) {
+            let toolCallsList = msg.toolCalls;
+            if (typeof toolCallsList === "string") {
+              try {
+                toolCallsList = JSON.parse(toolCallsList);
+              } catch {
+                toolCallsList = null;
+              }
+            }
+            if (!toolCallsList || !Array.isArray(toolCallsList)) continue;
+
+            for (let i = toolCallsList.length - 1; i >= 0; i--) {
+              let tc: any = toolCallsList[i];
+              if (typeof tc === "string") {
+                try {
+                  tc = JSON.parse(tc);
+                } catch {
+                  continue;
+                }
+              }
+              if (!tc) continue;
+
+              let res = tc.result as any;
+              if (typeof res === "string") {
+                try {
+                  res = JSON.parse(res);
+                } catch {
+                  // Keep as string if not JSON
+                }
+              }
+
+              const toolName = tc.toolName || tc.name;
+              const isStagingTool =
+                toolName === "stageForm" ||
+                toolName === "stageDocument" ||
+                toolName === "stageChart" ||
+                toolName === "stageBudget" ||
+                toolName === "stageExpense";
+
+              const art =
+                res?.artifact ||
+                res?.data ||
+                (res?.isArtifact ? res : null) ||
+                (isStagingTool ? tc.args : null);
+
+              const rawType =
+                res?.artifactType ||
+                art?.artifactType ||
+                res?.type ||
+                art?.type ||
+                (toolName === "stageForm"
+                  ? "form"
+                  : toolName === "stageDocument"
+                    ? "document"
+                    : toolName === "stageChart"
+                      ? "chart"
+                      : toolName === "stageBudget"
+                        ? "budget"
+                        : toolName === "stageExpense"
+                          ? "expense"
+                          : undefined);
+
+              if (art && rawType) {
                 const normalizedType =
-                  artType === "savinggoal" ? "saving_goal" : artType;
+                  rawType === "savinggoal" ? "saving_goal" : rawType;
 
                 if (artifactType !== "all" && normalizedType !== artifactType) {
                   continue;
@@ -923,9 +1066,13 @@ export function getAgentTools(ctx?: ToolContext) {
 
                 const artId =
                   art.artifactId ||
-                  res.artifactId ||
+                  res?.artifactId ||
                   tc.args?.targetArtifactId ||
                   `art_${globalIndex}`;
+
+                // Deduplicate if already loaded newer version
+                if (seenArtifactIds.has(artId)) continue;
+                seenArtifactIds.add(artId);
 
                 extractedArtifacts.push({
                   artifactId: artId,
@@ -933,13 +1080,13 @@ export function getAgentTools(ctx?: ToolContext) {
                   messageId: msg.id,
                   artifactType: normalizedType,
                   title:
-                    res.title ||
-                    art.title ||
+                    res?.title ||
+                    art?.title ||
                     tc.args?.title ||
-                    `${normalizedType} Draft`,
-                  summary: res.summary || art.summary,
+                    `${normalizedType.toUpperCase()} Draft`,
+                  summary: res?.summary || art?.summary || tc.args?.description,
                   createdAt: msg.createdAt.toISOString(),
-                  data: art.sections || art.data || art,
+                  data: art?.sections || art?.data || tc.args?.sections || art,
                 });
 
                 globalIndex++;
@@ -2025,7 +2172,8 @@ export interface ToolMeta {
     | "search"
     | "document"
     | "image"
-    | "file";
+    | "file"
+    | "camera";
   formatSummary: (args: any, result?: any) => string;
 }
 
@@ -2189,5 +2337,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolMeta> = {
       args?.fileId
         ? `Inspected uploaded document "${result?.file?.uploadedName || args.fileId}"`
         : `Checked recent conversation attachments (${result?.totalCount || 0} files found)`,
+  },
+  captureDocument: {
+    name: "captureDocument",
+    icon: "camera",
+    formatSummary: (args, result) =>
+      result?.success
+        ? `Captured and inspected document from live camera`
+        : `Camera capture: ${result?.message || "Unavailable"}`,
   },
 };

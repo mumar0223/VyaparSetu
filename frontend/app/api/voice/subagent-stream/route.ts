@@ -4,6 +4,7 @@ import { getAgentTools, TOOL_DEFINITIONS } from "@/lib/agent/tools";
 import { getLanguageModel } from "@/lib/agent/ai-provider";
 import { DASHBOARD_CHAT_CONFIG } from "@/lib/agent/chat-config";
 import { streamText, isStepCount } from "ai";
+import { prisma } from "@/lib/prisma";
 import path from "path";
 import fs from "fs";
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
     let imageBuffer: Buffer | null = null;
     let imageMimeType = "image/jpeg";
     let sharpnessScore: number | undefined = undefined;
+    let isCameraActive = false;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
@@ -33,12 +35,14 @@ export async function POST(req: NextRequest) {
       audioBase64 = (formData.get("audioBase64") as string) || undefined;
       const scoreStr = formData.get("sharpnessScore") as string;
       if (scoreStr) sharpnessScore = Number(scoreStr);
+      isCameraActive = formData.get("isCameraActive") === "true";
 
       const imageFile = formData.get("image");
       if (imageFile && typeof (imageFile as any).arrayBuffer === "function") {
         const ab = await (imageFile as Blob).arrayBuffer();
         imageBuffer = Buffer.from(ab);
         imageMimeType = (imageFile as Blob).type || "image/jpeg";
+        isCameraActive = true;
       }
     } else {
       const body = await req.json().catch(() => ({}));
@@ -46,9 +50,11 @@ export async function POST(req: NextRequest) {
       actionType = body.actionType || "general";
       conversationId = body.conversationId;
       audioBase64 = body.audioBase64;
+      if (body.isCameraActive) isCameraActive = true;
       if (body.imageBase64) {
         try {
           imageBuffer = Buffer.from(body.imageBase64, "base64");
+          isCameraActive = true;
         } catch (e) {
           console.warn("[voice/subagent-stream] Failed to parse base64 image:", e);
         }
@@ -58,11 +64,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!query || typeof query !== "string" || !query.trim()) {
-      query = imageBuffer ? "Extract and fill out the captured document form" : "";
+    if (!query || typeof query !== "string") {
+      query = "";
     }
 
-    if (!query.trim()) {
+    if (!query.trim() && !imageBuffer) {
       return NextResponse.json(
         { error: "Query or document is required" },
         { status: 400 },
@@ -86,9 +92,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Compact Chat History Prepending (Last 6 messages, ~100 tokens, zero cost burst) ──
+    let chatHistoryMessages: any[] = [];
+    if (conversationId) {
+      try {
+        const history = await prisma.conversationMessage.findMany({
+          where: { conversationId, conversation: { userId: user.id } },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: { role: true, content: true, files: true },
+        });
+        if (history.length) {
+          chatHistoryMessages = history
+            .reverse()
+            .filter((m) => (m.content && m.content.trim()) || (Array.isArray(m.files) && m.files.length > 0))
+            .map((m) => {
+              const fileDesc =
+                Array.isArray(m.files) && m.files.length > 0
+                  ? ` [Files: ${m.files.map((f: any) => (typeof f === "string" ? f : f?.name || f?.url)).join(", ")}]`
+                  : "";
+              return {
+                role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+                content: `${m.content || ""}${fileDesc}`.slice(0, 350),
+              };
+            });
+        }
+      } catch (hErr) {
+        console.warn("[voice/subagent-stream] Error fetching chat history:", hErr);
+      }
+    }
+
     const tools = getAgentTools({
       userId: user.id,
       conversationId,
+      imageBuffer,
+      imageMimeType,
+      savedImageUrl,
+      sharpnessScore,
+      isCameraActive,
     });
 
     const model = getLanguageModel(
@@ -100,7 +141,19 @@ export async function POST(req: NextRequest) {
 You were invoked by a live voice user to perform an authentic, professional action for Indian small businesses, shopkeepers, traders, and farmers.
 
 User Action Request: "${query}"
-${savedImageUrl ? `Captured Document File: "${savedImageUrl}" (Sharpness Score: ${sharpnessScore ?? "N/A"})` : ""}
+Camera Status: ${isCameraActive ? "ACTIVE (Live video feed is open)" : "INACTIVE"}
+${savedImageUrl ? `Direct Attached File: "${savedImageUrl}"` : ""}
+
+CRITICAL DOCUMENT & IMAGE RESOLUTION HIERARCHY (STRICT 3-TIER ORDER):
+1. TIER 1 (DIRECT ATTACHED IMAGE):
+   • If an image is already attached directly in this turn (savedImageUrl), visually inspect and use it immediately with multimodal vision. You do NOT need to call 'captureDocument' or 'getRecentFiles' if the document is already attached right here!
+2. TIER 2 (CHAT HISTORY & RECENT FILES):
+   • If NO image is directly attached in this turn, check if an image or document was previously uploaded or discussed in recent chat history.
+   • Call 'getRecentFiles({ fileId: "latest" })' to retrieve and inspect any previously uploaded invoice, passbook, paper, or document.
+3. TIER 3 (LIVE CAMERA CAPTURE):
+   • ONLY if NO image is found in Tier 1 and Tier 2, and the user asks to digitize or inspect what is visible on camera/screen:
+   • Call 'captureDocument({ query })' to capture and read a fresh frame from the live camera feed.
+   • Use the extracted document structure from 'captureDocument' to invoke 'stageForm' (or 'stageDocument') to stage the authentic digital interface on the user's screen!
 
 DOCUMENT VISION & MULTIMODAL EXECUTION PROTOCOL (WHEN AN IMAGE IS ATTACHED):
 1. LEGIBILITY CHECK:
@@ -172,11 +225,11 @@ AUTONOMOUS EXECUTION PROTOCOL FOR REQUESTS WITHOUT IMAGES:
    • Provide a clear, concise spoken summary so the live voice agent can explain it orally to the user.
    • If the search results warrant an official table or form, call 'stageDocument' or 'stageForm' to display it on screen simultaneously.
 
-CRITICAL POST-TOOL CONCISENESS RULE (MANDATORY 15 TO 40 WORDS MAXIMUM):
-- Once you call 'stageForm', 'stageDocument', or 'stageChart':
+CRITICAL POST-TOOL CONTENT SUMMARY RULE (MANDATORY 15 TO 25 WORDS MAXIMUM — ZERO FLUFF, 1-SECOND BURST):
+- Once you call 'stageForm', 'stageDocument', 'stageChart', or 'getMandiRates':
 - The visual interface is ALREADY rendered directly on the user's screen!
-- Your final text response MUST be ONLY 1 single short spoken confirmation sentence (strictly 15 to 40 words maximum) in the user's spoken conversational language (e.g. "मैंने आपके दस्तावेज़ के आधार पर लोन एप्लीकेशन फॉर्म स्क्रीन पर तैयार कर दिया है। आप इसे देख सकते हैं।").
-- NEVER output multi-paragraph markdown lists, section outlines, or field breakdowns in text, because the visual form is already visible on screen and the live voice agent must speak your confirmation immediately without delay.
+- Your final text response MUST be ONLY 1 single crisp spoken summary sentence (15 to 25 words maximum) stating the specific key details of what was created or extracted — e.g. bank name, applicant name, key numbers, or mandi rates found (e.g. "मैंने आपके पासबुक से रमेश कुमार के नाम पर 5 लाख का एसबीआई मुद्रा लोन फॉर्म स्क्रीन पर तैयार कर दिया है।" or "मैंने लखनऊ मंडी में प्याज का थोक भाव 2200 रुपये प्रति क्विंटल स्क्रीन पर दिखा दिया है।").
+- NEVER output generic hollow sentences like "आपका फॉर्म तैयार है" or multi-paragraph outlines. Provide the exact key facts in under 25 words so the live voice agent knows the exact content details and can speak them immediately without any delay!
 
 CRITICAL FORM STAGING & IN-PLACE EDITING MANDATE:
 - If the user asks to update, fill, or set details, BUT no active form exists on screen yet (or 'getArtifacts' returns 0 forms): You MUST CREATE the digital form using 'stageForm' with those details populated! You are STRICTLY FORBIDDEN from generating text claiming a form was updated unless 'stageForm' has actually executed in this turn!
@@ -223,7 +276,9 @@ STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
     userParts.push({
       type: "text",
       text: imageBuffer
-        ? `Please inspect this captured document image for request: "${query}". Fulfill the user's request accurately using multimodal vision and available tools.`
+        ? (query.trim()
+            ? `Please inspect this captured document image for request: "${query}". Fulfill the user's request accurately using multimodal vision and available tools.`
+            : "Please inspect this attached document image and process its details using available tools.")
         : `Please execute the user's request: "${query}". Use the appropriate tools now.`,
     });
 
@@ -251,8 +306,7 @@ STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
         if (savedImageUrl) {
           sendEvent("document_captured", {
             url: savedImageUrl,
-            sharpnessScore,
-            query: query || "Document Scan",
+            query: query || "",
           });
         }
 
@@ -264,7 +318,21 @@ STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
           wrappedTools[name] = {
             ...t,
             execute: async (toolArgs: any, context: any) => {
-              if (name === "webSearch") {
+              if (name === "captureDocument") {
+                sendEvent("status", {
+                  status: "working",
+                  activeTool: "captureDocument",
+                  description: "Scanning and reading document from live camera...",
+                  spokenHint: "Main aapka camera document scan aur extract kar raha hoon, bas thoda intezar kijiye.",
+                  progressPhase: "document_ocr",
+                });
+                if (savedImageUrl) {
+                  sendEvent("document_captured", {
+                    url: savedImageUrl,
+                    query: toolArgs?.query || query || "Camera Document",
+                  });
+                }
+              } else if (name === "webSearch") {
                 sendEvent("status", {
                   status: "working",
                   activeTool: "webSearch",
@@ -388,7 +456,7 @@ STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
           const aiStream = streamText({
             model,
             system: systemInstruction,
-            messages: [{ role: "user", content: userParts }],
+            messages: [...chatHistoryMessages, { role: "user", content: userParts }],
             tools: wrappedTools as any,
             stopWhen: isStepCount(5),
           });
@@ -430,7 +498,7 @@ STRICT REGULATORY, SAFETY & PROHIBITED COMMERCE POLICY (MANDATORY):
           sendEvent("done", {
             status: "finished",
             savedImageUrl,
-            query: query || (savedImageUrl ? "Scanned Document" : "Screen task"),
+            query: query || "",
             assistantContent: finalAssistantText,
             toolCalls: executedToolCalls,
             thoughtDurationSeconds,

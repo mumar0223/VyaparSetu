@@ -25,10 +25,10 @@ export const TITLE_GENERATION_CONFIG = {
  */
 export const LIVE_VOICE_AGENT_CONFIG = {
   provider: "vertex",
-  model: process.env.LIVE_VOICE_MODEL || "gemini-live-2.5-flash",
+  model: process.env.LIVE_VOICE_MODEL || "gemini-3.8-live",
   liveModels: [
+    "gemini-3.8-live",
     "gemini-live-2.5-flash",
-    "gemini-live-2.5-flash-native-audio",
   ] as const,
   voiceName: process.env.LIVE_VOICE_NAME || "Puck",
   responseModalities: ["AUDIO"],

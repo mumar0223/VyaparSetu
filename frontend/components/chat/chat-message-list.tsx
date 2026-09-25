@@ -36,23 +36,21 @@ function getParsedAttachments(msg: ChatMessage): {
     for (const att of msg.attachments) {
       if (att && att.url && !seenUrls.has(att.url)) {
         seenUrls.add(att.url);
-        if (att.type === "image" || att.mimeType?.startsWith("image/")) {
-          images.push({
-            id: att.id,
-            url: att.url,
-            uploadedName: att.uploadedName || "Image",
-            mimeType: att.mimeType,
-            size: att.size,
-          });
-        } else {
-          files.push({
-            id: att.id,
-            url: att.url,
-            uploadedName: att.uploadedName || "Document",
-            mimeType: att.mimeType,
-            size: att.size,
-          });
-        }
+        const typeStr = (att.type || "").toUpperCase();
+        const fileName = att.name || att.uploadedName || "";
+        const isImg =
+          typeStr === "IMAGE" ||
+          att.mimeType?.startsWith("image/") ||
+          /\.(jpeg|jpg|png|gif|webp|svg)$/i.test(fileName || att.url);
+        const item: ExtractedAttachmentItem = {
+          id: att.id,
+          url: att.url,
+          uploadedName: fileName || (isImg ? "Image" : "Document"),
+          mimeType: att.mimeType,
+          size: att.size,
+        };
+        if (isImg) images.push(item);
+        else files.push(item);
       }
     }
   }
@@ -73,15 +71,18 @@ function getParsedAttachments(msg: ChatMessage): {
       if (parsed && typeof parsed === "object" && parsed.url) {
         if (!seenUrls.has(parsed.url)) {
           seenUrls.add(parsed.url);
+          const typeStr = (parsed.type || "").toUpperCase();
+          const fileName = parsed.name || parsed.uploadedName || "";
+          const mime = parsed.mimeType || "";
           const isImg =
-            parsed.type === "image" ||
-            parsed.mimeType?.startsWith("image/") ||
-            /\.(jpeg|jpg|png|gif|webp|svg)$/i.test(parsed.url);
+            typeStr === "IMAGE" ||
+            mime.startsWith("image/") ||
+            /\.(jpeg|jpg|png|gif|webp|svg)$/i.test(fileName || parsed.url);
           const item: ExtractedAttachmentItem = {
             id: parsed.id || `att_${idx}`,
             url: parsed.url,
-            uploadedName: parsed.uploadedName || parsed.name || "Attachment",
-            mimeType: parsed.mimeType,
+            uploadedName: fileName || (isImg ? "Image" : "Document"),
+            mimeType: mime || undefined,
             size: parsed.size,
           };
           if (isImg) images.push(item);
@@ -94,7 +95,7 @@ function getParsedAttachments(msg: ChatMessage): {
       if (!seenUrls.has(url)) {
         seenUrls.add(url);
         const isImg = /\.(jpeg|jpg|png|gif|webp|svg)/i.test(url);
-        const name = url.split("/").pop() || "Attachment";
+        const name = url.split("/").pop() || "Document";
         const item: ExtractedAttachmentItem = {
           url,
           uploadedName: name,
@@ -398,47 +399,59 @@ export function ChatMessageList({
                   completedDurationSeconds={msg.thoughtDurationSeconds}
                 />
 
-                {/* Sleek Claude-Style Interactive Artifact Pill */}
+                {/* Sleek Claude-Style Interactive Artifact Pill or Inline Document */}
                 {artifacts.length > 0 && (
-                  <div className="my-3 space-y-2 w-full max-w-md">
-                    {artifacts.map((art, aIdx) => (
-                      <div
-                        key={aIdx}
-                        onClick={() => onOpenArtifact?.(art)}
-                        className="p-3 rounded-2xl border border-sage/40 dark:border-zinc-800 bg-white dark:bg-[#18181b]/95 hover:border-mint dark:hover:border-mint/60 flex items-center justify-between gap-3 transition-all cursor-pointer group shadow-xs hover:shadow-md select-none"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="size-9 rounded-xl bg-mint-pale/60 dark:bg-zinc-800 border border-mint/20 dark:border-zinc-700 text-forest dark:text-mint flex items-center justify-center shrink-0">
-                            {art.artifactType === "chart" && <BarChart3 className="size-4" />}
-                            {art.artifactType === "budget" && <PieChart className="size-4" />}
-                            {art.artifactType === "expense" && <IndianRupee className="size-4" />}
-                            {art.artifactType === "transaction" && <Layers className="size-4" />}
-                            {art.artifactType === "saving_goal" && <Target className="size-4" />}
-                            {art.artifactType === "debt" && <Landmark className="size-4" />}
-                            {art.artifactType === "form" && <ClipboardList className="size-4" />}
-                            {art.artifactType === "document" && <FileText className="size-4" />}
-                            {art.artifactType === "delete_record" && <AlertTriangle className="size-4 text-rose-500" />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-[13.5px] font-semibold text-forest dark:text-zinc-100 group-hover:text-mint transition-colors truncate">
-                                {art.title || t("chat.stagedDraft", "Interactive Action Draft")}
-                              </h4>
-                              {art.isUpdated && (
-                                <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-mint/20 text-forest dark:text-mint border border-mint/30 shrink-0">
-                                  Updated
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11.5px] text-muted-foreground truncate mt-0.5">
-                              {art.summary || (art.isUpdated ? "Draft updated • Click to review changes" : t("chat.clickToReview", "Draft prepared • Click to review & edit"))}
-                            </p>
-                          </div>
-                        </div>
+                  <div className="my-3 space-y-2.5 w-full">
+                    {artifacts.map((art, aIdx) => {
+                      if (art.artifactType === "document" && art.data?.content) {
+                        return (
+                          <InlineDocumentCard
+                            key={aIdx}
+                            artifact={art}
+                            onOpenArtifact={onOpenArtifact}
+                          />
+                        );
+                      }
 
-                        <ArrowUpRight className="size-4 text-muted-foreground group-hover:text-mint group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
-                      </div>
-                    ))}
+                      return (
+                        <div
+                          key={aIdx}
+                          onClick={() => onOpenArtifact?.(art)}
+                          className="max-w-md p-3 rounded-2xl border border-sage/40 dark:border-zinc-800 bg-white dark:bg-[#18181b]/95 hover:border-mint dark:hover:border-mint/60 flex items-center justify-between gap-3 transition-all cursor-pointer group shadow-xs hover:shadow-md select-none"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="size-9 rounded-xl bg-mint-pale/60 dark:bg-zinc-800 border border-mint/20 dark:border-zinc-700 text-forest dark:text-mint flex items-center justify-center shrink-0">
+                              {art.artifactType === "chart" && <BarChart3 className="size-4" />}
+                              {art.artifactType === "budget" && <PieChart className="size-4" />}
+                              {art.artifactType === "expense" && <IndianRupee className="size-4" />}
+                              {art.artifactType === "transaction" && <Layers className="size-4" />}
+                              {art.artifactType === "saving_goal" && <Target className="size-4" />}
+                              {art.artifactType === "debt" && <Landmark className="size-4" />}
+                              {art.artifactType === "form" && <ClipboardList className="size-4" />}
+                              {art.artifactType === "document" && <FileText className="size-4" />}
+                              {art.artifactType === "delete_record" && <AlertTriangle className="size-4 text-rose-500" />}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-[13.5px] font-semibold text-forest dark:text-zinc-100 group-hover:text-mint transition-colors truncate">
+                                  {art.title || t("chat.stagedDraft", "Interactive Action Draft")}
+                                </h4>
+                                {art.isUpdated && (
+                                  <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-mint/20 text-forest dark:text-mint border border-mint/30 shrink-0">
+                                    Updated
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11.5px] text-muted-foreground truncate mt-0.5">
+                                {art.summary || (art.isUpdated ? "Draft updated • Click to review changes" : t("chat.clickToReview", "Draft prepared • Click to review & edit"))}
+                              </p>
+                            </div>
+                          </div>
+
+                          <ArrowUpRight className="size-4 text-muted-foreground group-hover:text-mint group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -602,3 +615,87 @@ function SpeakButton({
     </button>
   );
 }
+
+function InlineDocumentCard({
+  artifact,
+  onOpenArtifact,
+}: {
+  artifact: ArtifactPayload;
+  onOpenArtifact?: (artifact: ArtifactPayload) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const content = artifact.data?.content || "";
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!content) return;
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-3 w-full rounded-2xl border border-sage/40 dark:border-zinc-800 bg-[#FAF9F6] dark:bg-[#131620] overflow-hidden shadow-xs hover:shadow-md transition-all">
+      {/* Sleek Document Header Bar */}
+      <div className="px-3.5 sm:px-4 py-2.5 bg-forest/5 dark:bg-zinc-800/70 border-b border-sage/30 dark:border-zinc-800 flex items-center justify-between gap-2.5 flex-wrap select-none">
+        <div
+          onClick={() => onOpenArtifact?.(artifact)}
+          className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
+          title="Click to expand artifact"
+        >
+          <div className="size-8 rounded-xl bg-mint-pale/60 dark:bg-zinc-800 border border-mint/20 dark:border-zinc-700 text-forest dark:text-mint flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <FileText className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className="text-[13.5px] font-semibold text-forest dark:text-zinc-100 group-hover:text-mint truncate transition-colors">
+                {artifact.title || "Document"}
+              </h4>
+              {artifact.data?.badge && (
+                <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.5 rounded-md bg-forest/10 dark:bg-mint/20 text-forest dark:text-mint border border-forest/20 shrink-0">
+                  {artifact.data.badge}
+                </span>
+              )}
+            </div>
+            {artifact.summary && (
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                {artifact.summary}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="px-2.5 py-1 rounded-lg text-xs font-medium border border-sage/30 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-cream dark:hover:bg-zinc-700 text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer transition-colors"
+            title="Copy Markdown"
+          >
+            {copied ? (
+              <Check className="size-3 text-mint" />
+            ) : (
+              <Copy className="size-3" />
+            )}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenArtifact?.(artifact)}
+            className="px-2.5 py-1 rounded-lg text-xs font-medium border border-sage/30 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-cream dark:hover:bg-zinc-700 text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer transition-colors"
+            title="Expand Fullscreen"
+          >
+            <Maximize2 className="size-3" />
+            <span>Expand</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Rendered Markdown Document & Tables */}
+      <div className="p-4 sm:p-5 text-[14px] leading-relaxed text-zinc-900 dark:text-zinc-200 overflow-x-auto max-h-[550px] overflow-y-auto">
+        <MarkdownMessage content={content} variant="assistant" />
+      </div>
+    </div>
+  );
+}
+

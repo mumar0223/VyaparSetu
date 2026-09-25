@@ -114,18 +114,29 @@ export class CameraManager {
   }
 
   /**
-   * Captures a lightweight 640x480 frame for Gemini Live real-time visual context.
+   * Captures an optimized preview frame for Gemini 3.8 Live realtime streaming
+   * (e.g. 768px long edge at quality 0.65, ~35-45KB per frame).
    * Returns base64 JPEG without the data URL prefix.
    */
-  public capturePreviewFrameBase64(maxWidth = 640, quality = 0.6): string | null {
+  public capturePreviewFrameBase64(maxLongEdge = 768, quality = 0.65): string | null {
     const video = this.getActiveVideoElement();
     if (!video || !this.isRunning) return null;
 
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    const scale = Math.min(1, maxWidth / vw);
-    const targetW = Math.round(vw * scale);
-    const targetH = Math.round(vh * scale);
+    if (vw <= 0 || vh <= 0) return null;
+
+    const isLandscape = vw >= vh;
+    let targetW = vw;
+    let targetH = vh;
+
+    if (isLandscape && vw > maxLongEdge) {
+      targetW = maxLongEdge;
+      targetH = Math.round((vh * maxLongEdge) / vw);
+    } else if (!isLandscape && vh > maxLongEdge) {
+      targetH = maxLongEdge;
+      targetW = Math.round((vw * maxLongEdge) / vh);
+    }
 
     const canvas = document.createElement("canvas");
     canvas.width = targetW;
@@ -150,6 +161,7 @@ export class CameraManager {
 
     const fullW = video.videoWidth;
     const fullH = video.videoHeight;
+    if (fullW <= 0 || fullH <= 0) return null;
 
     const burstFrames: Array<{
       canvas: HTMLCanvasElement;
@@ -175,7 +187,33 @@ export class CameraManager {
       burstFrames.push({ canvas, score, index: i + 1 });
     }
 
-    if (burstFrames.length === 0) return null;
+    if (burstFrames.length === 0) {
+      // Fallback: direct single frame capture
+      const fallbackCanvas = document.createElement("canvas");
+      fallbackCanvas.width = fullW;
+      fallbackCanvas.height = fullH;
+      const ctx = fallbackCanvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(video, 0, 0, fullW, fullH);
+      return new Promise((resolve) => {
+        fallbackCanvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(null);
+              return;
+            }
+            resolve({
+              blob,
+              sharpnessScore: 0,
+              dimensions: { width: fullW, height: fullH },
+              burstIndex: 1,
+            });
+          },
+          "image/jpeg",
+          0.92,
+        );
+      });
+    }
 
     // Pick the frame with highest sharpness variance score
     burstFrames.sort((a, b) => b.score - a.score);

@@ -21,6 +21,9 @@ export async function GET(
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
+          include: {
+            attachments: true,
+          },
         },
       },
     });

@@ -4,11 +4,25 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { PCMRecorder } from "@/lib/voice/pcm-recorder";
 import { PCMPlayer } from "@/lib/voice/pcm-player";
 import { CameraManager, type BurstCaptureResult } from "@/lib/voice/camera-manager";
+import { uploadFiles } from "@/lib/uploadthing";
 import type { SupportedLanguageCode } from "@/lib/agent/chat-config";
 import type { ArtifactPayload } from "./artifact-modal";
 import type { ToolCallItem } from "./types";
 
 const GEMINI_LIVE_INPUT_SAMPLE_RATE = 16000;
+
+export interface VoiceAttachedDocument {
+  id: string;
+  name: string;
+  size: number;
+  type: "image" | "file";
+  mimeType: string;
+  previewUrl?: string;
+  persistentUrl?: string;
+  blob?: Blob;
+  status: "uploading" | "completed" | "error";
+  progress: number;
+}
 
 export interface LiveAgentOptions {
   activeChatId?: string | null;
@@ -26,9 +40,10 @@ export interface LiveAgentOptions {
 
 interface VoiceSessionConfig {
   accessToken: string;
-  projectId: string;
-  location: string;
+  projectId?: string;
+  location?: string;
   model: string;
+  wsUrl?: string;
   voiceName: string;
   systemInstruction: string;
   tools: Array<{
@@ -178,7 +193,14 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
   const [cameraError, setCameraError] = useState<"denied" | null>(null);
   const cameraManagerRef = useRef<CameraManager | null>(null);
   const cameraPreviewIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sendCameraPreviewFrameRef = useRef<(() => void) | null>(null);
   const pendingAutoStartCameraRef = useRef(false);
+
+  const [attachedDocuments, setAttachedDocuments] = useState<VoiceAttachedDocument[]>([]);
+  const attachedDocumentsRef = useRef<VoiceAttachedDocument[]>([]);
+  useEffect(() => {
+    attachedDocumentsRef.current = attachedDocuments;
+  }, [attachedDocuments]);
 
   const clearCameraError = useCallback(() => {
     setCameraError(null);
@@ -192,6 +214,8 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
   const playerRef = useRef<PCMPlayer | null>(null);
 
   const connectedRef = useRef(false);
+  const setupCompleteRef = useRef(false);
+  const micInitPromiseRef = useRef<Promise<boolean> | null>(null);
   const mutedRef = useRef(false);
   const assistantSpeakingRef = useRef(false);
   const playbackActiveRef = useRef(false);
@@ -288,7 +312,10 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
               thinking: thinkingPayload,
             }),
           });
-          if (!response.ok) throw new Error("The voice turn could not be saved.");
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData?.error || "The voice turn could not be saved.");
+          }
         }
         turnStartTimeRef.current = 0;
       } catch (error) {
@@ -325,9 +352,9 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     turnTaskTriggeredRef.current = false;
     isExecutingToolRef.current = false;
 
-    // Safely persist with the captured immutable strings
+    // Safely persist with the captured immutable strings (no synthetic fallback text)
     await persistTurnSnapshot({
-      userTranscript: userTranscript || (files.length > 0 ? "Document Scan" : ""),
+      userTranscript: userTranscript.trim(),
       assistantTranscript,
       files,
       toolCalls,
@@ -382,10 +409,12 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     }
 
     // 5. Begin new recording turn.
-    recorderRef.current?.startTurn();
-    void recorderRef.current?.resume();
+    if (recorderRef.current) {
+      recorderRef.current.setMuted(false);
+      void recorderRef.current.resume();
+      recorderRef.current.startTurn();
+    }
     void playerRef.current?.resume();
-    recorderRef.current?.setMuted(false);
     isHoldingRef.current = true;
     setIsHoldingToSpeak(true);
     userSpeakingRef.current = true;
@@ -399,6 +428,8 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
           realtimeInput: { activityStart: {} },
         }),
       );
+      // Immediately send current camera frame if camera is active so Gemini gets vision context with speech
+      sendCameraPreviewFrameRef.current?.();
     }
 
     setStatus("listening");
@@ -513,6 +544,70 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     }, 120);
   }, []);
 
+  const startMicrophone = useCallback(async (): Promise<boolean> => {
+    if (recorderRef.current) return true;
+    if (micInitPromiseRef.current) return micInitPromiseRef.current;
+
+    const promise = (async () => {
+      try {
+        const recorder = new PCMRecorder({
+          onChunk: (data) => {
+            if (
+              setupCompleteRef.current &&
+              isHoldingRef.current &&
+              !mutedRef.current &&
+              !assistantSpeakingRef.current &&
+              socketRef.current &&
+              socketRef.current.readyState === WebSocket.OPEN
+            ) {
+              socketRef.current.send(
+                JSON.stringify({
+                  realtimeInput: {
+                    mediaChunks: [
+                      {
+                        mimeType: `audio/pcm;rate=${GEMINI_LIVE_INPUT_SAMPLE_RATE}`,
+                        data,
+                      },
+                    ],
+                  },
+                }),
+              );
+            }
+          },
+          onVolume: handleMicVolume,
+          onAudioLevel: handleAudioLevel,
+          onError: (error) => {
+            setStatus("error");
+            setErrorMessage(displayMicError(error));
+          },
+        });
+
+        recorderRef.current = recorder;
+        const started = await recorder.start();
+        if (!started) return false;
+        if (mutedRef.current) {
+          recorder.setMuted(true);
+        }
+        console.log(
+          "[voice] Gemini input sample rate:",
+          recorder.getNativeSampleRate(),
+        );
+        console.log("[voice] mic input info:", recorder.getInputInfo());
+        return true;
+      } catch (err: any) {
+        console.error("[voice] mic start failed", err);
+        setStatus("error");
+        setErrorMessage(displayMicError(err));
+        return false;
+      } finally {
+        micInitPromiseRef.current = null;
+      }
+    })();
+
+    micInitPromiseRef.current = promise;
+    return promise;
+  }, [handleAudioLevel, handleMicVolume]);
+
   const stopCameraPreviewLoop = useCallback(() => {
     if (cameraPreviewIntervalRef.current) {
       clearInterval(cameraPreviewIntervalRef.current);
@@ -520,42 +615,61 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     }
   }, []);
 
+  const sendCameraPreviewFrame = useCallback(() => {
+    const socket = socketRef.current;
+    const camera = cameraManagerRef.current;
+    if (
+      !camera ||
+      !camera.isActive() ||
+      !socket ||
+      socket.readyState !== WebSocket.OPEN ||
+      !connectedRef.current ||
+      !isHoldingRef.current || // STRICT: Only stream camera frames when user is speaking!
+      assistantSpeakingRef.current || // Never stream when AI is speaking
+      thinkingTimeoutRef.current !== null // Never stream when AI is thinking/generating
+    ) {
+      return;
+    }
+
+    const frameBase64 = camera.capturePreviewFrameBase64(768, 0.65);
+    if (frameBase64) {
+      try {
+        socket.send(
+          JSON.stringify({
+            clientContent: {
+              turns: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      inlineData: {
+                        mimeType: "image/jpeg",
+                        data: frameBase64,
+                      },
+                    },
+                  ],
+                },
+              ],
+              turnComplete: false,
+            },
+          }),
+        );
+      } catch (e) {
+        console.warn("[voice] preview frame send error", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    sendCameraPreviewFrameRef.current = sendCameraPreviewFrame;
+  }, [sendCameraPreviewFrame]);
+
   const startCameraPreviewLoop = useCallback(() => {
     stopCameraPreviewLoop();
     cameraPreviewIntervalRef.current = setInterval(() => {
-      const socket = socketRef.current;
-      const camera = cameraManagerRef.current;
-      if (
-        !camera ||
-        !camera.isActive() ||
-        !socket ||
-        socket.readyState !== WebSocket.OPEN ||
-        !connectedRef.current
-      ) {
-        return;
-      }
-
-      const frameBase64 = camera.capturePreviewFrameBase64(640, 0.6);
-      if (frameBase64) {
-        try {
-          socket.send(
-            JSON.stringify({
-              realtimeInput: {
-                mediaChunks: [
-                  {
-                    mimeType: "image/jpeg",
-                    data: frameBase64,
-                  },
-                ],
-              },
-            }),
-          );
-        } catch (e) {
-          console.warn("[voice] preview frame send error", e);
-        }
-      }
-    }, 1000);
-  }, [stopCameraPreviewLoop]);
+      sendCameraPreviewFrame();
+    }, 1500);
+  }, [stopCameraPreviewLoop, sendCameraPreviewFrame]);
 
   const startCamera = useCallback(async () => {
     if (isCameraActive || cameraManagerRef.current?.isActive()) return;
@@ -609,6 +723,177 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     }
   }, [isCameraActive]);
 
+  const attachDocuments = useCallback(async (filesInput: FileList | File[]) => {
+    const rawFiles = Array.from(filesInput);
+    if (!rawFiles.length) return;
+
+    const currentCount = attachedDocumentsRef.current.length;
+    if (currentCount >= 5) return;
+
+    const availableSlots = 5 - currentCount;
+    const filesToProcess = rawFiles.slice(0, availableSlots);
+
+    const newDocs: VoiceAttachedDocument[] = filesToProcess.map((f, i) => {
+      const isImg = f.type.startsWith("image/");
+      return {
+        id: `att_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+        name: f.name,
+        size: f.size,
+        type: isImg ? "image" : "file",
+        mimeType: f.type || "application/octet-stream",
+        previewUrl: isImg ? URL.createObjectURL(f) : undefined,
+        blob: f,
+        status: "uploading",
+        progress: 25,
+      };
+    });
+
+    setAttachedDocuments((prev) => [...prev, ...newDocs]);
+
+    // ── Concurrent Track 1: Stream images into Gemini Live WebSocket immediately ──
+    for (const f of filesToProcess) {
+      if (f.type.startsWith("image/")) {
+        try {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const resultStr = reader.result as string;
+            const base64 = resultStr.split(",")[1];
+            const socket = socketRef.current;
+            if (socket && socket.readyState === WebSocket.OPEN && base64) {
+              socket.send(
+                JSON.stringify({
+                  clientContent: {
+                    turns: [
+                      {
+                        role: "user",
+                        parts: [
+                          {
+                            inlineData: {
+                              mimeType: f.type || "image/jpeg",
+                              data: base64,
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                    turnComplete: false,
+                  },
+                }),
+              );
+            }
+          };
+          reader.readAsDataURL(f);
+        } catch (e) {
+          console.warn("[voice] Error streaming media chunk:", e);
+        }
+      }
+    }
+
+    // Proactively inform Gemini Live to acknowledge out loud
+    // ── Upload to persistent storage first, then persist user turn and trigger Gemini Live response ──
+    try {
+      const uploadRes = await uploadFiles("chatAttachmentUploader", {
+        files: filesToProcess,
+        onUploadProgress: ({ file, progress }) => {
+          const fileName = typeof file === "string" ? file : (file as any)?.name;
+          setAttachedDocuments((prev) =>
+            prev.map((doc) =>
+              doc.name === fileName ? { ...doc, progress: Math.min(progress, 95) } : doc,
+            ),
+          );
+        },
+      });
+
+      const uploadedSerializedFiles: string[] = [];
+
+      setAttachedDocuments((prev) =>
+        prev.map((doc) => {
+          const matched = (uploadRes as any[])?.find((r) => r.name === doc.name);
+          if (matched) {
+            const persistentUrl = matched.ufsUrl || matched.url;
+            const mimeType = doc.mimeType || "";
+            const isImg = mimeType.startsWith("image/") || /\.(jpeg|jpg|png|gif|webp|svg)$/i.test(doc.name);
+            const isPdf = mimeType === "application/pdf" || doc.name.toLowerCase().endsWith(".pdf");
+            const isSheet = mimeType.includes("sheet") || mimeType.includes("csv") || /\.(xlsx|xls|csv)$/i.test(doc.name);
+            const type = isImg ? "IMAGE" : isPdf ? "PDF" : isSheet ? "SHEET" : "DOCUMENT";
+
+            const filePayload = JSON.stringify({
+              url: persistentUrl,
+              name: doc.name,
+              type,
+              mimeType,
+              size: doc.size,
+            });
+
+            uploadedSerializedFiles.push(filePayload);
+            if (!turnFilesRef.current.includes(filePayload)) {
+              turnFilesRef.current.push(filePayload);
+            }
+            return {
+              ...doc,
+              persistentUrl,
+              status: "completed",
+              progress: 100,
+            };
+          }
+          return { ...doc, status: "completed", progress: 100 };
+        }),
+      );
+
+      // Persist the user message with the uploaded files BEFORE assistant response
+      if (uploadedSerializedFiles.length > 0) {
+        void persistTurnSnapshot({
+          userTranscript: "",
+          assistantTranscript: "",
+          files: uploadedSerializedFiles,
+          toolCalls: [],
+        });
+      }
+
+      // Then inform Gemini Live to acknowledge receipt orally
+      const socket = socketRef.current;
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(
+          JSON.stringify({
+            clientContent: {
+              turns: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      text: `The user has just uploaded ${filesToProcess.length} document(s): "${filesToProcess.map((f) => f.name).join(", ")}". Speak out loud to acknowledge receipt in a short friendly spoken sentence, and ask how they would like to proceed with the document(s).`,
+                    },
+                  ],
+                },
+              ],
+              turnComplete: true,
+            },
+          }),
+        );
+      }
+    } catch (uploadErr) {
+      console.warn("[voice] Background upload error:", uploadErr);
+      setAttachedDocuments((prev) =>
+        prev.map((doc) => ({ ...doc, status: "completed", progress: 100 })),
+      );
+    }
+  }, []);
+
+  const removeAttachedDocument = useCallback((id?: string) => {
+    setAttachedDocuments((prev) => {
+      if (!id) {
+        const last = prev[prev.length - 1];
+        if (last?.previewUrl) URL.revokeObjectURL(last.previewUrl);
+        return prev.slice(0, -1);
+      }
+      const target = prev.find((d) => d.id === id);
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((d) => d.id !== id);
+    });
+  }, []);
+
   const attachCameraVideoElement = useCallback((videoEl: HTMLVideoElement | null) => {
     cameraManagerRef.current?.attachToVideoElement(videoEl);
   }, []);
@@ -618,7 +903,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       args: any,
       audioBase64?: string,
       imageBlob?: Blob,
-      sharpnessScore?: number,
+      isCameraActive?: boolean,
     ): Promise<{
       finalAssistant: string;
       artifact: ArtifactPayload | null;
@@ -641,8 +926,8 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
           status: "working",
           activeTool: imageBlob ? "document_ocr" : "research",
           description: imageBlob
-            ? `Analyzing captured document (Sharpness Score: ${sharpnessScore ?? "N/A"})`
-            : `Starting research for: "${args?.query || "on-screen action"}"`,
+            ? "Analyzing document..."
+            : `Starting task for: "${args?.query || "on-screen action"}"`,
           spokenHint: imageBlob
             ? "Main aapke document ko check aur process kar raha hoon, bas thoda sa intezar kijiye."
             : "Main aapki request par kaam kar raha hoon, bas thoda sa intezar kijiye.",
@@ -700,9 +985,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
               if (chatId) formData.append("conversationId", chatId);
               if (audioBase64) formData.append("audioBase64", audioBase64);
               formData.append("image", imageBlob, "captured-document.jpg");
-              if (typeof sharpnessScore === "number") {
-                formData.append("sharpnessScore", String(sharpnessScore));
-              }
+              formData.append("isCameraActive", String(isCameraActive ?? true));
 
               res = await fetch("/api/voice/subagent-stream", {
                 method: "POST",
@@ -717,12 +1000,15 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                   actionType: args?.actionType,
                   conversationId: chatId,
                   audioBase64,
+                  isCameraActive: Boolean(isCameraActive),
                 }),
               });
             }
 
             if (!res.ok || !res.body) {
-              throw new Error("Subagent stream connection failed");
+              const errText = await res.text().catch(() => "");
+              console.error(`[voice/subagent-stream failed HTTP ${res.status}]:`, errText);
+              throw new Error(`Subagent stream connection failed: ${res.status} ${errText}`);
             }
 
             const reader = res.body.getReader();
@@ -1005,7 +1291,6 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
         { query },
         undefined,
         burst.blob,
-        burst.sharpnessScore,
       );
 
       const elapsedSeconds =
@@ -1032,101 +1317,53 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       for (const call of calls) {
         setActiveToolName(call.name);
 
-        if (call.name === "captureDocument") {
+        if (call.name === "triggerScreenAction" || call.name === "captureDocument") {
+          turnTaskTriggeredRef.current = true;
           const isCameraOn = Boolean(
             cameraManagerRef.current && cameraManagerRef.current.isActive()
           );
 
-          if (!isCameraOn) {
-            const result = {
-              status: "error",
-              error: "CAMERA_NOT_ACTIVE",
-              message:
-                "Camera is currently turned off. Please ask the user to turn on their camera first so you can see and capture the document.",
-            };
+          let imageBlob: Blob | undefined = undefined;
 
-            toolCallsRef.current.push({
-              toolName: call.name,
-              args: call.args,
-              result,
-              status: "error",
-            });
+          // Directly capture camera frame if camera is open and the task is document/camera related
+          if (isCameraOn && cameraManagerRef.current) {
+            const queryStr = typeof call.args?.query === "string" ? call.args.query : "";
+            const actionTypeStr = typeof call.args?.actionType === "string" ? call.args.actionType : "";
 
-            functionResponses.push({
-              id: call.id,
-              name: call.name,
-              response: { output: result },
-            });
-          } else {
-            // 1. Run rapid 3-frame burst with Laplacian variance sharpness scoring
-            const burst = await cameraManagerRef.current!.captureBestFrameBlob();
+            const isExplicitCapture = call.name === "captureDocument";
+            const isDocAction =
+              actionTypeStr === "document" ||
+              actionTypeStr === "capture" ||
+              actionTypeStr === "ocr" ||
+              actionTypeStr === "paper";
 
-            // 2. Launch background subagent with the sharpest in-focus Blob and formulated query, awaiting completion
-            turnTaskTriggeredRef.current = true;
-            const subResult = await launchBackgroundScreenTask(
-              {
-                query:
-                  call.args?.query ||
-                  "Inspect and process the captured document",
-              },
-              audioBase64,
-              burst?.blob,
-              burst?.sharpnessScore,
-            );
+            const isDocQuery =
+              /camera|document|paper|capture|showing|passbook|receipt|bill|invoice|aadhaar|pan|scan|inspect|digitize|photo|frame|kalam|pen|dastaavez|praroop|dekho|ye\s*form|iska\s*form/i.test(
+                queryStr,
+              );
 
-            if (
-              subResult.savedImageUrl &&
-              !turnFilesRef.current.includes(subResult.savedImageUrl)
-            ) {
-              turnFilesRef.current.push(subResult.savedImageUrl);
+            const isMandiOnly =
+              /mandi|rate|bhav|price|apmc|commodity/i.test(queryStr) && !isDocQuery;
+
+            // Only capture camera if it is explicitly a document/camera task, NOT for mandi or pure search
+            if (isExplicitCapture || isDocAction || isDocQuery || (!isMandiOnly && !actionTypeStr)) {
+              try {
+                const burst = await cameraManagerRef.current.captureBestFrameBlob();
+                if (burst?.blob) {
+                  imageBlob = burst.blob;
+                }
+              } catch (e) {
+                console.warn("[voice] Error capturing camera frame for screen task:", e);
+              }
             }
-
-            // 3. Always push the captureDocument tool call with photo URL so it renders in the chat UI
-            const captureToolCall: ToolCallItem = {
-              toolName: "captureDocument",
-              type: "captured_document",
-              args: call.args,
-              url: subResult.savedImageUrl || undefined,
-              result: {
-                status: "completed",
-                findings: subResult.finalAssistant,
-                url: subResult.savedImageUrl,
-                savedImageUrl: subResult.savedImageUrl,
-              },
-              status: "completed",
-            };
-            toolCallsRef.current.push(captureToolCall);
-
-            // 4. Push any real sub-agent tool calls (e.g. stageForm)
-            if (subResult.toolCalls && subResult.toolCalls.length > 0) {
-              toolCallsRef.current.push(...subResult.toolCalls);
-            }
-
-            // 5. Return native toolResponse to Gemini Live
-            functionResponses.push({
-              id: call.id,
-              name: call.name,
-              response: {
-                output: {
-                  status: "completed",
-                  findings: subResult.finalAssistant,
-                  artifact: subResult.artifact
-                    ? {
-                        title: subResult.artifact.title,
-                        summary: subResult.artifact.summary,
-                        type: subResult.artifact.artifactType,
-                      }
-                    : null,
-                  instruction:
-                    "Document analysis and extraction completed successfully. Speak the summary naturally to the user now.",
-                },
-              },
-            });
           }
-        } else if (call.name === "triggerScreenAction") {
-          turnTaskTriggeredRef.current = true;
-          // Await autonomous subagent execution (web search, data extraction, forms/tables)
-          const subResult = await launchBackgroundScreenTask(call.args, audioBase64);
+
+          const subResult = await launchBackgroundScreenTask(
+            call.args,
+            audioBase64,
+            imageBlob,
+            isCameraOn,
+          );
 
           if (
             subResult.savedImageUrl &&
@@ -1135,7 +1372,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
             turnFilesRef.current.push(subResult.savedImageUrl);
           }
 
-          // Push real sub-agent tool calls
+          // Push real sub-agent tool calls (including captureDocument, stageForm, webSearch, etc.)
           if (subResult.toolCalls && subResult.toolCalls.length > 0) {
             toolCallsRef.current.push(...subResult.toolCalls);
           } else {
@@ -1166,19 +1403,25 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                     }
                   : null,
                 instruction:
-                  "Screen action and research completed successfully. Speak the oral summary naturally to the user now.",
+                  "Screen action and vision processing completed successfully. Speak the oral summary naturally to the user now.",
               },
             },
           });
         } else if (call.name === "checkScreenActionStatus") {
           // Query live background task state in < 5ms
           const cur = backgroundTaskRef.current;
+          const isAnyDocUploading = attachedDocumentsRef.current.some((d) => d.status === "uploading");
+          const firstUploading = attachedDocumentsRef.current.find((d) => d.status === "uploading");
           const result = {
-            status: cur.status,
-            activeTool: cur.activeTool || "none",
-            description: cur.description || (cur.status === "completed" ? "Completed on screen" : "No active task"),
-            spokenHint: cur.spokenHint || (cur.status === "completed" ? "Form screen par taiyar ho chuka hai, aap ise dekh sakte hain." : "Abhi koi screen action active nahi hai."),
-            title: cur.artifact?.title,
+            status: isAnyDocUploading ? "uploading" : cur.status,
+            activeTool: isAnyDocUploading ? "document_upload" : (cur.activeTool || "none"),
+            description: isAnyDocUploading
+              ? `Uploading document ${firstUploading?.name} (${firstUploading?.progress}%)`
+              : (cur.description || (cur.status === "completed" ? "Completed on screen" : "No active task")),
+            spokenHint: isAnyDocUploading
+              ? "Aapka document upload ho raha hai, bas thoda sa intezar kijiye."
+              : (cur.spokenHint || (cur.status === "completed" ? "Form screen par taiyar ho chuka hai, aap ise dekh sakte hain." : "Abhi koi screen action active nahi hai.")),
+            title: cur.artifact?.title || firstUploading?.name,
           };
 
           toolCallsRef.current.push({
@@ -1300,6 +1543,8 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     }
     recorderRef.current?.stop();
     recorderRef.current = null;
+    setupCompleteRef.current = false;
+    micInitPromiseRef.current = null;
     playerRef.current?.stop();
     playerRef.current = null;
 
@@ -1341,7 +1586,25 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       if (validOverride) {
         activeChatIdRef.current = validOverride;
       }
-      disconnect();
+      clearThinkingTimeout();
+      flushAndPersistActiveTurn();
+
+      // Cleanly terminate any prior websocket without destroying the pre-warmed active microphone!
+      const prevSocket = socketRef.current;
+      socketRef.current = null;
+      if (prevSocket) {
+        prevSocket.onopen = null;
+        prevSocket.onmessage = null;
+        prevSocket.onerror = null;
+        prevSocket.onclose = null;
+        if (
+          prevSocket.readyState === WebSocket.OPEN ||
+          prevSocket.readyState === WebSocket.CONNECTING
+        ) {
+          prevSocket.close();
+        }
+      }
+
       setStatus("connecting");
       setErrorMessage(null);
       connectedRef.current = true;
@@ -1356,6 +1619,12 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       isHoldingRef.current = false;
       setIsHoldingToSpeak(false);
       turnTaskTriggeredRef.current = false;
+      setupCompleteRef.current = false;
+
+      // Warm up microphone in parallel with session negotiation if not already active
+      if (!recorderRef.current?.getIsRecording()) {
+        void startMicrophone();
+      }
 
       try {
         const currentChatId =
@@ -1397,7 +1666,10 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
         await player.init();
         playerRef.current = player;
 
-        const wsUrl = `wss://aiplatform.googleapis.com/ws/google.cloud.aiplatform.v1.LlmBidiService/BidiGenerateContent?access_token=${session.accessToken}`;
+        const wsHost = session.location ? `${session.location}-aiplatform.googleapis.com` : "us-central1-aiplatform.googleapis.com";
+        const wsUrl =
+          session.wsUrl ||
+          `wss://${wsHost}/ws/google.cloud.aiplatform.v1beta1.LlmBidiService/BidiGenerateContent?access_token=${session.accessToken}`;
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
 
@@ -1413,6 +1685,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                       prebuiltVoiceConfig: { voiceName: session.voiceName },
                     },
                   },
+                  mediaResolution: "MEDIA_RESOLUTION_LOW",
                 },
                 safetySettings: session.safetySettings || [
                   {
@@ -1463,46 +1736,12 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
                   : new TextDecoder().decode(event.data as ArrayBuffer);
             const message = JSON.parse(raw);
             if (message.setupComplete) {
-              const recorder = new PCMRecorder({
-                onChunk: (data) => {
-                  if (
-                    isHoldingRef.current &&
-                    !mutedRef.current &&
-                    !assistantSpeakingRef.current &&
-                    socketRef.current &&
-                    socketRef.current.readyState === WebSocket.OPEN
-                  ) {
-                    socketRef.current.send(
-                      JSON.stringify({
-                        realtimeInput: {
-                          mediaChunks: [
-                            {
-                              mimeType: `audio/pcm;rate=${GEMINI_LIVE_INPUT_SAMPLE_RATE}`,
-                              data,
-                            },
-                          ],
-                        },
-                      }),
-                    );
-                  }
-                },
-                onVolume: handleMicVolume,
-                onAudioLevel: handleAudioLevel,
-                onError: (error) => {
-                  setStatus("error");
-                  setErrorMessage(displayMicError(error));
-                },
-              });
-              recorderRef.current = recorder;
-              if (!(await recorder.start())) return;
+              setupCompleteRef.current = true;
+              const micReady = await startMicrophone();
+              if (!micReady) return;
               if (mutedRef.current) {
-                recorder.setMuted(true);
+                recorderRef.current?.setMuted(true);
               }
-              console.log(
-                "[voice] Gemini input sample rate:",
-                recorder.getNativeSampleRate(),
-              );
-              console.log("[voice] mic input info:", recorder.getInputInfo());
               setStatus("ready");
               if (pendingAutoStartCameraRef.current) {
                 pendingAutoStartCameraRef.current = false;
@@ -1547,12 +1786,10 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
 
             for (const part of serverContent?.modelTurn?.parts || []) {
               if (part.inlineData?.data) {
-                isExecutingToolRef.current = false;
                 if (isHoldingRef.current) continue;
                 playerRef.current?.playChunk(part.inlineData.data);
               }
               if (part.text && !assistantUsesOutputTranscriptRef.current) {
-                isExecutingToolRef.current = false;
                 assistantTranscriptRef.current = mergeTranscript(
                   assistantTranscriptRef.current,
                   part.text,
@@ -1580,7 +1817,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
               isExecutingToolRef.current = true;
               turnTaskTriggeredRef.current = true;
               clearFlushTimer();
-              await handleToolCalls(calls, socket);
+              void handleToolCalls(calls, socket);
             }
 
             if (serverContent?.turnComplete) {
@@ -1610,9 +1847,16 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
           );
         };
 
-        socket.onclose = () => {
+        socket.onclose = (event) => {
+          console.warn("[voice] WebSocket closed:", event.code, event.reason);
+          clearThinkingTimeout();
           if (connectedRef.current) {
             setStatus("disconnected");
+            if (event.code !== 1000) {
+              setErrorMessage(
+                `Voice session disconnected (${event.code}): ${event.reason || "Connection ended"}`,
+              );
+            }
           }
         };
       } catch (error) {
@@ -1636,6 +1880,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
       schedulePersistence,
       setAssistantSpeaking,
       startCamera,
+      startMicrophone,
     ],
   );
 
@@ -1694,6 +1939,7 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     setLanguage,
     connect,
     disconnect,
+    startMicrophone,
     toggleMute,
     startSpeaking,
     stopSpeaking,
@@ -1711,5 +1957,10 @@ export function useLiveAgent(options: LiveAgentOptions = {}) {
     switchCameraFacing,
     attachCameraVideoElement,
     captureDocumentManual,
+    attachedDocuments,
+    attachedDocument: attachedDocuments[0] || null,
+    attachDocuments,
+    attachDocument: (file: File) => attachDocuments([file]),
+    removeAttachedDocument,
   };
 }

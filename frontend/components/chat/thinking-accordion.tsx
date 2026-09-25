@@ -10,6 +10,7 @@ import {
   FolderGit2,
   FileText,
   Image as ImageIcon,
+  Camera,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,9 @@ function renderToolIcon(iconType?: string) {
   }
   if (t === "landmark" || t.includes("scheme") || t.includes("loan") || t.includes("mudra")) {
     return <Landmark className="size-4 text-orange" />;
+  }
+  if (t === "camera" || t.includes("camera") || t.includes("captured") || t.includes("capturedocument")) {
+    return <Camera className="size-4 text-emerald-500" />;
   }
   if (t === "image" || t.includes("img") || t.includes("photo")) {
     return <ImageIcon className="size-4 text-sky-500" />;

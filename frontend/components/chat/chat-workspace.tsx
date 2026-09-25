@@ -322,6 +322,9 @@ export function ChatWorkspace({
       // represents only creation or resolution of the durable chat session.
       liveAgent.setStatus("initializing");
 
+      // Pre-warm the microphone concurrently while resolving chat ID and initializing session
+      void liveAgent.startMicrophone();
+
       try {
         let targetId = activeChatId;
         if (!targetId) {
@@ -1144,6 +1147,11 @@ export function ChatWorkspace({
             onSwitchCameraFacing={liveAgent.switchCameraFacing}
             onAttachCameraVideoElement={liveAgent.attachCameraVideoElement}
             isSidebarOpen={isSidebarOpen}
+            attachedDocuments={liveAgent.attachedDocuments}
+            attachedDocument={liveAgent.attachedDocument}
+            onAttachDocuments={liveAgent.attachDocuments}
+            onAttachDocument={liveAgent.attachDocument}
+            onRemoveAttachedDocument={liveAgent.removeAttachedDocument}
           />
         ) : isNewChatView ? (
           /* NEW CHAT (Centered Hero View - only for blank /dashboard page) */

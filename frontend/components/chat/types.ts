@@ -11,14 +11,17 @@ export interface ToolCallItem {
 }
 
 
+export type AttachmentType = "DOCUMENT" | "IMAGE" | "PDF" | "SHEET";
+
 export interface ChatAttachment {
-  id: string;
-  uploadedName: string;
-  savedName: string;
+  id?: string;
+  name?: string;
   url: string;
-  type: "image" | "file";
-  mimeType: string;
+  type: AttachmentType | "image" | "file";
+  mimeType?: string;
   size?: number;
+  uploadedName?: string;
+  savedName?: string;
 }
 
 export interface ChatMessage {
